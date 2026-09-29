@@ -9,30 +9,69 @@ Status: Phases 0–6 done. See [TODO.md](./TODO.md) for the checkbox trail, [WOR
 - Frontend: `npm test` **24 passed** (validators, scan-shape, component contracts, landing incl. terminal-FX contract), `tsc --noEmit` clean, `next build` OK.
 - Backend: `pytest` **30 passed** (orchestrator partial/completed/failed, shodan/crtsh/whois mocked, auth 401, rate 429, perf). 2 errors in `test_cache.py`/`test_perf.py` are a Windows temp-dir `PermissionError` (env issue, `-p no:cacheprovider` still errors on `tmp_path` fixture) — unrelated to code; rerun on Linux/CI is clean.
 
+## Prereqs — install tools (sekali saja)
+
+Wajib: `Node 20+`, `Python 3.11+`, `Docker Desktop`, `Git`. Opsional: `openssl` (generate secret, sudah bawaan Git Bash/macOS/Linux).
+
+### Windows (winget, PowerShell Admin)
+
+```powershell
+winget install OpenJS.NodeJS.LTS Python.Python.3.11 Git.Git Docker.DockerDesktop
+```
+### Tutup + buka ulang terminal, lalu verifikasi:
+```node -v   # >= v20
+python --version  # >= 3.11
+docker --version
+git --version
+```
+
+### macOS (brew)
+
+```bash
+brew install node@20 python@3.11 git
+brew install --cask docker  # lalu buka Docker Desktop sekali
+node -v && python3 --version && docker --version && git --version
+```
+
+### Linux (apt, Ubuntu/Debian)
+
+```bash
+sudo apt update && sudo apt install -y nodejs npm python3 python3-venv git docker.io docker-compose-plugin
+node -v && python3 --version && docker --version && git --version
+sudo usermod -aG docker $USER  # relogin agar docker tanpa sudo
+```
+
+Lalu daftar API key gratis (cukup tier free untuk 1–2 host):
+- Shodan: https://account.shodan.io/ → copy key ke `backend/.env` sebagai `SHODAN_API_KEY`.
+
 ## Quickstart
 
-Backend dan frontend jalan di dua terminal terpisah. Pilih tab sesuai shell:
+### Backend dan frontend jalan di dua terminal terpisah. Pilih tab sesuai shell:
 
 ### PowerShell (Windows)
 
 ```powershell
 Copy-Item frontend\.env.local.example frontend\.env.local
 Copy-Item backend\.env.example backend\.env
-# Edit: SHODAN_API_KEY, BETTER_AUTH_SECRET (32+ random), DATABASE_URL
+### Edit: SHODAN_API_KEY, BETTER_AUTH_SECRET (32+ random), DATABASE_URL
 
 docker compose up -d postgres
-# DATABASE_URL=postgresql+asyncpg://osint:osint@localhost:5432/osint
+### DATABASE_URL=postgresql+asyncpg://osint:osint@localhost:5432/osint
+```
 
-# Terminal 1 — backend
+### Terminal 1 — backend
+```powershell
 cd backend
 python -m venv .venv
 .venv\Scripts\Activate.ps1
-# Jika ditolak policy: Set-ExecutionPolicy -Scope Process -ExecutionPolicy Bypass
+### Jika ditolak policy: Set-ExecutionPolicy -Scope Process -ExecutionPolicy Bypass
 pip install -r requirements.txt
 alembic upgrade head
 uvicorn app.main:app --reload --port 8000  # http://localhost:8000/docs
+```
 
-# Terminal 2 — frontend
+### Terminal 2 — frontend
+```powershell
 cd frontend
 npm install
 npm run dev  # http://localhost:3000
@@ -49,14 +88,16 @@ cp backend/.env.example backend/.env
 
 docker compose up -d postgres
 # DATABASE_URL=postgresql+asyncpg://osint:osint@localhost:5432/osint
-
-# Terminal 1 — backend
+```
+### Terminal 1 — backend
+```bash 
 cd backend && python -m venv .venv && source .venv/bin/activate
 pip install -r requirements.txt
 alembic upgrade head
 uvicorn app.main:app --reload --port 8000  # http://localhost:8000/docs
-
-# Terminal 2 — frontend
+```
+### Terminal 2 — frontend
+```bash
 cd frontend && npm install && npm run dev  # http://localhost:3000
 ```
 
