@@ -1,0 +1,11 @@
+.env
+.env.local
+*.db
+*.db-journal
+node_modules/
+.next/
+__pycache__/
+*.pyc
+.venv/
+dist/
+.vscode

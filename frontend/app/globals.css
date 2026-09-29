@@ -1,0 +1,31 @@
+@tailwind base;
+@tailwind components;
+@tailwind utilities;
+
+:root {
+  --background: 0 0% 100%;
+  --foreground: 222 47% 11%;
+  --skeleton: 0 0% 90%;
+  --btn-border: 214 32% 91%;
+  --input: 220 20% 90%;
+  --radius: 0.5rem;
+}
+.dark {
+  --background: 222 47% 7%;
+  --foreground: 210 40% 96%;
+  --skeleton: 218 36% 16%;
+  --btn-border: 217 33% 18%;
+  --input: 219 63% 16%;
+  --radius: 0.5rem;
+}
+body {
+  background-color: hsl(var(--background));
+  color: hsl(var(--foreground));
+}
+
+@layer components {
+  .g-button {
+    border-radius: var(--radius);
+    border: 1px solid hsl(var(--btn-border));
+  }
+}
