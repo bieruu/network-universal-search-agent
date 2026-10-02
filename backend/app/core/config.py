@@ -1,3 +1,4 @@
+import os
 from typing import Literal
 
 from pydantic_settings import BaseSettings, SettingsConfigDict
@@ -22,6 +23,19 @@ class Settings(BaseSettings):
     @property
     def cors_list(self) -> list[str]:
         return [o.strip() for o in self.cors_origins.split(",") if o.strip()]
+
+    @property
+    def is_production(self) -> bool:
+        return os.getenv("APP_ENV", "").lower() == "production" or os.getenv(
+            "NODE_ENV", ""
+        ).lower() == "production"
+
+    def model_post_init(self, __context):
+        if self.is_production and (
+            not self.better_auth_secret
+            or self.better_auth_secret in {"change-me-32-chars-min", "dev-secret-min-32-chars-change-me-xxxx"}
+        ):
+            raise ValueError("BETTER_AUTH_SECRET must be set to a non-default value in production")
 
 
 settings = Settings()

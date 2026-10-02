@@ -1,16 +1,13 @@
-import Image from "next/image";
 import { Card, CardTitle } from "@/components/ui/card";
 import { Certificate, Database, HardDrives, LockKey, TrendUp } from "@phosphor-icons/react/dist/ssr";
 import Reveal from "./Reveal";
 
-// 5 cells for 5 contents: shodan, crt.sh, whois, trends, auth/audit.
-// 3 cells carry a visual (2 photos + 1 tinted terminal strip).
 const CELLS = [
   {
     icon: HardDrives,
     title: "Open ports & banners",
     body: "Shodan host data mapped to port, product, version. Banners truncated, rendered as plain text.",
-    visual: "photo-server" as const,
+    visual: "grid" as const,
   },
   {
     icon: Certificate,
@@ -28,7 +25,7 @@ const CELLS = [
     icon: TrendUp,
     title: "Risk trend per target",
     body: "Transparent heuristic v1 scored on every scan. Last 10 scans charted, snapshots immutable.",
-    visual: "photo-certs" as const,
+    visual: "metrics" as const,
   },
   {
     icon: LockKey,
@@ -39,32 +36,23 @@ const CELLS = [
 ];
 
 function Visual({ kind }: { kind: (typeof CELLS)[number]["visual"] }) {
-  if (kind === "photo-server")
+  if (kind === "grid")
     return (
-      <div className="relative mt-4 h-36 overflow-hidden rounded-xl">
-        <Image
-          src="https://picsum.photos/seed/server-rack/800/600"
-          alt="Server rack in a dark data center"
-          fill
-          sizes="(max-width: 768px) 100vw, 400px"
-          className="object-cover"
-          loading="lazy"
-        />
-        {/* TODO: ganti foto asli */}
+      <div className="mt-4 grid h-36 grid-cols-3 gap-2 rounded-xl border border-accent/15 bg-slate-900/95 p-2">
+        <div className="rounded-md bg-accent/30" />
+        <div className="rounded-md bg-slate-700" />
+        <div className="rounded-md bg-accent/20" />
+        <div className="rounded-md bg-slate-800" />
+        <div className="rounded-md bg-accent/35" />
+        <div className="rounded-md bg-slate-700" />
       </div>
     );
-  if (kind === "photo-certs")
+  if (kind === "metrics")
     return (
-      <div className="relative mt-4 h-36 overflow-hidden rounded-xl">
-        <Image
-          src="https://picsum.photos/seed/tls-certs/800/600"
-          alt="Close-up of network hardware status lights"
-          fill
-          sizes="(max-width: 768px) 100vw, 400px"
-          className="object-cover"
-          loading="lazy"
-        />
-        {/* TODO: ganti foto asli */}
+      <div className="mt-4 flex h-36 items-end gap-2 rounded-xl border border-accent/15 bg-slate-900/95 p-3">
+        {[26, 34, 62, 48, 72, 58, 92].map((value, index) => (
+          <div key={value + index} className="flex-1 rounded-t-md bg-gradient-to-t from-accent/70 to-emerald-300/90" style={{ height: `${value}px` }} />
+        ))}
       </div>
     );
   if (kind === "tint")

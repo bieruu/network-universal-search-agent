@@ -13,28 +13,28 @@ const SCANS = [
   {
     command: "scan example.com",
     output: [
-      "shodan  93.184.216.34 · 2 ports · 0 vulns",
-      "crt.sh  3 subdomains · issuer Lets Encrypt",
-      "whois   registrar RESERVED · emails redacted",
-      "risk    18/100 (heuristic v1) · status partial",
+      "shodan  passive source · 2 ports seen",
+      "crt.sh  3 cert names · issuer letsencrypt",
+      "whois   registrar reserved · emails redacted",
+      "risk    heuristic match · status partial",
     ],
   },
   {
     command: "scan api.acme.co",
     output: [
-      "shodan  104.16.120.10 · 6 ports · 1 vuln",
-      "crt.sh  12 subdomains · issuer Sectigo",
-      "whois   registrar Namecheap · ns 3 found",
-      "risk    33/100 · status elevated",
+      "shodan  passive source · 6 ports seen",
+      "crt.sh  12 names found · issuer sectigo",
+      "whois   registrar namecheap · ns 3 found",
+      "risk    heuristic match · status elevated",
     ],
   },
   {
     command: "scan portal.nova.io",
     output: [
-      "shodan  198.51.100.7 · 8 ports · 2 vulns",
-      "crt.sh  9 subdomains · issuer DigiCert",
-      "whois   registrar Cloudflare · emails masked",
-      "risk    27/100 · status monitored",
+      "shodan  passive source · 8 ports seen",
+      "crt.sh  9 names found · issuer digicert",
+      "whois   registrar cloudflare · emails masked",
+      "risk    heuristic match · status monitored",
     ],
   },
 ] as const;

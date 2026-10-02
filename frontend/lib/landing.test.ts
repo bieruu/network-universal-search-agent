@@ -31,9 +31,9 @@ test("no raw HTML injection vectors", () => {
   }
 });
 
-test("remote images are placeholders with replacement slots", () => {
-  assert.ok(all.includes("picsum.photos/seed/"), "picsum seeds required");
-  assert.ok(all.includes("TODO: ganti foto asli"), "replacement TODO required");
+test("no placeholder remote-image scaffolding remains", () => {
+  assert.ok(!all.includes("picsum.photos/seed/"), "picsum placeholders must be removed");
+  assert.ok(!all.includes("TODO: ganti foto asli"), "placeholder TODO must be removed");
 });
 
 test("terminal typing FX contract", () => {

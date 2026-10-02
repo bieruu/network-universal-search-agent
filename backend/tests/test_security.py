@@ -1,3 +1,9 @@
+import base64
+import hashlib
+import hmac
+import json
+import time
+
 import pytest
 from fastapi import HTTPException
 
@@ -41,11 +47,32 @@ async def test_random_bearer_rejected_fail_closed():
 
 
 @pytest.mark.asyncio
-async def test_cookie_session_accepted_without_token_material():
+async def test_fake_cookie_rejected_fail_closed(monkeypatch):
+    from app.core.config import settings
+
+    monkeypatch.setattr(settings, "better_auth_secret", "s3cr3t-shared-value-32chars!!")
+    with pytest.raises(HTTPException) as e:
+        await require_user(
+            authorization=None, cookie="better-auth.session_token=abc; other=1"
+        )
+    assert e.value.status_code == 401
+
+
+@pytest.mark.asyncio
+async def test_signed_cookie_accepted(monkeypatch):
+    from app.core.config import settings
+
+    secret = "s3cr3t-shared-value-32chars!!"
+    monkeypatch.setattr(settings, "better_auth_secret", secret)
+    payload = {"sub": "alice@example.com", "exp": int(time.time()) + 60}
+    payload_bytes = json.dumps(payload, separators=(",", ":"), sort_keys=True).encode("utf-8")
+    raw = base64.urlsafe_b64encode(payload_bytes).rstrip(b"=").decode("ascii")
+    signature = hmac.new(secret.encode("utf-8"), payload_bytes, hashlib.sha256).hexdigest()
     uid = await require_user(
-        authorization=None, cookie="better-auth.session_token=abc; other=1"
+        authorization=None,
+        cookie=f"better-auth.session_token={raw}.{signature}; other=1",
     )
-    assert uid == "user:session"
+    assert uid == "user:alice@example.com"
 
 
 @pytest.mark.asyncio

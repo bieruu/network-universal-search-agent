@@ -1,7 +1,5 @@
-import Image from "next/image";
 import Reveal from "./Reveal";
 
-// Numbered rows — different family from the bento cards above.
 const STEPS = [
   {
     n: "01",
@@ -47,16 +45,27 @@ export default function HowItWorks() {
             ))}
           </ol>
         </div>
-        <Reveal delay={0.1} className="relative min-h-72 overflow-hidden rounded-2xl">
-          <Image
-            src="https://picsum.photos/seed/soc-analyst/800/1000"
-            alt="Security analyst workstation in a dark operations room"
-            fill
-            sizes="(max-width: 1024px) 100vw, 600px"
-            className="object-cover"
-            loading="lazy"
-          />
-          {/* TODO: ganti foto asli */}
+        <Reveal delay={0.1} className="relative min-h-72 overflow-hidden rounded-2xl border border-neutral-200 bg-gradient-to-br from-accent/10 via-slate-100 to-slate-200 p-5 dark:border-neutral-800 dark:from-accent/10 dark:via-neutral-900 dark:to-[#101923]">
+          <div className="flex h-full flex-col justify-between">
+            <div className="flex items-center justify-between text-[10px] uppercase tracking-[0.2em] text-slate-500 dark:text-neutral-400">
+              <span>ops</span>
+              <span>live</span>
+            </div>
+            <div className="mt-6 grid gap-2">
+              <div className="h-4 w-2/3 rounded-full bg-accent/40" />
+              <div className="h-4 w-5/6 rounded-full bg-slate-300 dark:bg-neutral-700" />
+              <div className="h-4 w-2/5 rounded-full bg-accent/25" />
+            </div>
+            <div className="mt-8 space-y-3 rounded-xl border border-neutral-200 bg-white/70 p-3 shadow-sm dark:border-neutral-800 dark:bg-neutral-900/80">
+              <div className="flex items-center justify-between text-xs text-slate-600 dark:text-neutral-400">
+                <span>risk signal</span>
+                <span className="font-mono text-accent">heuristic</span>
+              </div>
+              <div className="h-2 overflow-hidden rounded-full bg-slate-200 dark:bg-neutral-800">
+                <div className="h-full w-1/3 rounded-full bg-gradient-to-r from-emerald-400 to-accent" />
+              </div>
+            </div>
+          </div>
         </Reveal>
       </div>
     </section>
