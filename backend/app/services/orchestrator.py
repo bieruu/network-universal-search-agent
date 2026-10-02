@@ -3,6 +3,7 @@
 from __future__ import annotations
 
 import asyncio
+import re
 import uuid
 from datetime import datetime, timezone
 from typing import Any
@@ -17,8 +18,29 @@ from app.services import crtsh_service, risk, shodan_service, whois_service
 async def _with_timeout(coro, seconds: int, source: str) -> Any:
     try:
         return await asyncio.wait_for(coro, timeout=seconds)
+    except asyncio.TimeoutError as e:
+        raise RuntimeError(
+            f"{source}: timed out after {seconds}s — retry with Re-scan"
+        ) from e
     except Exception as e:
-        raise RuntimeError(f"{source}: {type(e).__name__}: {e}") from e
+        raise RuntimeError(sanitize_error(source, e)) from e
+
+
+def sanitize_error(source: str, e: BaseException) -> str:
+    """Build a user-safe error message. Never leaks query params (API keys)."""
+    status = getattr(getattr(e, "response", None), "status_code", None)
+    msg = str(e)[:500]
+    # Strip anything that looks like an API key in a URL.
+    msg = re.sub(r"([?&]key=)[^&\s]+", r"\1…", msg)
+    msg = re.sub(r"key=\S+", "key=…", msg)
+    # Service-curated messages are already user-safe; don't double-prefix them.
+    if isinstance(e, RuntimeError) and msg[:6].lower() in ("shodan", "crt.sh"):
+        return msg[:500]
+    if status is not None:
+        return f"{source}: HTTP {status} — {msg}"[:500]
+    if isinstance(e, (asyncio.TimeoutError, TimeoutError)):
+        return f"{source}: timed out — retry with Re-scan"[:500]
+    return f"{source}: {type(e).__name__}: {msg}"[:500]
 
 
 async def gather_results(

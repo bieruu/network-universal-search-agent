@@ -15,7 +15,7 @@ import httpx
 import pytest
 
 from app.core.config import settings
-from app.services import orchestrator, whois_service
+from app.services import orchestrator, shodan_service, whois_service
 
 
 async def _no_cache_get(key: str):
@@ -146,3 +146,168 @@ async def test_full_failure_all_sources_down_never_raises(monkeypatch):
     )  # must not raise
     assert payload["status"] == "failed"
     assert len(payload["errors"]) == 3
+
+
+@pytest.mark.asyncio
+async def test_shodan_403_cdn_ip_becomes_partial_without_key_leak(monkeypatch):
+    """discord.com case: Cloudflare IP → Shodan 403 → friendly partial, key stripped."""
+    monkeypatch.setattr(settings, "shodan_api_key", "SECRET-KEY-123")
+    _stub_cache(monkeypatch)
+
+    req = httpx.Request(
+        "GET", "https://api.shodan.io/shodan/host/162.159.138.232?key=SECRET-KEY-123"
+    )
+    resp = httpx.Response(403, request=req)
+
+    class _Client403:
+        async def get(self, url, params=None):
+            raise httpx.HTTPStatusError(
+                "Client error '403 Forbidden' for url 'https://api.shodan.io/shodan/host/162.159.138.232?key=SECRET-KEY-123'",
+                request=req,
+                response=resp,
+            )
+
+    with pytest.raises(RuntimeError, match="CDN/WAF"):
+        await shodan_service.lookup("162.159.138.232", client=_Client403())
+    try:
+        await shodan_service.lookup("162.159.138.232", client=_Client403())
+    except RuntimeError as e:
+        assert "SECRET-KEY-123" not in str(e)
+
+    # End-to-end through the orchestrator: partial + sanitized errors[].
+    async def shodan_403(target, client=None):
+        raise RuntimeError(
+            "Shodan has no data for 162.159.138.232 (likely CDN/WAF IP) or plan limit (HTTP 403)"
+        )
+
+    async def crtsh_timeout(target, client=None):
+        raise RuntimeError(
+            "crt.sh timed out for discord.com (large zone) — retry with Re-scan"
+        )
+
+    monkeypatch.setattr(orchestrator.shodan_service, "lookup", shodan_403)
+    monkeypatch.setattr(orchestrator.crtsh_service, "lookup", crtsh_timeout)
+    monkeypatch.setattr(orchestrator.whois_service, "lookup", _ok_whois)
+
+    payload = await orchestrator.run_scan("discord.com", "u1", force=True)
+    assert payload["status"] == "partial"
+    assert "whois" in payload["results"]
+    blob = " ".join(e["message"] for e in payload["errors"])
+    assert "SECRET-KEY-123" not in blob
+    assert "key=" not in blob
+    assert any(
+        "timed out" in e["message"] for e in payload["errors"] if e["source"] == "crtsh"
+    )
+
+
+def test_sanitize_error_strips_api_key():
+    req = httpx.Request(
+        "GET", "https://api.shodan.io/shodan/host/1.1.1.1?key=SUPERSECRET"
+    )
+    resp = httpx.Response(403, request=req)
+    err = httpx.HTTPStatusError(
+        "Client error '403 Forbidden' for url 'https://api.shodan.io/shodan/host/1.1.1.1?key=SUPERSECRET'",
+        request=req,
+        response=resp,
+    )
+    msg = orchestrator.sanitize_error("shodan", err)
+    assert "SUPERSECRET" not in msg
+    assert "403" in msg
+
+
+@pytest.mark.asyncio
+async def test_crtsh_retries_then_friendly_timeout(monkeypatch):
+    """Large zones: 2 transient timeouts then success still count (no instant fail)."""
+    from app.services import crtsh_service
+
+    calls = {"n": 0}
+
+    class _Flaky:
+        async def get(self, url, params=None):
+            calls["n"] += 1
+            if calls["n"] < 3:
+                raise httpx.ConnectTimeout("slow", request=httpx.Request("GET", url))
+
+            class _R:
+                def raise_for_status(self):
+                    return None
+
+                def json(self):
+                    return [
+                        {
+                            "name_value": "a.discord.com",
+                            "issuer_name": "CA",
+                            "not_before": "",
+                            "not_after": "",
+                        }
+                    ]
+
+            return _R()
+
+    _real_sleep = asyncio.sleep
+    monkeypatch.setattr(crtsh_service.asyncio, "sleep", lambda *a, **k: _real_sleep(0))
+    out = await crtsh_service.lookup("discord.com", client=_Flaky())
+    assert out["count"] == 1
+    assert calls["n"] == 3
+
+
+@pytest.mark.asyncio
+async def test_crtsh_502_retries_then_succeeds(monkeypatch):
+    """Transient crt.sh 502/503 (e.g. skills.sh) recovers within the retry budget."""
+    from app.services import crtsh_service
+
+    _real_sleep = asyncio.sleep
+    monkeypatch.setattr(crtsh_service.asyncio, "sleep", lambda *a, **k: _real_sleep(0))
+    calls = {"n": 0}
+
+    class _Flappy502:
+        async def get(self, url, params=None):
+            calls["n"] += 1
+            req = httpx.Request("GET", url)
+            if calls["n"] < 3:
+                raise httpx.HTTPStatusError(
+                    "Server error '502 Bad Gateway'",
+                    request=req,
+                    response=httpx.Response(502, request=req),
+                )
+
+            class _R:
+                def raise_for_status(self):
+                    return None
+
+                def json(self):
+                    return [
+                        {
+                            "name_value": "skills.sh",
+                            "issuer_name": "CA",
+                            "not_before": "",
+                            "not_after": "",
+                        }
+                    ]
+
+            return _R()
+
+    out = await crtsh_service.lookup("skills.sh", client=_Flappy502())
+    assert out["count"] == 1
+    assert calls["n"] == 3
+
+
+@pytest.mark.asyncio
+async def test_crtsh_persistent_502_gives_retry_hint(monkeypatch):
+    """crt.sh down on all attempts → friendly error telling the user to Re-scan."""
+    from app.services import crtsh_service
+
+    _real_sleep = asyncio.sleep
+    monkeypatch.setattr(crtsh_service.asyncio, "sleep", lambda *a, **k: _real_sleep(0))
+
+    class _Always502:
+        async def get(self, url, params=None):
+            req = httpx.Request("GET", url)
+            raise httpx.HTTPStatusError(
+                "Server error '502 Bad Gateway'",
+                request=req,
+                response=httpx.Response(502, request=req),
+            )
+
+    with pytest.raises(RuntimeError, match="Re-scan"):
+        await crtsh_service.lookup("skills.sh", client=_Always502())

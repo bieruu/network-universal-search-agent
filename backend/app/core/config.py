@@ -14,7 +14,7 @@ class Settings(BaseSettings):
     shodan_api_key: str = ""
     better_auth_secret: str = "change-me-32-chars-min"
     scan_timeout_shodan: int = 12
-    scan_timeout_crtsh: int = 15
+    scan_timeout_crtsh: int = 30
     scan_timeout_whois: int = 10
     rate_limit_per_hour: int = 10
     cache_ttl_hours: int = 24
