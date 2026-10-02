@@ -1,5 +1,5 @@
 "use client";
-import { Card, CardTitle } from "@/components/ui/card";
+import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
 import { Skeleton } from "@/components/ui/skeleton";
 import { Table, THead, TRow, TH, TD } from "@/components/ui/table";
 import type { ScanResult } from "@/lib/api";
@@ -14,32 +14,45 @@ export default function SubdomainsTable({
 }) {
   const rows = getSubdomains(scan?.results);
   return (
-    <Card>
-      <CardTitle>Subdomains (crt.sh)</CardTitle>
-      {loading ? (
-        <Skeleton className="mt-2 h-24" />
-      ) : rows.length === 0 ? (
-        <p className="mt-2 text-sm opacity-60">No subdomains found.</p>
-      ) : (
-        <Table>
-          <THead>
-            <TRow>
-              <TH>Subdomain</TH>
-              <TH>Issuer</TH>
-              <TH>Expires</TH>
-            </TRow>
-          </THead>
-          <tbody>
-            {rows.slice(0, 100).map((r) => (
-              <TRow key={r.subdomain}>
-                <TD>{r.subdomain}</TD>
-                <TD>{r.issuer ?? "—"}</TD>
-                <TD>{r.not_after ?? "—"}</TD>
-              </TRow>
-            ))}
-          </tbody>
-        </Table>
-      )}
+    <Card className="flex flex-col">
+      <CardHeader>
+        <CardTitle>Subdomains (crt.sh)</CardTitle>
+        <CardDescription>
+          {rows.length} subdomain{rows.length === 1 ? "" : "s"} found
+        </CardDescription>
+      </CardHeader>
+      <CardContent>
+        {loading ? (
+          <Skeleton className="h-24" />
+        ) : rows.length === 0 ? (
+          <p className="text-sm text-slate-500 dark:text-neutral-500">
+            {scan?.errors.some((e) => e.source === "crtsh")
+              ? "crt.sh returned no data (large zones can time out) — see the source error above."
+              : "No subdomains found."}
+          </p>
+        ) : (
+          <div className="max-h-[320px] overflow-auto">
+            <Table>
+              <THead>
+                <TRow>
+                  <TH>Subdomain</TH>
+                  <TH>Issuer</TH>
+                  <TH>Expires</TH>
+                </TRow>
+              </THead>
+              <tbody>
+                {rows.slice(0, 100).map((r) => (
+                  <TRow key={r.subdomain}>
+                    <TD className="font-mono">{r.subdomain}</TD>
+                    <TD>{r.issuer ?? "—"}</TD>
+                    <TD>{r.not_after ?? "—"}</TD>
+                  </TRow>
+                ))}
+              </tbody>
+            </Table>
+          </div>
+        )}
+      </CardContent>
     </Card>
   );
 }

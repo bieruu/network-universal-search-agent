@@ -10,7 +10,7 @@ export default function ScanStatus({ scan }: { scan: ScanResult | null }) {
       <Badge variant={variant}>{scan.status}</Badge>
       <span className="text-xs opacity-70">scan_id: {scan.scan_id}</span>
       {scan.errors.length > 0 && (
-        <span className="text-xs text-amber-300">
+        <span className="text-xs text-warning">
           {scan.errors.length} source error(s)
         </span>
       )}

@@ -12,7 +12,7 @@ const MONOGRAMS = ["shodan", "crt.sh", "whois"] as const;
 
 export default function LogoStrip() {
   return (
-    <section aria-label="Sources and stack" className="border-y border-neutral-800/80">
+    <section aria-label="Sources and stack" className="border-y border-neutral-200 dark:border-neutral-800/80">
       <div className="mx-auto flex max-w-7xl flex-wrap items-center justify-center gap-x-10 gap-y-4 px-4 py-6 sm:px-6">
         {LOGOS.map((l) => (
           <Reveal key={l.name}>
@@ -22,7 +22,7 @@ export default function LogoStrip() {
         ))}
         {MONOGRAMS.map((m) => (
           <Reveal key={m}>
-            <span className="font-mono text-sm font-semibold text-[#00E59B]">{m}</span>
+            <span className="font-mono text-sm font-semibold text-accent">{m}</span>
           </Reveal>
         ))}
       </div>

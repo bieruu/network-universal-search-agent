@@ -8,14 +8,28 @@
   --skeleton: 0 0% 90%;
   --btn-border: 214 32% 91%;
   --input: 220 20% 90%;
+  --accent: 160 100% 32%;
+  --accent-foreground: 0 0% 0%;
+  --accent-hover: 160 100% 28%;
+  --muted: 220 14% 46%;
+  --warning: 32 95% 44%;
+  --danger: 0 72% 51%;
+  --panel: 210 40% 98%;
   --radius: 0.5rem;
 }
 .dark {
-  --background: 222 47% 7%;
+  --background: 210 33% 6%;
   --foreground: 210 40% 96%;
-  --skeleton: 218 36% 16%;
-  --btn-border: 217 33% 18%;
-  --input: 219 63% 16%;
+  --skeleton: 0 0% 15%;
+  --btn-border: 0 0% 20%;
+  --input: 0 0% 9%;
+  --accent: 160 100% 45%;
+  --accent-foreground: 0 0% 0%;
+  --accent-hover: 160 84% 55%;
+  --muted: 0 0% 64%;
+  --warning: 46 100% 70%;
+  --danger: 0 91% 71%;
+  --panel: 210 32% 7%;
   --radius: 0.5rem;
 }
 body {

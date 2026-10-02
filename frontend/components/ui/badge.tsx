@@ -5,13 +5,15 @@ export function Badge({
   className,
   variant = "default",
   ...props
-}: React.HTMLAttributes<HTMLSpanElement> & { variant?: "default" | "destructive" | "outline" }) {
+}: React.HTMLAttributes<HTMLSpanElement> & { variant?: "default" | "destructive" | "outline" | "secondary" }) {
   const styles =
     variant === "destructive"
-      ? "bg-red-950 text-red-300 border-red-800"
+      ? "border-red-200 bg-red-100 text-red-700 dark:border-red-800 dark:bg-red-950 dark:text-red-300"
       : variant === "outline"
-        ? "border-neutral-700 text-neutral-300"
-        : "bg-neutral-800 text-neutral-100 border-neutral-700";
+        ? "border-btn-border text-slate-600 dark:text-neutral-400"
+        : variant === "secondary"
+          ? "bg-input text-foreground border-btn-border"
+          : "bg-input text-foreground border-btn-border";
   return (
     <span
       className={cn("inline-flex items-center rounded-full border px-2.5 py-0.5 text-xs", styles, className)}

@@ -1,27 +1,62 @@
 "use client";
 
 import { useEffect, useState } from "react";
-import { motion, useReducedMotion } from "motion/react";
+import { AnimatePresence, motion, useReducedMotion } from "motion/react";
 
 // Terminal typing effect: the command is typed char-by-char, then output
-// lines appear sequentially like a real execution. Static full output when
-// reduced motion is on; full text is also SSR'd (see Hero fallback).
-const COMMAND = "scan example.com";
-const OUTPUT = [
-  "shodan  93.184.216.34 · 2 ports · 0 vulns",
-  "crt.sh  3 subdomains · issuer Lets Encrypt",
-  "whois   registrar RESERVED · emails redacted",
-  "risk    18/100 (heuristic v1) · status partial",
+// lines appear sequentially like a real execution. Between two samples it
+// types `clear`, then the screen wipes itself out (staggered fade + slide-up)
+// before the next scan, so the rotation reads like one continuous shell
+// session instead of an abrupt jump. Static full output when reduced motion
+// is on; full text is also SSR'd (see Hero fallback).
+const SCANS = [
+  {
+    command: "scan example.com",
+    output: [
+      "shodan  93.184.216.34 · 2 ports · 0 vulns",
+      "crt.sh  3 subdomains · issuer Lets Encrypt",
+      "whois   registrar RESERVED · emails redacted",
+      "risk    18/100 (heuristic v1) · status partial",
+    ],
+  },
+  {
+    command: "scan api.acme.co",
+    output: [
+      "shodan  104.16.120.10 · 6 ports · 1 vuln",
+      "crt.sh  12 subdomains · issuer Sectigo",
+      "whois   registrar Namecheap · ns 3 found",
+      "risk    33/100 · status elevated",
+    ],
+  },
+  {
+    command: "scan portal.nova.io",
+    output: [
+      "shodan  198.51.100.7 · 8 ports · 2 vulns",
+      "crt.sh  9 subdomains · issuer DigiCert",
+      "whois   registrar Cloudflare · emails masked",
+      "risk    27/100 · status monitored",
+    ],
+  },
 ] as const;
 
 const CHAR_MS = 28;
 const LINE_PAUSE_MS = 320;
+const LOOP_DELAY_MS = 1000; // pause after output before typing `clear`
+const CLEAR_CMD = "clear";
+const CLEAR_PAUSE_MS = 650; // hold `clear` on screen (the "enter" beat)
+const CLEAR_BLANK_MS = 520; // wipe + blank beat before the next sample
+const CLEAR_EXIT_MS = 0.22; // per-line clear (wipe) animation duration, seconds
+const CLEAR_STAGGER_S = 0.045; // top-to-bottom cascade between cleared lines
 
 export default function TerminalTyper() {
   const reduce = useReducedMotion();
   const [mounted, setMounted] = useState(false);
+  const [scanIndex, setScanIndex] = useState(0);
   const [chars, setChars] = useState(0);
   const [lines, setLines] = useState(0);
+  // null = idle; 0..CLEAR_CMD.length = typing `clear`;
+  // CLEAR_CMD.length + 1 = screen blanked, waiting for the next scan.
+  const [clearChars, setClearChars] = useState<number | null>(null);
 
   useEffect(() => {
     setMounted(true);
@@ -29,20 +64,50 @@ export default function TerminalTyper() {
 
   useEffect(() => {
     if (!mounted) return;
+    const scan = SCANS[scanIndex];
     if (reduce) {
-      setChars(COMMAND.length);
-      setLines(OUTPUT.length);
+      setChars(scan.command.length);
+      setLines(scan.output.length);
+      setClearChars(null);
       return;
     }
-    if (chars < COMMAND.length) {
+
+    // 1) Type the scan command, char-by-char.
+    if (clearChars === null && chars < scan.command.length) {
       const t = setTimeout(() => setChars((c) => c + 1), CHAR_MS);
       return () => clearTimeout(t);
     }
-    if (lines < OUTPUT.length) {
+    // 2) Print the output lines sequentially.
+    if (clearChars === null && lines < scan.output.length) {
       const t = setTimeout(() => setLines((l) => l + 1), LINE_PAUSE_MS);
       return () => clearTimeout(t);
     }
-  }, [mounted, chars, lines, reduce]);
+    // 3) Output done → hold, then start typing `clear`.
+    if (clearChars === null) {
+      const t = setTimeout(() => setClearChars(0), LOOP_DELAY_MS);
+      return () => clearTimeout(t);
+    }
+    // 4) Type `clear`, char-by-char, on the prompt line.
+    if (clearChars < CLEAR_CMD.length) {
+      const t = setTimeout(() => setClearChars((c) => (c ?? 0) + 1), CHAR_MS);
+      return () => clearTimeout(t);
+    }
+    // 5) `clear` typed → hold on screen, then blank the terminal.
+    if (clearChars === CLEAR_CMD.length) {
+      const t = setTimeout(() => setClearChars(CLEAR_CMD.length + 1), CLEAR_PAUSE_MS);
+      return () => clearTimeout(t);
+    }
+    // 6) Blank beat → advance to the next sample and restart from zero.
+    const t = setTimeout(() => {
+      setScanIndex((index) => (index + 1 === SCANS.length ? 0 : index + 1));
+      setChars(0);
+      setLines(0);
+      setClearChars(null);
+    }, CLEAR_BLANK_MS);
+    return () => clearTimeout(t);
+  }, [mounted, chars, lines, clearChars, reduce, scanIndex]);
+
+  const scan = SCANS[scanIndex];
 
   // SSR + first paint + no-JS: full static text (SEO/accessible baseline).
   // After mount, the typing performance takes over from zero.
@@ -50,11 +115,11 @@ export default function TerminalTyper() {
     return (
       <div className="space-y-1.5">
         <p className="truncate">
-          <span className="text-[#00E59B]">$ </span>
-          <span className="text-neutral-100">{COMMAND}</span>
+          <span className="text-accent">$ </span>
+          <span className="text-slate-900 dark:text-neutral-100">{scan.command}</span>
         </p>
-        {OUTPUT.map((l) => (
-          <p key={l} className="truncate text-neutral-400">
+        {scan.output.map((l) => (
+          <p key={l} className="truncate text-slate-600 dark:text-neutral-400">
             {l}
           </p>
         ))}
@@ -62,33 +127,67 @@ export default function TerminalTyper() {
     );
   }
 
-  const done = chars >= COMMAND.length && lines >= OUTPUT.length;
+  const commandDone = chars >= scan.command.length;
+  const done = commandDone && lines >= scan.output.length;
+  const typingClear = clearChars !== null && clearChars <= CLEAR_CMD.length;
+  const blank = clearChars === CLEAR_CMD.length + 1;
 
   return (
     <div aria-live="polite" className="space-y-1.5">
-      <p className="truncate">
-        <span className="text-[#00E59B]">$ </span>
-        <span className="text-neutral-100">{COMMAND.slice(0, chars)}</span>
-        {!done && (
-          <span aria-hidden="true" className="ml-0.5 inline-block h-4 w-2 animate-pulse bg-[#00E59B]" />
+      {/* On `clear` the live lines wipe out (staggered, top-to-bottom) instead
+          of vanishing instantly — the terminal "scrolls itself" clean. */}
+      <AnimatePresence>
+        {!blank && (
+          <motion.p
+            key={`cmd-${scan.command}`}
+            className="truncate"
+            exit={{ opacity: 0, y: -6, transition: { duration: CLEAR_EXIT_MS, ease: "easeIn" } }}
+          >
+            <span className="text-accent">$ </span>
+            <span className="text-slate-900 dark:text-neutral-100">{scan.command.slice(0, chars)}</span>
+            {!commandDone && (
+              <span aria-hidden="true" className="ml-0.5 inline-block h-4 w-2 animate-pulse bg-accent" />
+            )}
+          </motion.p>
         )}
-      </p>
-      {OUTPUT.slice(0, lines).map((l, i) => (
-        <motion.p
-          key={l}
-          className="truncate text-neutral-400"
-          initial={reduce ? false : { opacity: 0, y: 8 }}
-          animate={{ opacity: 1, y: 0 }}
-          transition={{ type: "spring", stiffness: 100, damping: 20 }}
-        >
-          <span className="sr-only">{`output line ${i + 1}: `}</span>
-          {l}
-        </motion.p>
-      ))}
+        {!blank &&
+          scan.output.slice(0, lines).map((l, i) => (
+            <motion.p
+              key={`${scan.command}-${l}`}
+              className="truncate text-slate-600 dark:text-neutral-400"
+              initial={reduce ? false : { opacity: 0, y: 8 }}
+              animate={{ opacity: 1, y: 0 }}
+              transition={{ type: "spring", stiffness: 100, damping: 20 }}
+              exit={{
+                opacity: 0,
+                y: -6,
+                transition: {
+                  duration: CLEAR_EXIT_MS,
+                  ease: "easeIn",
+                  delay: (i + 1) * CLEAR_STAGGER_S,
+                },
+              }}
+            >
+              <span className="sr-only">{`output line ${i + 1}: `}</span>
+              {l}
+            </motion.p>
+          ))}
+      </AnimatePresence>
       {done && (
-        <p className="text-neutral-300">
-          <span className="text-[#00E59B]">$ </span>
-          <span aria-hidden="true" className="inline-block h-4 w-2 animate-pulse bg-[#00E59B]" />
+        <p className="truncate text-slate-700 dark:text-neutral-300">
+          <span className="text-accent">$ </span>
+          <AnimatePresence>
+            {typingClear && (
+              <motion.span
+                key="clear-word"
+                className="text-slate-900 dark:text-neutral-100"
+                exit={{ opacity: 0, transition: { duration: CLEAR_EXIT_MS, ease: "easeIn" } }}
+              >
+                {CLEAR_CMD.slice(0, clearChars ?? 0)}
+              </motion.span>
+            )}
+          </AnimatePresence>
+          <span aria-hidden="true" className="ml-0.5 inline-block h-4 w-2 animate-pulse bg-accent" />
         </p>
       )}
     </div>

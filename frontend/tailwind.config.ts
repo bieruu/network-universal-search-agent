@@ -5,6 +5,20 @@ const config: Config = {
   content: ["./app/**/*.{ts,tsx}", "./components/**/*.{ts,tsx}"],
   theme: {
     extend: {
+      colors: {
+        background: "hsl(var(--background))",
+        foreground: "hsl(var(--foreground))",
+        skeleton: "hsl(var(--skeleton))",
+        input: "hsl(var(--input))",
+        "btn-border": "hsl(var(--btn-border))",
+        accent: "hsl(var(--accent))",
+        "accent-foreground": "hsl(var(--accent-foreground))",
+        "accent-hover": "hsl(var(--accent-hover))",
+        muted: "hsl(var(--muted))",
+        warning: "hsl(var(--warning))",
+        danger: "hsl(var(--danger))",
+        panel: "hsl(var(--panel))",
+      },
       fontFamily: {
         // --font-landing-mono is set on the landing wrapper only; elsewhere falls back to defaults.
         mono: ["var(--font-landing-mono)", "ui-monospace", "SFMono-Regular", "Menlo", "monospace"],
@@ -19,8 +33,13 @@ const config: Config = {
       animation: {
         ripple: "ripple 2s ease calc(var(--i, 0) * 0.2s) infinite",
         orbit: "orbit calc(var(--duration) * 1s) linear infinite",
+        float: "float 7s ease-in-out infinite",
       },
       keyframes: {
+        float: {
+          "0%, 100%": { transform: "translateY(0)" },
+          "50%": { transform: "translateY(-10px)" },
+        },
         ripple: {
           "0%, 100%": { transform: "translate(-50%, -50%) scale(1)" },
           "50%": { transform: "translate(-50%, -50%) scale(0.9)" },

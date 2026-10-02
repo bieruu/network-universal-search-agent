@@ -12,7 +12,7 @@ export function THead(props: React.HTMLAttributes<HTMLTableSectionElement>) {
   return <thead {...props} />;
 }
 export function TRow(props: React.HTMLAttributes<HTMLTableRowElement>) {
-  return <tr className="border-b border-neutral-800" {...props} />;
+  return <tr className="border-b border-neutral-200 transition-colors last:border-0 hover:bg-accent/[0.06] dark:border-neutral-800" {...props} />;
 }
 export function TH({ className, ...props }: React.ThHTMLAttributes<HTMLTableCellElement>) {
   return <th className={cn("px-2 py-2 text-left font-medium opacity-70", className)} {...props} />;

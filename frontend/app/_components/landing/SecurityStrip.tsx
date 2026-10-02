@@ -28,19 +28,19 @@ export default function SecurityStrip() {
   return (
     <section id="security" className="mx-auto max-w-7xl px-4 py-16 sm:px-6 md:py-24">
       <Reveal>
-        <h2 className="max-w-[20ch] text-3xl font-bold tracking-tighter text-neutral-50 md:text-4xl">
+        <h2 className="max-w-[20ch] text-3xl font-bold tracking-tighter text-slate-900 dark:text-neutral-50 md:text-4xl">
           Secure by default, not by toggle
         </h2>
       </Reveal>
       <ul className="mt-10 grid gap-x-8 gap-y-6 sm:grid-cols-2 lg:grid-cols-4">
         {ITEMS.map((c, i) => (
-          <Reveal key={c.title} delay={Math.min(i * 0.05, 0.15)}>
-            <li className="border-l-2 border-[#00E59B]/60 pl-4">
-              <c.icon size={20} weight="regular" className="text-[#00E59B]" aria-hidden="true" />
-              <h3 className="mt-2 text-sm font-semibold text-neutral-100">{c.title}</h3>
-              <p className="mt-1 text-sm leading-relaxed text-neutral-400">{c.body}</p>
-            </li>
-          </Reveal>
+          <li key={c.title} className="border-l-2 border-accent/60 pl-4">
+            <Reveal delay={Math.min(i * 0.05, 0.15)}>
+              <c.icon size={20} weight="regular" className="text-accent" aria-hidden="true" />
+              <h3 className="mt-2 text-sm font-semibold text-slate-900 dark:text-neutral-100">{c.title}</h3>
+              <p className="mt-1 text-sm leading-relaxed text-slate-600 dark:text-neutral-400">{c.body}</p>
+            </Reveal>
+          </li>
         ))}
       </ul>
     </section>

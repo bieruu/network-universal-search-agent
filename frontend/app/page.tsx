@@ -1,5 +1,4 @@
 import type { Metadata } from "next";
-import { JetBrains_Mono, Space_Grotesk } from "next/font/google";
 import CtaFooter from "./_components/landing/CtaFooter";
 import FeatureBento from "./_components/landing/FeatureBento";
 import Hero from "./_components/landing/Hero";
@@ -13,12 +12,9 @@ export const metadata: Metadata = {
   description: "One search box for Shodan ports, crt.sh subdomains, and WHOIS with a transparent risk score.",
 };
 
-const grotesk = Space_Grotesk({ subsets: ["latin"], display: "swap" });
-const mono = JetBrains_Mono({ subsets: ["latin"], display: "swap", variable: "--font-landing-mono" });
-
 export default function Home() {
   return (
-    <div className={`${grotesk.className} ${mono.variable} bg-[#0a0f14] text-neutral-100`}>
+    <div className="bg-background text-foreground dark:bg-[#0a0f14] dark:text-neutral-100">
       <Nav />
       <main>
         <Hero />

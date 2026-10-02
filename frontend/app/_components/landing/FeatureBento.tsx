@@ -69,9 +69,9 @@ function Visual({ kind }: { kind: (typeof CELLS)[number]["visual"] }) {
     );
   if (kind === "tint")
     return (
-      <div aria-hidden="true" className="mt-4 rounded-xl border border-[#00E59B]/25 bg-[#00E59B]/5 p-3 font-mono text-xs text-neutral-300">
+      <div aria-hidden="true" className="mt-4 rounded-xl border border-accent/25 bg-accent/5 p-3 font-mono text-xs text-slate-700 dark:text-neutral-300">
         <p>POST /api/v1/scan → 401 without session</p>
-        <p className="mt-1 text-neutral-500">GET /history → 200 · paginated</p>
+        <p className="mt-1 text-slate-600 dark:text-neutral-500">GET /history → 200 · paginated</p>
       </div>
     );
   return null;
@@ -81,20 +81,20 @@ export default function FeatureBento() {
   return (
     <section id="sources" className="mx-auto max-w-7xl px-4 py-16 sm:px-6 md:py-24">
       <Reveal>
-        <h2 className="max-w-[20ch] text-3xl font-bold tracking-tighter text-neutral-50 md:text-4xl">
+        <h2 className="max-w-[20ch] text-3xl font-bold tracking-tighter text-slate-900 dark:text-neutral-50 md:text-4xl">
           Three sources, one triage view
         </h2>
-        <p className="mt-3 max-w-[65ch] text-neutral-400">
+        <p className="mt-3 max-w-[65ch] text-slate-600 dark:text-neutral-400">
           Each source runs with its own timeout. One fails, the scan still lands as partial.
         </p>
       </Reveal>
       <div className="mt-10 grid gap-4 sm:grid-cols-2 lg:grid-cols-3">
         {CELLS.map((c, i) => (
           <Reveal key={c.title} delay={Math.min(i * 0.05, 0.15)} className={i === 0 ? "sm:col-span-2 lg:col-span-1" : undefined}>
-            <Card className="h-full rounded-2xl p-5">
-              <c.icon size={22} weight="regular" className="text-[#00E59B]" aria-hidden="true" />
-              <CardTitle className="mt-3 text-base text-neutral-100">{c.title}</CardTitle>
-              <p className="mt-2 text-sm leading-relaxed text-neutral-400">{c.body}</p>
+            <Card className="h-full rounded-2xl border-neutral-200 bg-panel p-5 dark:border-neutral-800">
+              <c.icon size={22} weight="regular" className="text-accent" aria-hidden="true" />
+              <CardTitle className="mt-3 text-base text-slate-900 dark:text-neutral-100">{c.title}</CardTitle>
+              <p className="mt-2 text-sm leading-relaxed text-slate-600 dark:text-neutral-400">{c.body}</p>
               <Visual kind={c.visual} />
             </Card>
           </Reveal>

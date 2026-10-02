@@ -30,6 +30,7 @@ export default function TargetSearch({
     <form onSubmit={submit} className="flex flex-col gap-2" aria-label="target search">
       <div className="flex gap-2">
         <Input
+          id="target-search"
           placeholder="example.com or 1.1.1.1"
           value={value}
           onChange={(e) => setValue(e.target.value)}
@@ -43,7 +44,7 @@ export default function TargetSearch({
         <input type="checkbox" checked={force} onChange={(e) => setForce(e.target.checked)} />
         Bypass cache (force=true)
       </label>
-      {error && <p className="text-xs text-red-400">{error}</p>}
+      {error && <p className="text-xs text-danger">{error}</p>}
     </form>
   );
 }

@@ -1,11 +1,18 @@
 "use client";
 import { useEffect, useState } from "react";
 import { Badge } from "@/components/ui/badge";
-import { Card, CardTitle } from "@/components/ui/card";
+import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
+import { Progress } from "@/components/ui/progress";
 import { Skeleton } from "@/components/ui/skeleton";
 import { fetchHistory, type HistoryItem } from "@/lib/api";
 
-export default function HistoryList({ onSelect }: { onSelect: (id: string) => void }) {
+export default function HistoryList({
+  onSelect,
+  limit = 5,
+}: {
+  onSelect: (id: string) => void;
+  limit?: number;
+}) {
   const [items, setItems] = useState<HistoryItem[]>([]);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
@@ -17,29 +24,40 @@ export default function HistoryList({ onSelect }: { onSelect: (id: string) => vo
       .finally(() => setLoading(false));
   }, []);
 
+  const shown = items.slice(0, limit);
+
   return (
-    <Card>
-      <CardTitle>History</CardTitle>
-      {loading ? (
-        <Skeleton className="mt-2 h-16" />
-      ) : error ? (
-        <Badge variant="destructive">{error}</Badge>
-      ) : items.length === 0 ? (
-        <p className="mt-2 text-sm opacity-60">No scans yet.</p>
-      ) : (
-        <ul className="mt-2 space-y-1 text-sm">
-          {items.slice(0, 20).map((h) => (
-            <li key={h.scan_id}>
-              <button className="underline opacity-80 hover:opacity-100" onClick={() => onSelect(h.scan_id)}>
-                {h.target}
-              </button>{" "}
-              <span className="opacity-60">
-                {h.status} · {h.risk_score ?? "—"}
-              </span>
-            </li>
-          ))}
-        </ul>
-      )}
+    <Card className="flex flex-col">
+      <CardHeader>
+        <CardTitle>History</CardTitle>
+        <CardDescription>Latest {limit} scans, click to reopen snapshot</CardDescription>
+      </CardHeader>
+      <CardContent>
+        {loading ? (
+          <Skeleton className="h-24" />
+        ) : error ? (
+          <Badge variant="destructive">{error}</Badge>
+        ) : shown.length === 0 ? (
+          <p className="text-sm text-slate-500 dark:text-neutral-500">No scans yet — run your first scan above.</p>
+        ) : (
+          <ul className="flex flex-col gap-2">
+            {shown.map((h) => (
+              <li key={h.scan_id}>
+                <button
+                  className="flex w-full items-center gap-2 rounded-lg px-2 py-1.5 text-left text-sm transition-colors hover:bg-accent/10"
+                  onClick={() => onSelect(h.scan_id)}
+                >
+                  <span className="min-w-0 flex-1 truncate font-mono">{h.target}</span>
+                  <Badge variant="secondary">{h.status}</Badge>
+                  <span className="w-16">
+                    <Progress value={h.risk_score ?? 0} aria-label={`risk ${h.risk_score ?? "unknown"}`} />
+                  </span>
+                </button>
+              </li>
+            ))}
+          </ul>
+        )}
+      </CardContent>
     </Card>
   );
 }
