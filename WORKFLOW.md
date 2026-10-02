@@ -64,6 +64,16 @@ Generate secret: `openssl rand -base64 32`.
 
 ## 4. Daily Run
 
+One script (Windows): from the repo root, just run — backend + frontend start together,
+missing venv/deps install themselves, busy ports are reclaimed, and the browser opens
+already logged in (dev cookie via `/dev-login`):
+
+```powershell
+.\dev.ps1
+```
+
+Manual alternative (any OS):
+
 ```bash
 docker compose up -d postgres
 # T1 backend
@@ -71,6 +81,7 @@ cd backend && source .venv/bin/activate && uvicorn app.main:app --reload --port 
 # T2 frontend
 cd frontend && pnpm dev
 ```
+Then open `http://localhost:3000/dev-login` once for the dev session cookie.
 
 Flow: Sign in → `/dashboard` → type `example.com` → watch per-card skeletons → charts populate → History saves automatically.
 

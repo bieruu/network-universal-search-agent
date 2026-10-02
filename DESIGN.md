@@ -1,135 +1,150 @@
-# DESIGN.md — Design Reference (Locked)
+---
+version: "1.0"
+name: "Universal Search Landing"
+description: "Dark-first SaaS landing for a passive OSINT console. Ideal for landing pages, saas. AI-ready template."
+colors:
+  primary: "#0A0F14"
+  secondary: "#0C1117"
+  tertiary: "#334155"
+  neutral: "#F8FAFC"
+  surface: "#FFFFFF"
+  accent: "#00E59B"
+typography:
+  h1:
+    fontFamily: Space Grotesk
+    fontSize: 3.75rem
+    fontWeight: 700
+  body-md:
+    fontFamily: Space Grotesk
+    fontSize: 1rem
+    fontWeight: 400
+components:
+  button-primary:
+    backgroundColor: "{colors.accent}"
+    textColor: "#000000"
+    padding: 12px
+---
 
-> Acuan visual untuk landing + dashboard. Stack aktual: Next.js 14 App Router, Tailwind v3 (`darkMode: "class"`), shadcn-minimal `components/ui`, Chart.js, `motion/react` (terinstal), `next/font` (Space Grotesk + JetBrains Mono). Image-gen tidak ada di env → picsum placeholder + slot TODO, lihat §8.
+## Overview
 
-## 1. Design Read & Dials
+Dark-first SaaS landing for a passive OSINT console — Shodan ports, crt.sh subdomains, and WHOIS behind one search box. Before it had sections, it had a constraint: explain session-gated scanning to skeptics without a single fake number. So the hero doesn't illustrate the product — it performs it, typing `scan example.com` into a real terminal window and printing shaped sample output. Nothing glows, nothing gradients — one emerald accent on near-black does all the talking.
 
-- **Read:** B2B SaaS landing + secure dashboard for security analyst, dark-hacking eksperimental, Tailwind + shadcn.
-- **Dials:** `DESIGN_VARIANCE: 9 / MOTION_INTENSITY: 8 / VISUAL_DENSITY: 4`
-- **Theme lock:** dark-only. `<html class="dark">` di `frontend/app/layout.tsx:11` jangan dicabut. Tidak ada section light di tengah page.
+Then restraint became the system. Space Grotesk carries display and body, JetBrains Mono carries terminal lines, eyebrows, and monogram logos. Motion is rationed to two moments that earn it: section reveals and the typing terminal. Everything else is static and fast. The light theme exists as a full citizen, not an afterthought — same tokens, same components, verified pair by pair.
 
-## 2. Tokens (map ke kode saat ini)
+Tight sections, pill buttons, mono terminal — these aren't aesthetic picks from a gallery. They come from the job: credibility at a glance, one CTA label everywhere, scroll on. Anti-slop is the only honest design for a page that has to earn a security analyst's click.
 
-Base ada di `frontend/app/globals.css:5-12`:
-- `--background: 222 47% 7%` (off-black, bukan `#000`), `--foreground: 210 40% 96%`
-- Pertahankan. Jangan pakai pure `#000/#fff`.
-- Landing memakai dark-lock `#0a0f14` (surface `#0d1319` terminal, `#0c1117` How-it-works) — lihat `frontend/app/page.tsx:21`.
+- Density: 4/10 — Airy sections
+- Variance: 8/10 — Expressive
+- Motion: 4/10 — Subtle
 
-Accent (satu saja, kunci untuk seluruh page):
-- **Final:** Electric Emerald `#00E59B` — teks hitam di atasnya untuk kontras AA (CTA `bg-[#00E59B] text-black`).
-- **Larangan:** ungu AI-glow default, gradient text besar, outer glow. Accent hanya untuk CTA primer, status OK, satu highlight terminal.
-- Neutral: Zinc/Slate dingin. Jangan campur warm-gray + cool-gray dalam satu page.
+- **Style:** Dark-first, Technical-mono, Restrained
+- **Keywords:** saas, landing, dark-mode, mono, terminal, security, minimal-chrome
+- **Era:** 2020s DevTool Marketing
+- **Light/Dark:** ✓ Full (dark default, preference persisted)
 
-Shape & depth:
-- Satu skala radius: cards `rounded-2xl (16px)`, buttons `rounded-full`, inputs `rounded-lg (8px)`. Dokumentasikan bila menyimpang.
-- Shadow tint ke background hue, tidak ada drop-shadow hitam pekat di dark.
-- z-index hanya untuk nav sticky, modal, overlay, grain. Jangan spam `z-50`.
+## Colors
 
-Tipografi:
-- Final: `Space Grotesk` (body/display) + `JetBrains Mono` (angka/terminal/logo) via `next/font` dengan `display:swap` — lihat `frontend/app/page.tsx:2,16-17`. `Inter` hanya bila minta Linear-tenang.
-- Hero: `text-4xl md:text-5xl lg:text-6xl tracking-tighter leading-none`, H1 `max-w-[22ch]` (deviasi dari 2-baris baku agar tidak orphan), max 2 baris. Subtext max 20 kata, `max-w-[65ch]`.
-- Semua angka dashboard/landing: `font-mono`. Dilarang serif campur (`Fraunces`/`Instrument_Serif`) untuk emphasis — pakai italic/bold satu family.
+- **Off-Black** (#0A0F14) — Primary dark background (`--background: 210 33% 6%` in `frontend/app/globals.css`, exact neutral match; earlier `222 47% 7%` read blue — fixed)
+- **How-It-Works Surface** (#0C1117) — Dark section band (light pair: `bg-slate-50`)
+- **Terminal / Panel Surface** (`--panel`: `210 40% 98%` light / `210 32% 7%` dark ≈ `#0d1319`) — Satu token untuk terminal hero DAN kartu bento (`bg-panel`, border `neutral-200/800`): keduanya tampil identik, tidak ada surface khusus per komponen
+- **Electric Emerald** (#00E59B) — Single accent. Lives ONLY in token `--accent` (`160 100% 45%` dark / `160 100% 32%` light); source uses `bg-accent` / `text-accent` / `border-accent` / `text-accent-foreground`. Only other occurrence allowed: Simple Icons CDN URL params (URLs can't use CSS vars)
+- **Emerald Hover** (`--accent-hover`: `160 84% 55%` dark / `160 100% 28%` light, mapped as `accent-hover`) — Semua hover state interaktif: fill `bg-accent` → `hover:bg-accent-hover`; wash `hover:bg-accent/10` + `hover:border-accent/40` untuk outline/ghost/sidebar/table-row/nav-link; chart hover `accentBarHover`/`accentHover` dari `lib/chart-theme.ts`. Larangan: `hover:bg-slate-*`, `hover:bg-neutral-700/800`, `hover:bg-input`, `hover:opacity-90` untuk fill accent.
+- **Slate Ink** (#0F172A `slate-900` / #F5F5F5 `neutral-50`) — Heading pair light/dark
+- **Slate Body** (#475569 `slate-600` / #A3A3A3 `neutral-400`) — Body pair light/dark
+- **Slate Caption** (#64748B `slate-500` / #737373 `neutral-500`) — Caption pair light/dark
+- **White Surface** (#FFFFFF) — Primary light background (`--background: 0 0% 100%`)
+- **Input / Search Field** — Bidang input pakai wash emerald tipis (`bg-accent/5`) + border `border-accent/40`; hover `border-accent/60`; fokus `border-accent` + `ring-2 ring-accent/30` + `bg-accent/10`. Semua kelas accent theme-agnostic (token `--accent` sudah beda per tema: `160 100% 32%` light / `160 100% 45%` dark) — hanya teks & placeholder yang dipasangkan `dark:` (`text-slate-900 dark:text-neutral-100`, `placeholder:text-slate-400 dark:placeholder:text-neutral-500`). Tidak ada lagi surface/border `neutral-*` monokrom di input. Berlaku di `TargetSearch` (card "New scan") dan form sign-in.
 
-## 3. Layout System
+Token rules (locked):
+- Fill accent + `text-accent-foreground` (black) in both themes — AA safe.
+- Text/icons/borders accent via token only — never hex literals or `emerald-*`/`dark:` pairs.
+- No pure `#000/#fff` surfaces in dark; no heavy black drop-shadows.
+- Zinc/Slate cool neutrals only — never mix warm-gray + cool-gray on one page.
+- Dials: `DESIGN_VARIANCE: 8 / MOTION_INTENSITY: 4 / VISUAL_DENSITY: 4`.
 
-- Container: `max-w-7xl mx-auto` (landing), `max-w-5xl` (dashboard). Breakpoints `sm/md/lg/xl/2xl` standar.
-- Hero: split 50/50, `min-h-[100dvh]` (jangan `h-screen`), `pt` max `pt-24`. Isi max 4 elemen teks: eyebrow (opsional, max 1) + H1 + subtext + CTA (1 primer + max 1 sekunder). Logo wall, bullets, avatar row → pindah ke bawah hero.
-- Nav: satu baris di desktop, tinggi 64–72px (max 80px).
-- Bento: jumlah cell = jumlah konten (5 item → 5 cell, mis. hero+4). Minimal 2–3 cell punya variasi visual (image/tint/pattern), bukan 6 kartu teks polos.
-- Larangan pengulangan: satu family layout max 1x per page; zigzag image+text max 2 section berurutan; eyebrow max 1 per 3 sections; split-header kiri-H1/kanan-paragraf dilarang sebagai default.
+## Typography
 
-Sections landing (urutan kunci):
-1. Nav → 2. Hero split + terminal preview nyata → 3. Logo strip (di bawah hero) → 4. Bento 5 (Shodan, crt.sh, WHOIS, trends, auth/audit) → 5. How it works (numbered, beda family) → 6. Security strip → 7. CTA + footer.
+- **Display / Hero:** Space Grotesk via `next/font` (`display:swap`, loaded once in root `layout.tsx`, applied to `<body>`) — Weight 700, `tracking-tighter leading-none`, H1 `max-w-[22ch]` (≤2 lines, no orphans)
+- **Body:** Space Grotesk — Weight 400, relaxed leading, subtext max 20 words / `max-w-[65ch]`
+- **UI Labels / Captions:** Space Grotesk — 0.875rem, weight 500; mono captions (`text-xs`) for eyebrow lines (`PASSIVE OSINT · SHODAN + CRT.SH + WHOIS`) and captions (`auth-gated · rate-limited · audit-logged`)
+- **Monospace:** JetBrains Mono (variable `--font-landing-mono` set on `<body>` in root `layout.tsx`, consumed via Tailwind `font-mono`) — Terminal output, logo monograms (`shodan`, `crt.sh`, `whois`), API tint snippets. Serif mix (`Fraunces`/`Instrument_Serif`) banned — emphasis via italic/bold in-family.
 
-## 4. Components (shadcn-minimal)
+Scale:
+- Hero: `text-4xl md:text-5xl lg:text-6xl`
+- H1: 2.25rem
+- H2: `text-3xl md:text-4xl`
+- Body: 1rem / relaxed
+- Small: 0.875rem / mono 0.75rem (`text-xs`)
 
-- Hanya dari `frontend/components/ui/*` (button, card, badge, input, skeleton, table). Tidak ada inline `style` untuk tema.
-- States wajib: loading = `Skeleton` seukuran layout akhir (bukan spinner generik); empty = komposisi rapi + cara mengisi; error = inline/badge, toast hanya transient.
-- CTA: 1 label per intent di seluruh page (`Open dashboard` dipakai di nav+hero+footer, bukan variasi `Get started/Try free`). Label max 3 kata, 1 baris di desktop, kontras AA (emerald + teks hitam lolos; putih di atas emerald terang gagal — audit tiap CTA).
-- Form: label di atas, helper opsional, error di bawah, `gap-2`. Tidak ada placeholder-as-label.
-- Charts: Chart.js saja via `react-chartjs-2`, `next/dynamic ssr:false`, label aksesibel, responsif.
 
-## 5. Hacking Motif (pakai hemat)
+## Layout
 
-- Terminal window nyata (mini `OverviewCards` + baris `$ scan example.com`), bukan div fake screenshot. Scanline/grain hanya di `fixed inset-0 pointer-events-none` pseudo-element, jangan di container scroll.
-- Satu marquee max per page (jika dipakai). Motion harus termotivasi: hierarchy, storytelling, feedback, transisi state.
-- Dilarang: custom cursor, neon outer-glow default, fake terminal dari kotak div + teks palsu.
+- **Grid:** `max-w-7xl mx-auto`, side padding `px-4 sm:px-6`. Breakpoints `sm/md/lg/xl/2xl` standard.
+- **Spacing rhythm:** Nav `h-16`; sections `py-16 md:py-24`.
+- **Section vertical gaps:** `py-16 md:py-24` between bands; bento grid `gap-4`, strip rows `gap-x-8 gap-y-6`.
+- **Hero layout:** Split 50/50, `min-h-[100dvh]` (never `h-screen`), `pt` max `pt-24`. Max 4 text elements: eyebrow (≤1) + H1 + subtext + CTA (1 primary + ≤1 secondary).
+- **Feature sections:** Bento with cell count = content count (5 items → 5 cells: Shodan, crt.sh, WHOIS, trends, auth/audit); ≥2 cells carry visuals (2 photos + 1 tinted API strip), never plain text cards. How-it-works uses numbered rows — a different family from bento. Security strip uses icon + left-rule rows in 4 columns.
+- **Mobile collapse:** Hero stacks, bento `sm:grid-cols-2 lg:grid-cols-3`, strips stack. All multi-column layouts collapse below 768px. No horizontal overflow.
+- **z-index contract:** base (0) / sticky-nav (40) / overlay (grain, pointer-events-none). No `z-50` spam.
 
-## 6. Motion Spec
+Section order (locked): Nav → Hero split + real terminal → Logo strip → Bento 5 → How-it-works → Security strip → CTA + footer.
 
-- Library: `motion/react` (terinstal, `frontend/package.json`). Dilarang `window.addEventListener("scroll")`; pakai `useScroll`/`whileInView`/IntersectionObserver.
-- Nilai kontinu (mouse/scroll) via `useMotionValue`/`useTransform`, bukan `useState`.
-- Hanya animasikan `transform` + `opacity`. Spring mis. `type:"spring", stiffness:100, damping:20`.
-- Wajib `useReducedMotion()` / `@media (prefers-reduced-motion: reduce)` untuk semua motion di atas intensitas 3 — collapse ke statis.
-- Terminal hero (`TerminalTyper.tsx`): ketik-per-karakter command (28ms/char) → cetak output sekuensial (320ms/baris) → kursor berkedip; `useReducedMotion` = statis penuh; `aria-live="polite"`; teks penuh tetap ada di SSR (`!mounted` branch) untuk SEO/no-JS. Window memakai `role="log"`, bukan `role="img"`.
+Dashboard order (locked, `dashboard/page.tsx` owns it; `app-shell.tsx` is a pure shell: sidebar + sticky `h-16` header + slot): Search card (TargetSearch + ScanStatus + `errors[]`) → stats grid (2→4 col) → charts grid (`PortsChart | RiskTrendChart`, `lg:grid-cols-2`, chart height locked `h-[240px]` + `maintainAspectRatio:false`) → `PortsTable` full width → `SubdomainsTable | WhoisCard` (`lg:grid-cols-2`, tables `max-h-[320px]` scroll) → `HistoryList | Latest findings`. All cards share `CardHeader (Title + Description) + CardContent`; one history list only (no duplicate Recent scans).
 
-## 7. Aksesibilitas & Perf
 
-- Kontras AA body (4.5:1), AAA target hero. Toggle light tidak ada (dark-lock) — tidak perlu dual-mode, tapi hormati `prefers-reduced-motion` dan `prefers-reduced-transparency` (sediakan fallback solid untuk glass).
-- LCP <2.5s: hero visual `next/image priority`, reserve space (CLS <0.1), lazy-load di bawah fold. Fonts via `next/font` + `display:swap`, jangan `<link>` Google Fonts.
-- Keyboard nav Radix/shadcn, `aria-label` charts dan terminal, fokus terlihat.
+## Elevation & Depth
 
-## 8. Image Strategy (jujur terhadap env)
+Flat surfaces, token borders, emerald tint wash (`bg-accent/5`), mono terminal window with real scan text — depth comes from layering restraint, not shadows.
 
-- Tidak ada image-gen tool di env ini → prioritas 2: foto nyata. Sementara: `https://picsum.photos/seed/{slug}/{w}/{h}` dengan seed deskriptif (`server-rack`, `tls-certs`, `soc-analyst`) + slot `<!-- TODO: ganti foto asli -->` (atau `{/* TODO: ganti foto asli */}` di JSX).
-- 3 slot terpasang: bento server-rack (800×600), bento tls-certs (800×600), how-it-works soc-analyst (800×1000). Hero memakai terminal nyata, bukan foto. Halaman teks saja = belum selesai.
-- Logo wall: SVG Simple Icons (`https://cdn.simpleicons.org/{slug}/00E59B`) untuk Next.js/FastAPI/PostgreSQL (logo-only); Shodan/crt.sh/WHOIS jadi monogram teks mono (deviasi: CDN Simple Icons 404 untuk slug `shodan`, jadi monogram — bukan wordmark teks polos).
+- **Physics:** Spring `type:"spring", stiffness:100, damping:20` for reveals; terminal types 28ms/char → prints lines every 320ms → blinking cursor, then loops 3 sample targets — typing `clear` then wiping the screen out (staggered fade + `y:-6` slide-up, ~220ms/line, 45ms top-to-bottom cascade) so the rotation reads as one continuous shell session.
+- **Entry animations:** `Reveal` (`whileInView`, opacity + `y:24→0`); list cascades stagger ≤0.15s. Reduced-motion collapses everything to static.
+- **Hover states:** accent fill → `hover:bg-accent-hover`; outline/ghost/nav/table/history rows → `hover:bg-accent/10` (+ `hover:border-accent/40` untuk bordered); text links → `hover:text-accent`; 200ms. No lifts, no glows, no slate/neutral hover fills.
+- **Page transitions:** None — sticky nav + instant theme class swap.
+- **Performance:** Only `transform` + `opacity` animated. No scroll listeners (`whileInView` only). Fonts via `next/font`, no Google Fonts `<link>`.
 
-## 9. Copy Rules
 
-- Headline ≤8 kata, sub ≤25 kata. Satu register copy per page (teknis-mono, jangan campur editorial + marketing).
-- Dilarang angka presisi palsu (`92%`, `4.1×`) kecuali data nyata atau label mock. Quote max 3 baris, kutip tipografis (“ ”), atribusi nama+role.
-- Self-audit tiap string sebelum ship; ganti kalimat AI-puitis yang tidak jelas dengan kalimat fungsional polos.
+## Shapes
 
-## 10. File Map Phase 5 (as-built)
+Base corner radius: 8px (`--radius: 0.5rem`). Cards `rounded-2xl` (16px), buttons `rounded-full` (pill), inputs `rounded-md`, terminal dots `rounded-full`, photo frames `rounded-xl`. Document any deviation.
 
-- `frontend/app/page.tsx` (public, dark-lock `#0a0f14`, fonts next/font) + `frontend/app/_components/landing/{Nav,Hero,TerminalTyper,Reveal,LogoStrip,FeatureBento,HowItWorks,SecurityStrip,CtaFooter}.tsx`
-- Token di `frontend/app/globals.css`, tema sekali di `frontend/app/layout.tsx` (`<html class="dark">`). Charts tetap di dashboard, bukan landing.
-- Terinstal: `motion` + `@phosphor-icons/react` (satu family ikon, `weight="regular"` konsisten, `size` 20/22).
-- Deviasi tercatat: (1) Shodan/crt.sh/WHOIS = monogram mono, bukan ikon CDN (Simple Icons 404); (2) H1 `max-w-[22ch]` agar ≤2 baris tanpa orphan; (3) 0 marquee di seluruh landing (motion budget dipakai untuk Reveal + terminal typing); (4) terminal window `role="log"` + `aria-live`, bukan `role="img"`.
 
-## 10b. File Map Restyle Login + Dashboard (planned — belum dieksekusi, tanpa ubah kode app)
+## Components
 
-- Primitif baru di `frontend/components/ui/` (aditif, jangan timpa yang ada): `avatar, label, progress, separator, tooltip, sheet`. Extend aditif: `card` (+Header/Content/Description/Footer), `button` (+size icon, varian ghost/secondary/destructive/link), `badge` (+secondary). API lama (`buttonClasses`, `Badge` minimal) tetap jalan.
-- Login: `frontend/app/(auth)/sign-in/_components/modern-animated-sign-in.tsx` (teradaptasi, lihat §12) + rute `frontend/app/(auth)/sign-in/page.tsx` di-wire ke `@/lib/auth-client`.
-- Dashboard: `frontend/components/ui/app-1-utils/{app-1-sidebar.tsx, app-1-data.ts}` (ditulis dari nol, data OSINT) + `frontend/app/(dashboard)/dashboard/_components/app-shell.tsx` (adaptasi App1). Komponen OSINT existing (`TargetSearch, ScanStatus, OverviewCards, PortsTable, SubdomainsTable, WhoisCard, HistoryList, *Chart`) pindah ke grid shell, tidak dibuang.
-- Fondasi: `frontend/lib/utils.ts` (`cn` dukung objek/conditional), `frontend/tailwind.config.ts` (colors dari token lama via `hsl(var(...))`, `boxShadow.input`, animasi+keyframes `ripple`/`orbit`), `frontend/app/globals.css` (tambah `--skeleton/--btn-border/--input/--radius` + `.g-button`). Token §2 utuh, tidak ada nilai yang diganti.
+- **Input / Search Field:** `rounded-md`, `focus:outline-none`, `transition-colors`. Border emerald tipis `border-accent/40` + wash `bg-accent/5` (mengganti `border-neutral-300/700` + `bg-white/neutral-900` yang monokrom). Hover `hover:border-accent/60`; fokus `focus:border-accent` + `focus:ring-2 focus:ring-accent/30` + `focus:bg-accent/10`; teks `text-slate-900 dark:text-neutral-100`, placeholder `placeholder:text-slate-400 dark:placeholder:text-neutral-500`. Dipakai oleh `TargetSearch` (card "New scan") dan form sign-in — satu primitive, dua tempat.
+- **Primary Button:** Pill shape. `bg-accent text-accent-foreground` fill, `font-semibold`. Hover: `opacity-90`. One label per intent across the whole page (`Open dashboard` in nav + hero + footer — never `Get started`/`Try free`). Max 3 words, 1 line on desktop.
+- **Secondary Button:** Pill outline (`border-neutral-300 dark:border-neutral-700`, `hover:bg-slate-100 dark:hover:bg-neutral-800`). Theme-aware in both modes.
+- **Badge:** Pill outline (`border-accent/40 font-mono text-accent`) for the hero eyebrow — the single allowed eyebrow.
+- **Terminal:** Real window (`role="log"`, `aria-live="polite"`), traffic dots + `osint — zsh` title bar. Full text SSR'd as no-JS baseline, typed replay after mount (`TerminalTyper`). After each sample finishes the typer types `clear` and wipes the lines out (staggered `AnimatePresence` exit, transform/opacity only) before the next of the 3 rotating targets. `dangerouslySetInnerHTML` count in landing source: 0.
+- **Logo Strip:** Logo-only wall — Simple Icons CDN (`cdn.simpleicons.org/*/00E59B`) for real brands (Next.js/FastAPI/PostgreSQL); mono monograms for sources without icons (Shodan 404'd on CDN → monogram, recorded deviasi).
+- **Bento Cards:** Identik dengan terminal (`bg-panel`, border `neutral-200/800`, `rounded-2xl`) + icon (`text-accent`) + title + body. Photo cells (`picsum seeds`, lazy) and one API tint strip (`bg-accent/5`, `POST /api/v1/scan → 401` + `GET /history → 200`).
+- **How-It-Works Rows:** Numbered `01–03` (`text-accent` mono) + title + body, top-ruled rows; motion div lives INSIDE `li` (valid list structure, Lighthouse a11y 1.0).
+- **Security Items:** Icon (`text-accent`) + title + body with `border-l-2 border-accent/60`.
+- **Navigation:** Sticky `h-16` + backdrop-blur. Monogram `N` (`bg-accent`) + mono wordmark, anchor links (Sources/How/Security), `ThemeToggle`, primary CTA.
+- **Dashboard Sidebar Sources:** Blok "Sources" di sidebar (`app-1-sidebar.tsx`) — satu-satunya daftar sumber pasif (Shodan/crt.sh/WHOIS). Header mono eyebrow `text-accent` (menggantikan `text-slate-500 dark:text-neutral-500`), tiap baris = chip monogram emerald (`bg-accent/10 text-accent`, menggantikan `bg-input` yang monokrom) + label netral (`text-slate-600 dark:text-neutral-500`). Nav item + Log out tetap wash `hover:bg-accent/10`.
+- **ThemeToggle:** Sun/Moon ghost icon-button; `localStorage['theme']` shared with the `layout.tsx` inline script; no-saved-preference defaults to **dark** in both.
 
-## 11. Pre-Flight (gagal satu = belum ship)
 
-- [x] Hero muat 1 viewport, H1 ≤2 baris, CTA terlihat tanpa scroll
-- [x] Eyebrow ≤1/3 sections, marquee ≤1 (aktual: 0), layout family ≥4 untuk 8 sections
-- [x] Semua CTA 1-baris, kontras AA, satu label per intent (`Open dashboard`)
-- [x] Dark-lock konsisten, tidak ada section light nyasar
-- [x] Motion jalan + reduced-motion statis, hanya transform/opacity (Reveal + TerminalTyper, `useReducedMotion` di keduanya; kontrak di `lib/landing.test.ts`)
-- [x] SSR content ada (curl/build prerender: semua section + teks terminal penuh), `/dashboard`→307 live
-- [ ] Lihat di 390px + 1440px, Lighthouse LCP/CLS lolos, tidak ada string rusak (desktop screenshots di `public/evidence/`; 390px + Lighthouse masih manual)
+## Do's and Don'ts
 
-## 11b. Pre-Flight Restyle Login + Dashboard (gagal satu = belum ship)
+- No emojis in UI — Phosphor (`@phosphor-icons/react`, `weight="regular"`) only; no CDN icon scripts
+- No pure black surfaces in dark — use `#0a0f14` family
+- No purple/blue AI-glow, no gradient text, no outer glow, no custom cursor, no marquee (motion budget goes to Reveal + terminal)
+- No hardcoded `#00E59B` / `emerald-*` in source — token utilities only
+- No 3-equal-column feature layouts — bento/asymmetry only; one layout family max 1x per page; zigzag image+text max 2 sections in a row; eyebrow max 1 per 3 sections
+- No split-header (left-H1/right-paragraph) as default
+- No `h-screen` — use `min-h-[100dvh]`
+- No AI copywriting clichés: "Elevate", "Seamless", "Unleash", "Next-Gen" — headlines ≤8 words, subs ≤25, one register per page (technical-mono)
+- No fake precision stats (`92%`, `4.1×`), no testimonials-as-proof — max 3-line quote with typographic marks only if real
+- No broken external image links — picsum seeds + `{/* TODO: ganti foto asli */}` slots
+- No generic lorem ipsum in demos — terminal shows real-shaped sample output (3 rotating targets)
+- No `Reveal`-wraps-`li` — motion div goes INSIDE `li`
+- No Shodan/crt.sh calls from the browser (landing links to `/dashboard` only)
 
-- [ ] Login: 1 CTA primer emerald pill, form ikut §4 (label atas, error bawah, `gap-2`), orbit + ripple hanya transform/opacity + reduced-motion statis, tanpa CDN/ungu-biru/log, wiring `authClient` + redirect `/dashboard` jalan, cookie dev tetap valid
-- [ ] Dashboard: sidebar + header sticky 64px, 4 stat cards data scan nyata (font-mono, tanpa angka palsu), chart tren risk via Chart.js `ssr:false`, tabel/kartu OSINT existing tetap render + partial/empty states utuh
-- [ ] Semua page: font Space Grotesk + JetBrains Mono global, dark `#0a0f14` konsisten, `tsc` + `npm test` + `next build` lolos, screenshot dark `public/evidence/` (login, dashboard)
+- Do keep one CTA label per intent
+- Do persist theme + honor `prefers-reduced-motion` / `prefers-reduced-transparency`
+- Do self-audit every string before ship; replace AI-poetic lines with plain functional ones
 
-## 12. Restyle Spec Login + Dashboard (locked — keputusan user 2026-09-29)
 
-Keputusan terkunci: (1) chart tetap **Chart.js** (tanpa `recharts`, sesuai AGENTS.md); (2) dashboard = **shell App1 + data OSINT penuh** (bukan shell saja); (3) ikon login **lucide semua** (tanpa `cdn.21st.dev`, tanpa `remotePatterns`).
+## Use Case
 
-Login (`modern-animated-sign-in`, adaptasi wajib sebelum pakai):
-- Accent: glow input `#3b82f6` → `#00E59B`; `boxColor` default `#5046e6` → `var(--skeleton)`; teks orbit + header ikut register teknis-mono ("Universal Search", bukan "Animated Login").
-- Ikon: 9 ikon orbit + logo Google diganti `lucide-react` (mis. `ShieldCheck, Server, Globe, Key, Eye, Activity, Database, Bell, Search`; tombol Google pakai `Chrome`). Tidak ada `next/image` remote.
-- Form: `grid-cols-${fieldPerRow}` dinamis → hardcode; hapus `console.log`; hapus tombol "Forgot password?" (tidak ada rutenya); validasi email/password tetap, error via `errorField`.
-- Motion: `BoxReveal` + orbit pakai `useReducedMotion` fallback statis; hanya transform/opacity. Panel kiri (orbit) `max-lg:hidden`, kanan form `max-lg:w-full` — responsif 390px ikut pre-flight §11b.
-- Wiring (tanpa ubah kontrak auth): submit → `authClient.signInEmail` → ok? `router.push('/dashboard')` : `errorField="Sign-in failed"`; tombol Google → `authClient.signInOAuth`. Alur cookie dev di README tetap berlaku (stub tidak set cookie).
-
-Dashboard (adaptasi App1 → OSINT):
-- Shell: `SidebarProvider + App1Sidebar + SidebarInset` (pertahankan `min-w-0` fix), header sticky `h-16` (trigger, judul "Welcome back" → nama target/scan aktif, tombol search/notif, avatar).
-- 4 stat cards → Open ports / Services / Vulns / Subdomains dari scan aktif (tabular-nums mono, hint = delta vs scan sebelumnya, bukan "+2 from last month" palsu).
-- Area chart → `RiskTrendChart` existing (Chart.js, last-10-scans) di `Card` App1; tidak ada `recharts`.
-- Dua kartu bawah → Recent scans (badge status `completed|partial|failed`, risk bar via `Progress`) + Latest findings (ganti activity generik). Klik scan → `reopen` snapshot immutable (kontrak existing dipertahankan).
-- Sidebar nav: Dashboard (`/dashboard`), Sign in (`/sign-in`), section Sources (Shodan/crt.sh/WHOIS sebagai monogram, bukan link mati). Ikon satu family (`lucide-react`, `strokeWidth` konsisten) — beda dari landing (`@phosphor-icons`) dan dicatat sebagai deviasi yang diizinkan khusus dashboard shell.
-- Larangan: angka presisi palsu (§9), ungu/biru accent (§2), `dangerouslySetInnerHTML` (sudah ada di shadcn-chart? tidak dipakai — chart tetap Chart.js, abaikan file `shadcn/chart` dari paste-an).
-
-Batasan eksekusi (supaya tidak merusak yang jalan):
-- Aditif saja: tidak ada overwrite `components/ui/{button,badge,card,input}.*`; tidak ada ganti nilai token §2; tidak ada lib chart baru; tidak ada folder top-level baru.
-- Verifikasi: `tsc --noEmit` + `npm test` (tambah test kontrak login: tanpa log/CDN/ungu-biru) + `next build` + screenshot `public/evidence/` (login, dashboard, dark).
+Landing pages, SaaS — marketing front page for a passive network search console. One job: earn a security analyst's click to the gated product.

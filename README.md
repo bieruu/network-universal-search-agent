@@ -46,7 +46,12 @@ Lalu daftar API key gratis (cukup tier free untuk 1–2 host):
 
 ## Quickstart
 
-### Backend dan frontend jalan di dua terminal terpisah. Pilih tab sesuai shell:
+### Cara cepat (Windows, 1 perintah): `.\dev.ps1` dari root repo — backend + frontend
+nyala bersamaan, venv/deps yang kurang diinstall otomatis, port yang sibuk direbut
+kembali, browser terbuka langsung login (cookie dev via `/dev-login`). Ctrl+C
+mematikan dua-duanya. Tanpa browser otomatis: `.\dev.ps1 -NoBrowser`.
+
+### Manual — backend dan frontend jalan di dua terminal terpisah. Pilih tab sesuai shell:
 
 ### PowerShell (Windows)
 
@@ -115,6 +120,10 @@ Auth in this repo is a **stub** (real Better Auth wiring is future work). Concre
 
 Steps (backend + frontend already running per Quickstart):
 
+Fastest: open `http://localhost:3000/dev-login` once — it sets the dev session cookie and bounces you to `/dashboard`. (Dev only; returns 404 in production builds.)
+
+Manual alternative:
+
 1. Open `http://localhost:3000/sign-in`. Type anything (e.g. `analyst@local.dev` / `dev123`) and click **Sign in with email**. You will be bounced back — that is expected, the stub sets no cookie.
 2. Set the dev session cookie manually. Easiest via DevTools console (F12 → Console), while on `http://localhost:3000`:
    ```js
@@ -135,6 +144,8 @@ Troubleshooting:
 | Scan fails with 401 | Backend did not see the cookie. Check backend runs on `:8000` and `BACKEND_URL=http://localhost:8000` in `frontend/.env.local`. |
 | `Backend unreachable` (502) | FastAPI not running. Start it per Quickstart Terminal 1. |
 | `localhost` / `192.168.x.x` rejected | Intended. Private/RFC1918 targets are blocked front + back — use a public domain or IP. |
+| `next dev` / `next build` crashes on start with `EINVAL: invalid argument, readlink ...\.next\...` | Repo lives under OneDrive: "Files On-Demand" turns `.next` internals into placeholder files and Next's own cleanup chokes on them. `npm run dev` / `npm run build` now auto-clean `.next` on Windows+OneDrive (`frontend/scripts/clean-next.mjs`, hooked via `predev`/`prebuild`). Manual fallback: `npm run clean`, or move the repo outside OneDrive. |
+| `pnpm: command not found` | This repo's lockfile is npm (`frontend/package-lock.json`). Use `npm install` / `npm run dev`; or enable pnpm first via `corepack enable pnpm`. |
 
 To "sign out" in dev, delete the cookie: DevTools → Application → Cookies → right-click `better-auth.session_token` → Delete (or run `document.cookie = "better-auth.session_token=; path=/; max-age=0"` in the console).
 
