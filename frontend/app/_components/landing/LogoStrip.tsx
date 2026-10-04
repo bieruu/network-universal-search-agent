@@ -16,7 +16,6 @@ export default function LogoStrip() {
       <div className="mx-auto flex max-w-7xl flex-wrap items-center justify-center gap-x-10 gap-y-4 px-4 py-6 sm:px-6">
         {LOGOS.map((l) => (
           <Reveal key={l.name}>
-            {/* eslint-disable-next-line @next/next/no-img-element */}
             <img src={l.src} alt={l.name} width={28} height={28} loading="lazy" />
           </Reveal>
         ))}

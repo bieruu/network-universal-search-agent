@@ -1,4 +1,5 @@
 """structlog JSON logging + X-Request-ID middleware."""
+
 from __future__ import annotations
 
 import time
@@ -34,5 +35,10 @@ class RequestIDMiddleware(BaseHTTPMiddleware):
             structlog.contextvars.unbind_contextvars("request_id")
         elapsed_ms = int((time.perf_counter() - start) * 1000)
         response.headers["X-Request-ID"] = rid
-        logger.info("request", path=request.url.path, method=request.method, latency_ms=elapsed_ms)
+        logger.info(
+            "request",
+            path=request.url.path,
+            method=request.method,
+            latency_ms=elapsed_ms,
+        )
         return response

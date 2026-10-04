@@ -20,6 +20,7 @@ export default function AppShell({
   children: ReactNode;
 }) {
   const router = useRouter();
+  const { data: session } = authClient.useSession();
 
   async function handleLogout() {
     await authClient.signOut();
@@ -31,7 +32,7 @@ export default function AppShell({
     <SidebarProvider>
       <App1Sidebar active="/dashboard" />
       <SidebarInset>
-        <header className="sticky top-0 z-10 flex h-16 items-center gap-2 border-b border-btn-border bg-background/90 px-4 backdrop-blur">
+        <header className="sticky top-0 z-10 flex h-16 items-center gap-2 border-b border-btn-border bg-background/90 px-4 backdrop-blur-sm">
           <Sheet>
             <SheetTrigger asChild>
               <Button variant="ghost" size="icon" className="shrink-0 md:hidden" aria-label="Open menu">
@@ -58,8 +59,13 @@ export default function AppShell({
           <Button variant="ghost" size="icon" className="shrink-0" aria-label="Log out" title="Log out" onClick={handleLogout}>
             <LogOut size={20} strokeWidth={2} />
           </Button>
-          <Avatar>
-            <AvatarFallback>{(target?.[0] ?? "A").toUpperCase()}</AvatarFallback>
+          <span className="hidden max-w-[180px] truncate text-sm text-slate-600 dark:text-neutral-400 sm:block">
+            {session?.user.name ?? session?.user.email}
+          </span>
+          <Avatar title={session?.user.email ?? "Signed in"}>
+            <AvatarFallback>
+              {(session?.user.name?.[0] ?? session?.user.email?.[0] ?? "A").toUpperCase()}
+            </AvatarFallback>
           </Avatar>
         </header>
 

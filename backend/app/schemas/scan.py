@@ -5,7 +5,9 @@ from uuid import UUID
 
 from pydantic import BaseModel, Field
 
-TARGET_RE = r"^(?:[a-z0-9](?:[a-z0-9-]{0,61}[a-z0-9])?\.)+[a-z]{2,}$|^(?:\d{1,3}\.){3}\d{1,3}$"
+TARGET_RE = (
+    r"^(?:[a-z0-9](?:[a-z0-9-]{0,61}[a-z0-9])?\.)+[a-z]{2,}$|^(?:\d{1,3}\.){3}\d{1,3}$"
+)
 
 
 class ScanRequest(BaseModel):

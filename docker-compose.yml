@@ -3,9 +3,9 @@ services:
   postgres:
     image: postgres:16
     environment:
-      POSTGRES_DB: osint
-      POSTGRES_USER: osint
-      POSTGRES_PASSWORD: osint
+      POSTGRES_DB: ${POSTGRES_DB:-osint}
+      POSTGRES_USER: ${POSTGRES_USER:-owner}
+      POSTGRES_PASSWORD: ${POSTGRES_PASSWORD:?Set POSTGRES_PASSWORD in your local environment before starting Postgres}
     ports:
       - "5432:5432"
     volumes:

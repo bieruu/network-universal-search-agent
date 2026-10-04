@@ -26,16 +26,24 @@ class Settings(BaseSettings):
 
     @property
     def is_production(self) -> bool:
-        return os.getenv("APP_ENV", "").lower() == "production" or os.getenv(
-            "NODE_ENV", ""
-        ).lower() == "production"
+        return (
+            os.getenv("APP_ENV", "").lower() == "production"
+            or os.getenv("NODE_ENV", "").lower() == "production"
+        )
 
-    def model_post_init(self, __context):
+    def model_post_init(self, __context, /):
         if self.is_production and (
             not self.better_auth_secret
-            or self.better_auth_secret in {"change-me-32-chars-min", "dev-secret-min-32-chars-change-me-xxxx"}
+            or len(self.better_auth_secret) < 32
+            or self.better_auth_secret
+            in {"change-me-32-chars-min", "dev-secret-min-32-chars-change-me-xxxx"}
+            or self.better_auth_secret.lower().startswith(
+                ("replace-with", "change-me", "dev-secret", "your-secret")
+            )
         ):
-            raise ValueError("BETTER_AUTH_SECRET must be set to a non-default value in production")
+            raise ValueError(
+                "BETTER_AUTH_SECRET must be set to a non-default value in production"
+            )
 
 
 settings = Settings()

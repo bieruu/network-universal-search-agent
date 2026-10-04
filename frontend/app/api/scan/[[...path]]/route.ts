@@ -28,11 +28,13 @@ async function proxy(req: NextRequest, path: string[], body?: string) {
   }
 }
 
-export async function GET(req: NextRequest, { params }: { params: { path?: string[] } }) {
-  return proxy(req, params.path ?? []);
+export async function GET(req: NextRequest, { params }: { params: Promise<{ path?: string[] }> }) {
+  const { path } = await params;
+  return proxy(req, path ?? []);
 }
 
-export async function POST(req: NextRequest, { params }: { params: { path?: string[] } }) {
+export async function POST(req: NextRequest, { params }: { params: Promise<{ path?: string[] }> }) {
+  const { path } = await params;
   const body = await req.text();
-  return proxy(req, params.path ?? [], body);
+  return proxy(req, path ?? [], body);
 }

@@ -1,6 +1,7 @@
 from __future__ import annotations
 
 from datetime import datetime, timezone
+from typing import Annotated
 
 from fastapi import APIRouter, Depends, HTTPException
 from sqlalchemy import select
@@ -17,8 +18,14 @@ from app.services import orchestrator
 router = APIRouter(prefix="/api/v1", tags=["scan"])
 
 
-async def _persist(scan_id: str, target: str, user_id: str, payload: dict, session: AsyncSession) -> None:
-    ttype = "ip" if len(target.split(".")) == 4 and all(p.isdigit() for p in target.split(".")) else "domain"
+async def _persist(
+    scan_id: str, target: str, user_id: str, payload: dict, session: AsyncSession
+) -> None:
+    ttype = (
+        "ip"
+        if len(target.split(".")) == 4 and all(p.isdigit() for p in target.split("."))
+        else "domain"
+    )
     res = await session.execute(select(Target).where(Target.value == target.lower()))
     tgt = res.scalar_one_or_none()
     if tgt is None:
@@ -44,23 +51,31 @@ async def _persist(scan_id: str, target: str, user_id: str, payload: dict, sessi
 @router.post("/scan")
 async def post_scan(
     body: ScanRequest,
-    user_id: str = Depends(require_user),
-    session: AsyncSession = Depends(get_session),
+    user_id: Annotated[str, Depends(require_user)],
+    session: Annotated[AsyncSession, Depends(get_session)],
 ) -> dict:
     assert_target_allowed(body.target)
     check_rate_limit(user_id)
     payload = await orchestrator.run_scan(
-        body.target.lower(), user_id, force=body.force, persist=lambda **kw: _persist(session=session, **kw)
+        body.target.lower(),
+        user_id,
+        force=body.force,
+        persist=lambda **kw: _persist(session=session, **kw),
     )
     return {"scan_id": payload["scan_id"], "status": payload["status"]}
 
 
 @router.get("/scan/{scan_id}")
 async def get_scan(
-    scan_id: str, user_id: str = Depends(require_user), session: AsyncSession = Depends(get_session)
+    scan_id: str,
+    user_id: Annotated[str, Depends(require_user)],
+    session: Annotated[AsyncSession, Depends(get_session)],
 ) -> dict:
-    _ = user_id
-    scan = await session.get(Scan, scan_id)
+    scan = (
+        await session.execute(
+            select(Scan).where(Scan.id == scan_id, Scan.user_id == user_id)
+        )
+    ).scalar_one_or_none()
     if scan is None:
         raise HTTPException(status_code=404, detail="Scan not found")
     tgt = await session.get(Target, scan.target_id)

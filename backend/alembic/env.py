@@ -1,12 +1,13 @@
 """Alembic env (async). Autogenerate from app.models metadata."""
+
 from __future__ import annotations
 
 import asyncio
 import os
 
-from alembic import context
 from sqlalchemy.ext.asyncio import create_async_engine
 
+from alembic import context
 from app.db.base import Base
 from app.models import finding, scan, target  # noqa: F401
 
@@ -15,23 +16,46 @@ url = os.getenv("DATABASE_URL", "postgresql+asyncpg://osint:osint@localhost:5432
 target_metadata = Base.metadata
 
 
+def include_object(
+    obj: object,
+    name: str,
+    type_: str,
+    reflected: bool,
+    compare_to: object | None,
+) -> bool:
+    return not (type_ == "table" and reflected and compare_to is None)
+
+
 def run_migrations_offline() -> None:
-    context.configure(url=url, target_metadata=target_metadata, literal_binds=True)
+    context.configure(
+        url=url,
+        target_metadata=target_metadata,
+        literal_binds=True,
+        include_object=include_object,
+    )
     with context.begin_transaction():
         context.run_migrations()
 
 
 def run_migrations_online() -> None:
-    engine = create_async_engine(url)
+    def do_run_migrations(connection) -> None:
+        context.configure(
+            connection=connection,
+            target_metadata=target_metadata,
+            include_object=include_object,
+        )
+        with context.begin_transaction():
+            context.run_migrations()
 
-    async def do_run() -> None:
-        async with engine.connect() as conn:
-            await conn.run_sync(
-                lambda sync_conn: context.configure(connection=sync_conn, target_metadata=target_metadata)
-            )
-            await conn.run_sync(lambda _: context.run_migrations())
+    async def run_async_migrations() -> None:
+        engine = create_async_engine(url)
+        try:
+            async with engine.connect() as connection:
+                await connection.run_sync(do_run_migrations)
+        finally:
+            await engine.dispose()
 
-    asyncio.run(do_run())
+    asyncio.run(run_async_migrations())
 
 
 if context.is_offline_mode():

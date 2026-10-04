@@ -12,7 +12,13 @@ import httpx
 
 from app.core import cache as cache_mod
 from app.core.config import settings
-from app.services import crtsh_service, risk, shodan_service, whois_service
+from app.services import (
+    crtsh_service,
+    risk,
+    shodan_service,
+    subfinder_service,
+    whois_service,
+)
 
 
 async def _with_timeout(coro, seconds: int, source: str) -> Any:
@@ -34,7 +40,9 @@ def sanitize_error(source: str, e: BaseException) -> str:
     msg = re.sub(r"([?&]key=)[^&\s]+", r"\1…", msg)
     msg = re.sub(r"key=\S+", "key=…", msg)
     # Service-curated messages are already user-safe; don't double-prefix them.
-    if isinstance(e, RuntimeError) and msg[:6].lower() in ("shodan", "crt.sh"):
+    if isinstance(e, RuntimeError) and msg.lower().startswith(
+        ("shodan", "crt.sh", "subfinder")
+    ):
         return msg[:500]
     if status is not None:
         return f"{source}: HTTP {status} — {msg}"[:500]
@@ -46,7 +54,7 @@ def sanitize_error(source: str, e: BaseException) -> str:
 async def gather_results(
     target: str, force: bool = False
 ) -> tuple[dict[str, Any], list[dict[str, str]]]:
-    """Run 3 sources concurrently; exceptions become errors[], never raise."""
+    """Run sources concurrently; fall back to Subfinder if crt.sh fails."""
     ttl = settings.cache_ttl_hours * 3600
     cached: dict[str, Any] = {}
     async with httpx.AsyncClient(
@@ -89,6 +97,22 @@ async def gather_results(
         for source, res in zip(jobs.keys(), settled):
             if isinstance(res, BaseException):
                 errors.append({"source": source, "message": str(res)[:500]})
+                if source == "crtsh":
+                    try:
+                        fallback = await _with_timeout(
+                            subfinder_service.lookup(target),
+                            subfinder_service.TIMEOUT_SECONDS,
+                            "subfinder",
+                        )
+                    except RuntimeError as fallback_error:
+                        errors.append(
+                            {
+                                "source": "subfinder",
+                                "message": str(fallback_error)[:500],
+                            }
+                        )
+                    else:
+                        results[source] = fallback
             else:
                 results[source] = res
                 await cache_mod.cache_set_async(f"{source}:{target.lower()}", res, ttl)

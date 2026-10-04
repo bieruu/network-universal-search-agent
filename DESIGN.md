@@ -116,7 +116,7 @@ Base corner radius: 8px (`--radius: 0.5rem`). Cards `rounded-2xl` (16px), button
 - **Badge:** Pill outline (`border-accent/40 font-mono text-accent`) for the hero eyebrow — the single allowed eyebrow.
 - **Terminal:** Real window (`role="log"`, `aria-live="polite"`), traffic dots + `osint — zsh` title bar. Full text SSR'd as no-JS baseline, typed replay after mount (`TerminalTyper`). After each sample finishes the typer types `clear` and wipes the lines out (staggered `AnimatePresence` exit, transform/opacity only) before the next of the 3 rotating targets. `dangerouslySetInnerHTML` count in landing source: 0.
 - **Logo Strip:** Logo-only wall — Simple Icons CDN (`cdn.simpleicons.org/*/00E59B`) for real brands (Next.js/FastAPI/PostgreSQL); mono monograms for sources without icons (Shodan 404'd on CDN → monogram, recorded deviasi).
-- **Bento Cards:** Identik dengan terminal (`bg-panel`, border `neutral-200/800`, `rounded-2xl`) + icon (`text-accent`) + title + body. Photo cells (`picsum seeds`, lazy) and one API tint strip (`bg-accent/5`, `POST /api/v1/scan → 401` + `GET /history → 200`).
+- **Bento Cards:** Identik dengan terminal (`bg-panel`, border `neutral-200/800`, `rounded-2xl`) + icon (`text-accent`) + title + body. No placeholder photo cells remain; visuals are abstract chart / metric / status panels only.
 - **How-It-Works Rows:** Numbered `01–03` (`text-accent` mono) + title + body, top-ruled rows; motion div lives INSIDE `li` (valid list structure, Lighthouse a11y 1.0).
 - **Security Items:** Icon (`text-accent`) + title + body with `border-l-2 border-accent/60`.
 - **Navigation:** Sticky `h-16` + backdrop-blur. Monogram `N` (`bg-accent`) + mono wordmark, anchor links (Sources/How/Security), `ThemeToggle`, primary CTA.
@@ -135,7 +135,7 @@ Base corner radius: 8px (`--radius: 0.5rem`). Cards `rounded-2xl` (16px), button
 - No `h-screen` — use `min-h-[100dvh]`
 - No AI copywriting clichés: "Elevate", "Seamless", "Unleash", "Next-Gen" — headlines ≤8 words, subs ≤25, one register per page (technical-mono)
 - No fake precision stats (`92%`, `4.1×`), no testimonials-as-proof — max 3-line quote with typographic marks only if real
-- No broken external image links — picsum seeds + `{/* TODO: ganti foto asli */}` slots
+- No placeholder image slots or fake photo scaffolding — landing visuals must be concrete, static, and product-relevant
 - No generic lorem ipsum in demos — terminal shows real-shaped sample output (3 rotating targets)
 - No `Reveal`-wraps-`li` — motion div goes INSIDE `li`
 - No Shodan/crt.sh calls from the browser (landing links to `/dashboard` only)

@@ -9,6 +9,7 @@ const src = readFileSync(
   join(here, "..", "app", "(auth)", "sign-in", "_components", "modern-animated-sign-in.tsx"),
   "utf8",
 );
+const shell = readFileSync(join(here, "..", "app", "(auth)", "_components", "auth-shell.tsx"), "utf8");
 
 test("login uses lucide icons only, no CDN or remote images", () => {
   assert.ok(!src.includes("cdn.21st.dev"), "no 21st.dev CDN");
@@ -23,24 +24,29 @@ test("login has no debug logs or dead routes", () => {
 });
 
 test("login accent uses the global token, no hardcoded hex", () => {
-  assert.ok(src.includes("bg-accent") || src.includes("text-accent"), "global accent token required");
-  assert.ok(!src.includes("00E59B") && !src.includes("00e59b"), "no hardcoded emerald hex — use bg-accent/text-accent/border-accent");
+  assert.ok(shell.includes("bg-accent") || shell.includes("text-accent"), "global accent token required");
+  assert.ok(!shell.includes("00E59B") && !shell.includes("00e59b"), "no hardcoded emerald hex — use bg-accent/text-accent/border-accent");
   for (const banned of ["#3b82f6", "#5046e6", "from-blue", "to-purple", "via-purple"]) {
-    assert.ok(!src.includes(banned), `banned accent: ${banned}`);
+    assert.ok(!shell.includes(banned), `banned accent: ${banned}`);
   }
 });
 
 test("login motion is transform/opacity with reduced-motion fallback", () => {
-  assert.ok(src.includes("useReducedMotion"), "reduced-motion fallback required");
-  assert.ok(!src.includes("addEventListener"), "no manual listeners");
+  assert.ok(shell.includes("useReducedMotion"), "reduced-motion fallback required");
+  assert.ok(!shell.includes("addEventListener"), "no manual listeners");
 });
 
 test("login wires authClient and surfaces field errors", () => {
-  assert.ok(src.includes("authClient.signInEmail"), "email wiring required");
-  assert.ok(src.includes("authClient.signInOAuth"), "oauth wiring required");
+  assert.ok(src.includes("authClient.signIn.email"), "Better Auth email API required");
+  assert.ok(src.includes("authClient.signIn.social"), "Better Auth social API required");
   assert.ok(src.includes('router.push("/dashboard")'), "redirect required");
   assert.ok(src.includes("errorField"), "errorField required");
   assert.ok(src.includes('role="alert"'), "alert region required");
+});
+
+test("login links to the separate account creation flow", () => {
+  assert.ok(src.includes('href="/sign-up"'), "sign-up link required");
+  assert.ok(src.includes("Continue with GitHub"), "GitHub OAuth entry point required");
 });
 
 test("login primary CTA uses the accent variant (no bg cascade conflict)", () => {

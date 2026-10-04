@@ -8,10 +8,10 @@
 - [x] `docker-compose.yml` with `postgres:16` (db `osint`, user `osint`)
 - [x] README quickstart links to WORKFLOW.md
 
-## Phase 1 — Auth + DB Foundation [M1] — DONE (stub Better Auth, middleware + proxy, models, /health verified `{"status":"ok"}`, 401 test passes)
-- [x] Better Auth setup (email + OAuth provider), session cookie httpOnly/Secure
+## Phase 1 — Auth + DB Foundation [M1] — DONE (auth APIs, DB sessions and owner isolation verified in focused tests; live DB/provider setup remains deployment-dependent)
+- [x] Better Auth server/client wiring for email/password; optional Google/GitHub providers require real credentials
 - [x] Next `middleware.ts` guards `(dashboard)/*`, proxy `app/api/scan/[...path]/route.ts` forwards session
-- [x] SQLAlchemy models `targets, scans, findings` + Alembic `upgrade head` works
+- [x] SQLAlchemy models `targets, scans, findings` + initial Alembic revision; fresh PostgreSQL upgrade and drift check verified 2026-10-04
 - [x] `GET /health`, `GET /ready` return 200; CORS allowlist only APP_URL
 - [x] `require_user()` rejects unauthed with 401 (test)
 
@@ -39,18 +39,19 @@
 - [x] Security sweep: bundle clean (no SHODAN/secret/db-pw in `.next/static`), `require_user` fail-closed fix + 4 tests, CORS narrowed, security headers verified live (200 + nosniff/DENY), banners escaped (0 `dangerouslySetInnerHTML` in app source), `next build` OK — DONE 2026-09-28
 - [x] Empty/partial/timeout UX verified — DONE 2026-09-28 (`test_failure_modes.py`: crt.sh timeout→partial, Shodan 401→partial, WHOIS redacted→completed, full-outage→failed; FE renders `errors[]` badge + empty states, covered by component tests)
 - [x] Perf: mocked cache-hit gather 0.44s, mocked miss 0.69s; LIVE `example.com` miss 5.2s server-side (<12s ✓), cache-hit POST 534–665ms server-side (<1.5s ✓, structlog `latency_ms` evidence) — DONE 2026-09-28
-- [x] Prod config: `backend/Dockerfile` + `.dockerignore`, `CACHE_BACKEND=sqlite|postgres` (asyncpg `osint_cache`, fail-open), Vercel/Docker/Neon steps in WORKFLOW.md §8 — DONE 2026-09-28 (`docker build` not verified: docker missing)
-- [x] Acceptance run per PRD §8 — DONE 2026-09-28: login→307 redirect ✓, live `example.com` completed (12 ports, 10 subs, WHOIS, risk 20) ✓, history 3 + trend 3 ✓, bundle clean ✓. Manual leftovers: Postgres persist-across-restart, 390/1440px screenshots (no desktop browser in session), `docker compose up` (no docker)
+- [x] Prod config: `backend/Dockerfile` + `.dockerignore`, `CACHE_BACKEND=sqlite|postgres` (asyncpg `osint_cache`, fail-open), Vercel/Docker/Neon steps in WORKFLOW.md §8 — Docker image built and bundled Subfinder v2.16.0 verified 2026-10-04
+- [x] Acceptance run per PRD §8 — DONE 2026-09-28: login→307 redirect ✓, live `example.com` completed (12 ports, 10 subs, WHOIS, risk 20) ✓, history 3 + trend 3 ✓, bundle clean ✓. Follow-up 2026-10-04: Docker backend startup/migrations and Subfinder verified; isolated PostgreSQL volume survived restart; current landing checked at 390px and 1440px; mobile/desktop Lighthouse run completed.
 
 ## Phase 5 — Landing Page [Next] — DONE 2026-09-28 (build OK, tsc OK, 5 landing tests pass; 6 sejak kontrak terminal-FX 2026-09-29)
 - [x] `app/page.tsx` public + `app/_components/landing/*` (Nav 64px, Hero split + real terminal, logo strip, bento 5, How-it-works, Security, CTA + footer)
-- [x] Visual: Space Grotesk + JetBrains Mono (next/font), emerald `#00E59B` single accent + black text (AA), dark-lock `#0a0f14`; 3 picsum seeds + TODO slots
+- [x] Visual: Space Grotesk + JetBrains Mono (next/font), emerald `#00E59B` single accent + black text (AA), dark-lock `#0a0f14`; landing panels use product-style static visuals without placeholder photo slots
 - [x] Motion: `motion/react` Reveal (whileInView, spring 100/20) + `useReducedMotion` fallback, 0 marquee, transform/opacity only
-- [x] Pre-flight: 1 CTA label (`Open dashboard`), copy audit (no fake stats), SSR content verified via curl (all sections), `/dashboard`→307 live; desktop screenshots verified in-browser + saved to `frontend/public/evidence/` (hero, bento) — DONE 2026-09-28. Leftover manual: 390px check, Lighthouse LCP/CLS.
+- [x] Pre-flight: 1 CTA label (`Open dashboard`), copy audit (no fake stats), SSR content verified via curl (all sections), `/dashboard`→307 live; desktop screenshots verified in-browser + saved to `frontend/public/evidence/` (hero, bento) — DONE 2026-09-28.
+- [x] Remaining visual release checks: current production build has no horizontal overflow at 390px or 1440px. Lighthouse: mobile performance 0.96, LCP 2,589ms, CLS 0.0515; desktop performance 1.00, LCP 560ms, CLS 0.0055 (2026-10-04).
 
-## Phase 6 — Docs & Landing Polish [PROPOSED 2026-09-28, belum dikerjakan]
-- [x] README: status implementasi per fase, arsitektur singkat + link, cara jalanin (FE/BE/DB), cara login dev (cookie), env yang wajib dirotasi, batasan known (auth stub, docker belum diverifikasi) — DONE 2026-09-29 (skor: FE 24 passed + tsc clean + build OK; BE 30 passed, 2 env-only PermissionError Windows temp-dir)
-- [x] DESIGN.md: selaraskan dengan landing yang jadi — token final (`#0a0f14`, emerald `#00E59B`), font final (Space Grotesk + JetBrains Mono via next/font), struktur section final, keputusan deviasi (Shodan jadi monogram karena CDN 404, H1 `max-w-[22ch]`, 0 marquee) — DONE 2026-09-29 (Overview/Colors/Elevation/Components as-built + manual checks kecuali 390px + Lighthouse)
+## Phase 6 — Docs & Landing Polish [DONE 2026-09-29; auth guidance superseded 2026-10-03]
+- [x] README: status implementasi per fase, arsitektur singkat + link, cara jalanin (FE/BE/DB), environment dan known limits — DONE 2026-09-29 (historical state included auth stub; current auth setup documented below)
+- [x] DESIGN.md: selaraskan dengan landing yang jadi — token final (`#0a0f14`, emerald `#00E59B`), font final (Space Grotesk + JetBrains Mono via next/font), struktur section final, keputusan deviasi (Shodan jadi monogram karena CDN 404, H1 `max-w-[22ch]`, 0 marquee) — DONE 2026-09-29.
 - [x] Terminal hero: animasi mengetik + eksekusi layaknya terminal (ketik per karakter → cetak baris berurutan → kursor berkedip; `prefers-reduced-motion` = statis; teks tetap ada di SSR) — DONE 2026-09-29 (Hero renders `TerminalTyper`, hooks-order fix, `role="log"` + `aria-live`, kontrak di `landing.test.ts`, SSR verified via prerender `index.html`)
 
 ## Phase 7 — Login + Dashboard Restyle [DONE 2026-09-30: tsc OK, 34 tests pass (10 baru login+dashboard), `next build` OK]
@@ -59,7 +60,7 @@
 
 - [x] A — Fondasi: install `lucide-react` + Radix (`avatar, slot, progress, separator, tooltip, dialog, label`); upgrade `cn()` dukung objek/conditional; extend `tailwind.config.ts` (colors dari token lama via `hsl(var(...))`, `boxShadow.input`, animasi+keyframes `ripple`/`orbit`); `globals.css` tambah `--skeleton/--btn-border/--input/--radius` + `.g-button`
 - [x] B — Primitif UI: tambah `components/ui/{avatar,label,progress,separator,tooltip,sheet}.tsx`; extend `card` (+Header/Content/Description/Footer), `button` (+size icon, varian ghost/secondary/destructive/link), `badge` (+secondary)
-- [x] C — Login (`app/(auth)/sign-in/`): `modern-animated-sign-in.tsx` teradaptasi (accent emerald `#00E59B`, ikon lucide semua, `BoxReveal` + `useReducedMotion`, `grid-cols` hardcode, tanpa `console.log`/CDN, path import diluruskan); wire submit → `authClient.signInEmail` → `router.push('/dashboard')`, gagal → `errorField`, Google → `signInOAuth`, "Forgot password?" dibuang; panel kiri orbit + teks produk; test kontrak baru + `tsc` + `build`
+- [x] C — Login (`app/(auth)/sign-in/`): initial branded sign-in; auth wiring replaced 2026-10-03 by Better Auth `signIn.email`/`signIn.social`, with account creation at `/sign-up`.
 - [x] D — Dashboard (`app/(dashboard)/dashboard/`): tulis `app-1-utils/` dari nol (sidebar nav Dashboard/History/target + monogram `N`, data OSINT); `App1` teradaptasi (header sticky + trigger + avatar; 4 stat cards → Open ports/Services/Vulns/Subdomains data nyata `font-mono`; area chart → Chart.js tren risk `ssr:false`; kartu bawah → Recent scans + Latest findings); komponen OSINT existing pindah ke grid App1; test + `tsc` + `build`
 - [x] E — Docs: DESIGN.md (Components/Layout login/dashboard) + screenshot `public/evidence/`; risiko: token `bg-background` dkk. yang tadinya mati kini aktif (visual shift kecil, verifikasi via build + screenshot) — DONE 2026-09-30 (kontrak login + dashboard lolos; deviasi dicatat: ikon Google `Globe` ganti `Chrome`, `OverviewCards` tidak dirender di page, nav tanpa link History mati). Manual leftover: screenshot dark login/dashboard (tanpa desktop browser di sesi ini) — DONE 2026-09-30 (`login-dark.png`, `login-desktop-dark.png`, `dashboard-dark.png` di `frontend/public/evidence/`; viewport 912px, panel orbit desktop dipaksa via CSS override)
 
@@ -80,18 +81,17 @@
 - [x] Dokumentasikan token palet dan aturan penggunaannya lintas tema di DESIGN.md saat pekerjaan implementasi dilakukan.
 - [x] Setelah palet landing/sign-in ditetapkan, terapkan palet yang sama pada semua page, termasuk dashboard; audit background, surface, teks, border, state, dan accent.
 - [x] Verifikasi kontras dark/light dan jalankan frontend tests, TypeScript, serta build setelah implementasi.
-- Browser 2026-10-01: landing/sign-in/dashboard dark+light OK, Lighthouse 1.0/1.0/1.0, bukti `frontend/public/evidence/phase9-*`. Sisa: 390px viewport + LCP/CLS.
+- Browser 2026-10-01: landing/sign-in/dashboard dark+light OK, Lighthouse 1.0/1.0/1.0, bukti `frontend/public/evidence/phase9-*`. Current-build 390px/1440px viewport and LCP/CLS rechecked 2026-10-04 under Phase 5.
 
 ## Phase 10 — Palette Token Alignment + Mobile Sheet Fix [DONE 2026-10-01: npm test 43 passed (2 baru), tsc clean, `next build` OK]
 
 - [x] Migrasi semua `#00E59B` literal → utilitas token global (`bg-accent/text-accent/border-accent/text-accent-foreground`); hex hanya di `--accent` + URL Simple Icons; kontrak di `login.test.ts` + `palette.test.ts`
 - [x] Fix sheet burger kosong di mobile (`max-md:flex` override `hidden`; sebab: `cn()` plain-join, `.hidden` menang atas `.flex` di cascade) + `Button` `forwardRef` untuk `asChild`; kontrak di `dashboard.test.ts`; terverifikasi di CSS produksi
 
-## Phase 11 — One-Script Dev + Auto-Login [DONE 2026-10-01: npm test 45 passed (2 baru devlogin), tsc clean, chain terverifikasi live]
+## Phase 11 — One-Script Dev + Auto-Login [SUPERSEDED 2026-10-03]
 
 - [x] `dev.ps1` di root: 1 perintah nyalakan backend+frontend, install otomatis yang kurang (venv/deps/node_modules), reclaim port 3000/8000, tunggu sehat, buka browser; Ctrl+C matikan dua tree; murni ASCII agar lolos parser Windows PowerShell 5.1
-- [x] `frontend/app/dev-login/route.ts`: dev-only (404 di production), set cookie `better-auth.session_token=dev` → 307 `/dashboard`; kontrak di `lib/devlogin.test.ts`
-- [x] Verifikasi live: `/dev-login` 307 + cookie, `/dashboard` 200 tanpa bounce, `POST /api/v1/scan` 200 (auth pass-through); docs di README + WORKFLOW §4
+- [x] Historical dev-cookie helper removed when the real Better Auth DB-backed flow was added; `/dev-login` no longer exists.
 
 ## Phase 12 — Dashboard Parity dengan Landing [DONE: npm test 48 passed, tsc clean, `next build` OK, verifikasi browser dark+light]
 
@@ -121,59 +121,46 @@
 - [x] Follow-up crt.sh 502 (skills.sh, 2026-10-01): 502 ternyata outage crt.sh-wide (example.com ikut 502) — retry diperluas ke 502/503/504 + pesan "temporarily unavailable, retry with Re-scan"; test 502-recover + 502-persistent. Scan tetap `partial` (Shodan/WHOIS tampil)
 - [x] Verifikasi: BE `pytest` 30 passed (scope C) + `ruff`/`black` bersih di file tersentuh; FE `npm test` 50 passed, `tsc` bersih, `next build` OK; grep hover-netral 0 + hex hanya CDN
 
-## Phase 16 — Pre-push Security Audit [TODO 2026-10-02]
+## Current verified status (2026-10-04)
 
-- [ ] **P0 — Ganti auth stub dengan sesi Better Auth yang benar-benar diverifikasi backend.** `require_user()` tidak boleh menerima cookie hanya karena namanya memuat `better-auth.session`; verifikasi tanda tangan/penyimpanan sesi, expiry, dan identitas pengguna. Hapus login yang menerima kredensial apa pun dan cookie tetap; tolak startup produksi bila `BETTER_AUTH_SECRET` kosong atau masih default. Tambahkan tes cookie palsu ditolak, sesi valid diterima, dan konfigurasi produksi gagal tertutup.
-- [ ] **P0 — Isolasi data berdasarkan pemilik.** Filter history, trend, dan detail scan memakai `user_id` terautentikasi; scan milik pengguna lain harus menghasilkan 404/403. Tambahkan tes lintas pengguna untuk ketiga endpoint.
-- [ ] **P1 — Amankan konfigurasi PostgreSQL lokal.** Ganti password statis di Compose dengan env placeholder dan batasi port database ke loopback (atau jangan publish port bila tidak diperlukan); dokumentasikan kredensial dev yang aman.
-- [ ] **P1 — Lengkapi pemeriksaan pra-push rahasia.** Perluas `.gitignore` untuk `.env.*` dengan pengecualian eksplisit file contoh; jalankan scanner rahasia pada working tree dan seluruh riwayat Git lokal. Jika rahasia pernah ter-commit, rotate/revoke dahulu, lalu bersihkan riwayat; periksa juga remote GitHub karena tidak tercakup audit lokal.
-- [ ] **P1 — Tetapkan lisensi repo.** Pilih lisensi yang sesuai tujuan dan tambahkan `LICENSE` sebelum publikasi; pastikan hak/atribusi aset dan kode pihak ketiga.
-- [ ] **P2 — Tingkatkan reproducibility dan pemeriksaan dependency.** Pin versi backend dan buat lockfile dengan workflow yang sesuai; jalankan `npm audit`/`pip-audit` dan evaluasi advisory sebelum push (audit ini tidak memastikan status CVE terbaru).
-- [ ] **P2 — Tambahkan CI dan pembaruan dependency otomatis.** Jalankan lint, type-check, tests, dan build yang relevan untuk frontend/backend pada pull request; pertimbangkan Dependabot.
-- [ ] **P2 — Jalankan ulang gate sebelum push dari setup bersih.** Verifikasi instruksi README/WORKFLOW, backend tests + `ruff` + `black`, frontend lint + `tsc` + tests + build, serta smoke-test deployment tanpa kredensial dev. Audit statis ini tidak menjalankan test suite.
+### Completed and validated
+- [x] Better Auth email/password and configurable Google/GitHub providers are wired to PostgreSQL, with a real Next API handler.
+- [x] Backend verifies Better Auth cookie tokens against active database sessions; arbitrary, expired, and unsigned fake cookies do not authenticate.
+- [x] Production rejects default/placeholder Better Auth secrets.
+- [x] History, trend, and scan detail queries are scoped to the authenticated owner; cross-user scan access returns 404.
+- [x] Separate sign-in/sign-up flows use Better Auth client APIs; signup validates email, password length, and confirmation.
+- [x] `/dashboard` middleware validates via Better Auth `get-session`; removed the synthetic `/dev-login` route and its auto-login path.
+- [x] Backend validates Better Auth HMAC-signed session cookies against active PostgreSQL sessions; verified with a local live signup and protected scan.
+- [x] Risk logic no longer uses a fake zero-value TLS placeholder; expiry-based signal is used instead.
+- [x] Landing placeholder visuals and fake sample-data scaffolding were removed from the live UI.
+- [x] Implemented bounded Subfinder fallback for crt.sh failures; it preserves the crt.sh error, validates/deduplicates/caps results, and reports missing binary, process failure, timeout, or excess output. Host runtime and Docker image Subfinder v2.16.0 verified. Focused backend tests, Ruff, and Black passed.
+- [x] Upgraded Next.js to patched 15.5.27, updated dynamic route params, and pinned transitive PostCSS to 8.5.28. Frontend tests (53), TypeScript, and production build pass; `npm audit --omit=dev` reports 0 vulnerabilities.
+- [x] Generated and reviewed frontend license metadata via npm SBOM; `caniuse-lite` is identified as CC-BY-4.0 and needs maintainer acceptance or replacement.
+- [x] Verified Better Auth tables and the local signup → session → protected scan → sign-out/revocation flow against shared PostgreSQL. The scan returned HTTP 200/partial, sign-out returned 200, the revoked session returned 401, and the synthetic test account/scan were cleaned up.
+- [x] Verify Google/GitHub login: user confirmed both providers are working (2026-10-04).
+- [x] Re-run post-change gates (2026-10-04): fallback-focused backend tests (31), security tests (10), Ruff, and Black passed; frontend TypeScript, 53 tests, and Next.js 15.5.27 production build passed. Production dependency audit is clean.
 
-## Phase 17 — crt.sh Lokal (Multi-Source CT, az7rb/crt.sh) [TODO 2026-10-02]
+### Remaining blockers (not fabricated, not silently omitted)
+- [x] Add and verify the backend's initial Alembic revision. Fresh PostgreSQL upgrade and schema drift check passed; the existing local application schema was matched and stamped without changing application data. Alembic excludes the Better Auth-owned tables in the shared database.
+- [x] Google/GitHub login verified by user report (2026-10-04).
+- [x] Add GitHub Actions CI for PostgreSQL migrations, backend tests/style, frontend lint/type/tests/build, and dependency audit.
+- [x] Complete maintainer license review for the `caniuse-lite` CC-BY-4.0 dependency.
+- [x] Run full Git history and current-source secret scans with redacted Gitleaks v8.24.3 reports: 42 commits scanned, no leaks in history or current source (2026-10-04). Local `.env` files were excluded from the source scan and are ignored by Git.
+- [x] Migrated the frontend to Tailwind CSS 4.3.3, moved the existing theme tokens to CSS-first configuration, and removed obsolete Tailwind 3 config/dependencies. Frontend TypeScript, all 53 tests, production build, and full `npm audit` pass (0 vulnerabilities).
+- [x] Run clean-room pre-push validation without local `.env` files: frontend `npm ci`, lint, 53 tests, TypeScript, audit (0 vulnerabilities), and production build passed; backend ran in the Python 3.11 image with 49 tests, Ruff, targeted Black, fresh PostgreSQL migration/drift check, and Subfinder smoke test (2026-10-04).
 
-> Latar: crt.sh sering 502 (outage global - diverifikasi 2026-10-02: crt.sh 502 untuk example.com / google.com / discord.com). Solusi: sumber CT diambil dari tool az7rb/crt.sh v3.0.3 (https://github.com/az7rb/crt.sh) yang memanggil 4 sumber CT paralel; saat diverifikasi certspotter / crt.name / shodan-ctl semuanya 200, jadi scan tidak lagi bergantung pada satu titik gagal. Raw JSON masuk cache SQLite (TTL); snapshot ternormalisasi tetap ke Postgres `scans.result_snapshot`.
+### Newly reported issues and requests (2026-10-04; not yet investigated or implemented)
+- [ ] Diagnose the reported Shodan error for `162.159.138.232` (HTTP 403: no host data or plan limit); define and test clear handling for CDN/WAF IPs and plan restrictions.
+- [ ] Diagnose the crt.sh timeout reported at about 15 seconds; reconcile the observed duration with the configured 30-second source timeout and the overall scan timeout before adjusting behavior.
+- [ ] Diagnose Subfinder `NotImplementedError` from scan `fb852eba-4ce2-479f-8c27-47961b93d1953`; obtain the complete sanitized traceback and add a regression test for the identified cause.
+- [ ] Investigate the two reported backend CI errors; capture the failed job/step names and full error output before choosing fixes. Local clean-room CI-equivalent checks passed previously, but the hosted errors are not yet explained.
+- [ ] Add restrained looping decorative/background animation across the requested pages to make the UI feel less flat. Keep scan data and primary actions stationary, support reduced motion, and verify mobile performance.
+- [ ] Change the database password to the value requested by the user; store it only in local/deployment secret configuration, never in the repository.
 
-- [ ] **Toolchain - build binary dari source.** `git clone https://github.com/az7rb/crt.sh` lalu `cd crt.sh` lalu `go build -ldflags "-X main.version=3.0.1" -o crt.sh .`. `go.mod` menuntut **Go 1.26.x** (toolchain go1.26.8) dan Go belum terpasang di mesin ini -> pilih: (a) `winget install GoLang.Go`, atau (b) unduh `crt.sh_3.0.3_windows_amd64.zip` dari Releases. Binary tidak di-commit: simpan di `backend/tools/` + tambah ke `.gitignore`.
-- [ ] **Runner subprocess.** `app/services/crt_tool.py`: jalankan binary via `asyncio.create_subprocess_exec` (tanpa shell, argumen list, path dari env `CRTSH_BIN`), parse output `-f json` (`domain` / `total` / `sources{count,duration_ms,error}` / `subdomains`), timeout + kill, cap <=500 subdomain, bersihkan stderr. Binary tidak ada -> fallback otomatis ke jalur httpx.
-- [ ] **Fallback httpx (tanpa Go).** `crtsh_service.py` query 4 sumber langsung: `crt.sh/?q=%.{domain}&output=json` (field `name_value`), `api.certspotter.com/v1/issuances?domain=...&include_subdomains=true&expand=dns_names` (paginasi), `crt.name/v1/search?apex={domain}`, `ctl.shodan.io/api/v1/domain/{domain}/hostnames`. `asyncio.gather(return_exceptions=True)`, dedup, cap 500, timeout per sumber. Sebagian gagal -> tetap `completed` + info sumber yang gagal; semua gagal -> `RuntimeError` ramah.
-- [ ] **Config** (`core/config.py` + `backend/.env.example`): `crtsh_bin`, `ct_sources` (default `crt.sh,certspotter,crt.name,shodan-ctl`), `ct_source_timeout=10`, `crtsh_base_url` (override/mirror), `ct_cache_ttl_hours=24`. Perbaiki bug: `scan_timeout_crtsh` sekarang dipakai dobel (timeout per-request di `crtsh_service.py` dan per-source di `orchestrator.py`) -> pisahkan per-attempt vs per-source.
-- [ ] **Cache lokal.** Hasil CT di-cache di SQLite TTL 24h (bypass `force=true` sudah ada) -> query kedua dan seterusnya dilayani dari disk tanpa network; snapshot tetap immutable di Postgres `scans.result_snapshot`.
-- [ ] **Kontrak FE tetap.** `results.crtsh` shape lama `{domain,count,subdomains[]}` tidak berubah; `SubdomainsTable` judul + empty-state dibuat netral ("CT sources") dan hanya menyebut crt.sh bila crt.sh memang sumber yang gagal; opsi tambahan: tampilkan `sources_ok` / `sources_failed`.
-- [ ] **Docker.** `backend/Dockerfile` tambah stage builder Go (atau unduh binary rilis) agar deploy tetap punya 4 sumber CT; tanpa stage baru container kehilangan fitur ini - dependency baru, perlu approval.
-- [ ] **Docs.** `WORKFLOW.md` bagian 2/3/7 (build binary + env baru), `PRD.md` bagian 4 daftar sumber CT, `AGENTS.md` bagian 5 sinkronkan 15s -> nilai nyata, `README.md` struktur `backend/tools/`.
-- [ ] **Tests** (`test_services.py`, `test_failure_modes.py`, tanpa internet nyata): crt.sh 502 tapi certspotter/crt.name sukses -> `completed` + subdomains terisi; semua sumber gagal -> `partial`/`failed` + pesan ramah; dedup lintas sumber; cap 500; paginasi certspotter; binary hilang -> fallback httpx. Gate: `pytest -q`, `ruff check .`, `black --check .`, `tsc --noEmit`.
-- [ ] **Verifikasi live.** `discord.com` -> `completed` (subdomains terisi walau crt.sh 502); scan kedua = cache hit; grep rahasia bersih.
-- [ ] **Keputusan produk (butuh jawaban sebelum koding):** sumber mana yang dipakai - `crt.sh + certspotter + crt.name` saja, atau ikut `shodan-ctl` (index CT Shodan, gratis tanpa key)?
+See [MANUAL-SETUP.md](./MANUAL-SETUP.md) for setup steps and prerequisites requiring local/deployment configuration.
 
-## Phase 18 — Real-Data Completeness (stub & ilustrasi menjadi data nyata) [TODO 2026-10-02]
-
-> Latar: hasil audit 2026-10-02 - inti scan SUDAH memakai data nyata (Shodan/crt.sh/WHOIS/DNS + Postgres + cache SQLite), tetapi masih ada 4 bagian yang stub/ilustrasi. Ingat AGENTS.md bagian 7: `backend` tidak boleh menyimpan data palsu di jalur scan; item di bawah menutup sisa celah itu. Auth sengaja TIDAK diduplikasi - sudah ada di Phase 16 P0.
-
-- [ ] **Auth/sesi: hapus stub (prasyarat = Phase 16 P0, jangan diduplikasi).** Sisi FE belum tercatat di Phase 16: `frontend/lib/auth-client.ts` masih stub - `signInEmail/signInOAuth` menulis cookie manual `dev-session`/`dev-oauth` lalu `return {ok:true}` untuk kredensial apa pun, dan `useSession()` hardcoded `{data:null}`. Ganti dengan `createAuthClient` dari `better-auth/react`, tampilkan user nyata di UI, dan jangan biarkan `frontend/middleware.ts` hanya memeriksa keberadaan cookie.
-- [ ] **Rute `dev-login` tidak boleh ikut rilis produksi.** `frontend/app/dev-login/route.ts` hanya digating `NODE_ENV !== "development"`; pastikan route ini tidak ter-bundle/terekspos pada build produksi (pindahkan ke tooling dev atau blokir di level build) + tambah tes yang menolak akses saat `NODE_ENV=production`.
-- [ ] **Risk score: TLS factor masih placeholder.** `backend/app/services/risk.py:24` = `tls_factor = 0.0  # placeholder: expired/old TLS detection in v2` -> skor risiko saat ini mengabaikan sertifikat kadaluarsa/hampir kadaluarsa. Implementasi: turunkan faktor TLS dari data crt.sh (`not_before`/`not_after`) dan/atau info SSL Shodan, isi `breakdown`, plus tes (cert expired harus menaikkan skor).
-- [ ] **Landing: data ilustrasi TerminalTyper/Hero.** `frontend/app/_components/landing/TerminalTyper.tsx:12-40` memuat `SCANS` contoh hardcoded (`scan example.com`, `93.184.216.34 - 2 ports`, `risk 18/100`) dan `Hero.tsx:13,73` menamainya "Sample output". Putuskan: (a) label tegas "contoh/ilustrasi" tanpa angka yang bisa disalahartikan sebagai hasil nyata, atau (b) generate dari scan nyata saat build/CI. Sinkronkan kontrak `frontend/lib/landing.test.ts`.
-- [ ] **Landing: ganti foto placeholder.** `FeatureBento.tsx:53,67` dan `HowItWorks.tsx:59` masih memakai `picsum.photos/seed/...` dengan komentar `TODO: ganti foto asli`; ganti dengan aset/screenshot produk sendiri (atau hapus), lalu perbarui `frontend/lib/landing.test.ts:35-36` yang saat ini justru MEWAJIBKAN picsum + TODO tersebut.
-- [ ] **Rate limit persisten (butuh approval - bertabrakan dengan Backlog "Redis cache").** `backend/app/core/rate_limit.py:11` menyimpan bucket di memori proses -> reset saat restart dan tidak berlaku lintas worker/instance; pindahkan ke Postgres/Redis dengan fallback in-memory untuk dev/test. Perubahan stack perlu persetujuan karena PRD bagian 3 (Technology Stack Locked) dan AGENTS.md bagian 7 melarang memulai Backlog v2.
-- [ ] **Smoke test jaringan nyata (opsional, kaitkan dengan Phase 16 P2 CI).** Suite saat ini 100% mocked ("external network is never touched" di `tests/test_services.py`), sehingga perubahan bentuk respons upstream tidak tertangkap. Tambah job nightly/manual bergerbang env (mis. `LIVE_SMOKE=1`) yang memanggil 3 sumber sekali; gate utama tetap mocked.
-- [ ] **Verifikasi penutupan fase.** Setelah dikerjakan: cookie palsu 401 / sesi valid 200 (BE) + `useSession()` menampilkan user (FE); skor risiko bereaksi terhadap cert expired; grep kode produksi untuk `dev-session`, `dev-oauth`, `picsum`, `tls_factor = 0.0` harus 0 hasil; `pytest -q && ruff check . && black --check . && tsc --noEmit && next build` hijau.
-
-## Phase 19 - Real Auth: Google/GitHub OAuth + Halaman Sign-Up Terpisah [TODO 2026-10-02]
-
-> Latar: `frontend/lib/auth-client.ts` masih stub (cookie manual `dev-session`/`dev-oauth`, `useSession()` hardcoded null), belum ada server Better Auth, dan daftar/masuk belum dipisah. Prasyarat keamanan: **Phase 16 P0** (backend `require_user()` verifikasi sesi nyata) dikerjakan belakangan - OAuth bisa diimplementasi dulu, tapi jangan dianggap aman sebelum P0 selesai. Kredensial OAuth belum ada: implementasi + env placeholder dulu, verifikasi live menyusul.
-
-- [ ] **Server Better Auth (wajib, OAuth tidak jalan tanpa ini).** Install `better-auth` + `pg` (Postgres adapter) di `frontend/`; `frontend/lib/auth.ts` = `betterAuth({ emailAndPassword enabled, socialProviders: { google, github }, database: <pg pool> })` dengan tabel `user/session/account/verification` di Postgres yang sama (generate schema via `@better-auth/cli`, commit SQL-nya); `frontend/app/api/auth/[...all]/route.ts` = route handler (sign-in, sign-up, callback `google`/`github`, session, signOut).
-- [ ] **Ganti stub auth-client.** `lib/auth-client.ts` -> `createAuthClient` dari `better-auth/react`: `signIn.email`, `signIn.social({provider:"google"|"github"})`, `signUp.email`, `useSession()` nyata, `signOut`; `frontend/middleware.ts` tetap redirect ke `/sign-in` (perbaikan verifikasi menyusul di Phase 16 P0).
-- [ ] **Ekstrak shell auth bersama.** Panel kiri (orbit + branding) & layout sign-in pindah ke `app/(auth)/_components/auth-shell.tsx` agar sign-in dan sign-up tidak duplikat; token palet + animasi `BoxReveal`/`useReducedMotion` dipertahankan.
-- [ ] **Sign-in (`/sign-in`) = masuk saja.** Email + password, tombol **Continue with Google** dan **Continue with GitHub** (GitHub belum ada - tambahkan), link "Don't have an account? Sign up" -> `/sign-up`; `callbackURL=/dashboard`.
-- [ ] **Sign-up baru (`/sign-up`) = daftar saja.** Form email + password + konfirmasi password -> `signUp.email` (validasi zod, password >= 8, samakan dengan konfirmasi), tombol Google & GitHub juga, link "Already have an account? Sign in" -> `/sign-in`; sukses -> `/dashboard`.
-- [ ] **Link navigasi.** Landing `Nav.tsx` + `CtaFooter.tsx` dan sidebar dashboard punya jalur ke `/sign-up` dan `/sign-in` yang konsisten.
-- [ ] **Env & dokumentasi (tanpa rahasia di-commit).** `frontend/.env.local.example` tambah `BETTER_AUTH_SECRET`, `BETTER_AUTH_URL`, `GOOGLE_CLIENT_ID`, `GOOGLE_CLIENT_SECRET`, `GITHUB_CLIENT_ID`, `GITHUB_CLIENT_SECRET`, `DATABASE_URL`; README/WORKFLOW: cara buat OAuth app + redirect URI `http://localhost:3000/api/auth/callback/{google,github}` dan catatan bahwa verifikasi backend masih stub sampai Phase 16 P0.
-- [ ] **Kontrak & gate.** Perpanjang `lib/login.test.ts` (github wiring, link `/sign-up`), tambah `lib/signup.test.ts` (form email+password+konfirmasi, kedua tombol OAuth, link `/sign-in`, tanpa hex `#00E59B`), `palette.test.ts` cakup sign-up; jalankan `npm test && tsc --noEmit && next build`.
-- [ ] **Verifikasi live (setelah kredensial OAuth tersedia).** Login Google -> callback -> `/dashboard` dengan sesi Better Auth asli; login GitHub sama; sign-up email -> akun muncul di tabel Postgres; `dev-login` tetap terpisah. Selama kredensial belum ada, verifikasi = build + tests + alur form (tanpa panggilan OAuth nyata).
+### Scope note
+The PostgreSQL-backed signup/session/protected-scan/sign-out flow was verified live and its synthetic test data was removed. Google/GitHub login was confirmed working by the user on 2026-10-04. The Alembic baseline preserves the existing schema and is verified on fresh and existing databases. Clean-room tests, Docker startup, database volume persistence, source/history secret scans, and current-build responsive/performance checks passed. Maintainer approval for the CC-BY-4.0 dependency remains an external action. Newly reported scan and hosted-CI errors and the animation request above remain pending.
 
 ## Backlog (v2, do NOT start)
 - [ ] Scheduled monitoring + diff alerts

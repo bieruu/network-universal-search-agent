@@ -1,17 +1,19 @@
 # Network Universal Search Agent
 
-Secure passive OSINT dashboard (Next.js 14 + FastAPI). One search box → Shodan ports, crt.sh subdomains, WHOIS + transparent risk heuristic, session-gated and rate-limited.
+Secure passive OSINT dashboard (Next.js 15 + FastAPI). One search box → Shodan ports, crt.sh subdomains, WHOIS + transparent risk heuristic, session-gated and rate-limited.
 
-Status: Phases 0–6 done. See [TODO.md](./TODO.md) for the checkbox trail, [WORKFLOW.md](./WORKFLOW.md) for full setup, [ARCHITECTURE.md](./ARCHITECTURE.md) for the system design, [DESIGN.md](./DESIGN.md) for the locked visual reference.
+Status: core application, authentication, and dashboard work is implemented; release checks and manual provider/maintainer actions are tracked in [TODO.md](./TODO.md).
 
-## Test scores (latest, 2026-09-29)
+See [WORKFLOW.md](./WORKFLOW.md) for full setup, [ARCHITECTURE.md](./ARCHITECTURE.md) for the system design, [DESIGN.md](./DESIGN.md) for the visual reference, and [MANUAL-SETUP.md](./MANUAL-SETUP.md) for verified setup and remaining manual actions.
 
-- Frontend: `npm test` **24 passed** (validators, scan-shape, component contracts, landing incl. terminal-FX contract), `tsc --noEmit` clean, `next build` OK.
-- Backend: `pytest` **30 passed** (orchestrator partial/completed/failed, shodan/crtsh/whois mocked, auth 401, rate 429, perf). 2 errors in `test_cache.py`/`test_perf.py` are a Windows temp-dir `PermissionError` (env issue, `-p no:cacheprovider` still errors on `tmp_path` fixture) — unrelated to code; rerun on Linux/CI is clean.
+## Test scores (latest local validation, 2026-10-04)
+
+- Frontend: ESLint, `npm test` (**53 passed**), `npm run tsc`, production build, and `npm audit` passed.
+- Backend: full `pytest -q` (49 passed), repository-wide Ruff and Black, and Alembic migration/drift checks passed.
 
 ## Prereqs — install tools (sekali saja)
 
-Wajib: `Node 20+`, `Python 3.11+`, `Docker Desktop`, `Git`. Opsional: `openssl` (generate secret, sudah bawaan Git Bash/macOS/Linux).
+Wajib: `Node 20.6+`, `Python 3.11+`, `Docker Desktop`, `Git`. Opsional: `openssl` (generate secret, sudah bawaan Git Bash/macOS/Linux).
 
 ### Windows (winget, PowerShell Admin)
 
@@ -48,7 +50,7 @@ Lalu daftar API key gratis (cukup tier free untuk 1–2 host):
 
 ### Cara cepat (Windows, 1 perintah): `.\dev.ps1` dari root repo — backend + frontend
 nyala bersamaan, venv/deps yang kurang diinstall otomatis, port yang sibuk direbut
-kembali, browser terbuka langsung login (cookie dev via `/dev-login`). Ctrl+C
+kembali, browser terbuka ke halaman pendaftaran Better Auth. Ctrl+C
 mematikan dua-duanya. Tanpa browser otomatis: `.\dev.ps1 -NoBrowser`.
 
 ### Manual — backend dan frontend jalan di dua terminal terpisah. Pilih tab sesuai shell:
@@ -109,30 +111,22 @@ cd frontend && npm install && npm run dev  # http://localhost:3000
 Flow: sign in → `/dashboard` → search `example.com` → per-card skeletons → charts populate → history saves automatically.
 Browser only calls `/api/*` (Next proxy → FastAPI). Never call Shodan/crt.sh directly, never call `:8000` from the browser.
 
+CI runs the frontend and backend checks via `.github/workflows/ci.yml`.
+
 ## Sign-in & testing the dashboard (dev)
 
-Auth in this repo is a **stub** (real Better Auth wiring is future work). Concretely:
+Authentication uses Better Auth with email/password and PostgreSQL-backed sessions. Create an account at `/sign-up`, then sign in at `/sign-in`. Create the Better Auth tables once in the shared PostgreSQL database:
 
-- The `/sign-in` form accepts **any email + password** and always says success — but it creates **no session cookie**.
-- The OAuth buttons (GitHub/Google) are stubs too.
-- `middleware.ts` lets you into `/dashboard` only if the cookie `better-auth.session_token` exists. Without it you bounce back to `/sign-in` (307).
-- The backend (`require_user`) accepts any request whose cookie contains `better-auth.session`, and the Next proxy forwards your browser cookies — so one manually-set cookie unlocks both.
+```bash
+cd frontend
+npm run auth:migrate
+```
 
-Steps (backend + frontend already running per Quickstart):
+The frontend `DATABASE_URL` and backend `DATABASE_URL` must point to the same database (the frontend uses a standard `postgresql://` URL; the backend uses `postgresql+asyncpg://`). FastAPI validates the session token against the active Better Auth session row and its expiry; a cookie's name or contents alone do not grant access. Dashboard middleware calls the Better Auth session endpoint, and protected API requests are independently checked by FastAPI.
 
-Fastest: open `http://localhost:3000/dev-login` once — it sets the dev session cookie and bounces you to `/dashboard`. (Dev only; returns 404 in production builds.)
+Google and GitHub sign-in are available only after their client IDs and secrets are configured. Without those credentials, the provider returns an explicit unavailable/error response; no OAuth live flow is claimed.
 
-Manual alternative:
-
-1. Open `http://localhost:3000/sign-in`. Type anything (e.g. `analyst@local.dev` / `dev123`) and click **Sign in with email**. You will be bounced back — that is expected, the stub sets no cookie.
-2. Set the dev session cookie manually. Easiest via DevTools console (F12 → Console), while on `http://localhost:3000`:
-   ```js
-   document.cookie = "better-auth.session_token=dev; path=/; max-age=86400";
-   ```
-   Alternative: DevTools → Application → Cookies → `http://localhost:3000` → add row: Name `better-auth.session_token`, Value `dev`.
-3. Open `http://localhost:3000/dashboard`. It must stay on the dashboard (no redirect). If you land on `/sign-in` again, the cookie is missing — repeat step 2 and check you are on the `localhost:3000` origin, not `127.0.0.1:3000` (cookies are per-origin).
-4. Test a scan: type `example.com` → Search. Cards/tables/charts fill per source (first run takes a few seconds: live Shodan/crt.sh/WHOIS). Click **Re-scan** to force a fresh run (`force=true` bypasses cache); a normal repeat search is instant (24h SQLite cache).
-5. Open History (same page, list below) and re-open a past scan — the snapshot must look identical (immutable).
+After signing in, test a scan: type `example.com` → Search. Cards/tables/charts fill per source (first run takes a few seconds: live Shodan/crt.sh/WHOIS). Click **Re-scan** to force a fresh run (`force=true` bypasses cache); a normal repeat search uses the cache. Open History and re-open a past scan — the snapshot must look identical (immutable).
 
 What to expect without keys: if `SHODAN_API_KEY` is empty/invalid in `backend/.env`, the scan still lands as `partial` with an error badge on the Shodan card (never a 500) — crt.sh + WHOIS still render. That is the designed partial-failure path, not a bug.
 
@@ -140,14 +134,15 @@ Troubleshooting:
 
 | Symptom | Fix |
 |---|---|
-| Bounced to `/sign-in` | Cookie missing/wrong origin. Repeat step 2 on `http://localhost:3000`. |
+| Bounced to `/sign-in` | Session is missing/expired, or `BETTER_AUTH_URL` and browser origin do not match. Sign in again using the configured app URL. |
 | Scan fails with 401 | Backend did not see the cookie. Check backend runs on `:8000` and `BACKEND_URL=http://localhost:8000` in `frontend/.env.local`. |
+| Scan fails with 503 | Backend is not configured with the shared PostgreSQL session store; set backend `DATABASE_URL` to the same DB as frontend (using the `+asyncpg` SQLAlchemy scheme). |
 | `Backend unreachable` (502) | FastAPI not running. Start it per Quickstart Terminal 1. |
 | `localhost` / `192.168.x.x` rejected | Intended. Private/RFC1918 targets are blocked front + back — use a public domain or IP. |
 | `next dev` / `next build` crashes on start with `EINVAL: invalid argument, readlink ...\.next\...` | Repo lives under OneDrive: "Files On-Demand" turns `.next` internals into placeholder files and Next's own cleanup chokes on them. `npm run dev` / `npm run build` now auto-clean `.next` on Windows+OneDrive (`frontend/scripts/clean-next.mjs`, hooked via `predev`/`prebuild`). Manual fallback: `npm run clean`, or move the repo outside OneDrive. |
 | `pnpm: command not found` | This repo's lockfile is npm (`frontend/package-lock.json`). Use `npm install` / `npm run dev`; or enable pnpm first via `corepack enable pnpm`. |
 
-To "sign out" in dev, delete the cookie: DevTools → Application → Cookies → right-click `better-auth.session_token` → Delete (or run `document.cookie = "better-auth.session_token=; path=/; max-age=0"` in the console).
+Use the dashboard's **Log out** action to revoke the current Better Auth session.
 
 ## Structure
 
@@ -161,21 +156,20 @@ frontend/app/
                                   # PortsTable, SubdomainsTable, WhoisCard,
                                   # PortsChart, RiskTrendChart (ssr:false)
   api/scan/[[...path]]/route.ts   # session proxy → FastAPI
+  api/auth/[...all]/route.ts      # Better Auth endpoints
 backend/app/
   routers/{scan,history,health}.py
   services/{orchestrator,shodan_service,crtsh_service,whois_service,risk}.py
   core/{config,security,rate_limit,logging,cache}.py
 ```
 
-Landing: Space Grotesk + JetBrains Mono (next/font), single emerald accent `#00E59B`, one CTA label (`Open dashboard`), hero terminal with typing FX (static SSR text + `role="log"` + `aria-live`, reduced-motion falls back to static). Photos are picsum seeds with `TODO: ganti foto asli` slots.
+Landing: Space Grotesk + JetBrains Mono (next/font), single emerald accent `#00E59B`, one CTA label (`Open dashboard`), hero terminal with typing FX (static SSR text + `role="log"` + `aria-live`, reduced-motion falls back to static). No placeholder photo scaffolding remains in the landing layout.
 
-## Acceptance evidence (PRD §8, live 2026-09-28)
+## Acceptance evidence
 
-- Login required: `/dashboard` without session → 307 redirect.
-- Live `example.com`: `completed`, 12 ports / 10 subs / WHOIS, risk 20; cache-miss 5.2s server-side (<12s), cache-hit 534–665ms (<1.5s).
-- History 3 items + trend 3 points; bundle grep clean (no SHODAN/secret in `.next/static`); security headers live (nosniff/DENY).
-- Landing screenshots: `frontend/public/evidence/landing-hero-desktop.png`, `landing-bento-desktop.png`.
-- Known manual leftovers: Postgres persist-across-restart, 390/1440px screenshots, `docker compose up` (no Docker in this env), Lighthouse LCP/CLS. Auth is a stub (see TODO Phase 1 notes).
+- Login, protected scan, session revocation, and owner isolation have been verified; see [TODO.md](./TODO.md) for evidence.
+- The PostgreSQL-backed backend image has been built and includes Subfinder v2.16.0.
+- OAuth provider callbacks, maintainer license approval, and any outstanding release checks are listed in [MANUAL-SETUP.md](./MANUAL-SETUP.md).
 
 ## Env that must be rotated for prod
 

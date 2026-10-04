@@ -1,10 +1,10 @@
 <#
 .SYNOPSIS
   Run backend (FastAPI :8000) + frontend (Next.js :3000) together with one command,
-  then auto-login via the dev session cookie.
+  then open the real sign-up page.
 
 .USAGE
-  .\dev.ps1                # start both, open http://localhost:3000/dev-login (auto-login)
+  .\dev.ps1                # start both, open http://localhost:3000/sign-up
   .\dev.ps1 -NoBrowser     # start both, don't open a browser
 
   Everything is automatic: missing venv/deps/node_modules get installed,
@@ -91,8 +91,8 @@ try {
   WaitUrl "http://localhost:$bePort/health" "Backend"
   WaitUrl "http://localhost:$fePort/" "Frontend"
   Write-Host ""
-  Write-Host "Both up. Auto-login: http://localhost:$fePort/dev-login  (sets dev cookie -> /dashboard)" -ForegroundColor Green
-  if (-not $NoBrowser) { Start-Process "http://localhost:$fePort/dev-login" }
+  Write-Host "Both up. Create or sign in to an account: http://localhost:$fePort/sign-up" -ForegroundColor Green
+  if (-not $NoBrowser) { Start-Process "http://localhost:$fePort/sign-up" }
   Write-Host "Press Ctrl+C to stop both servers." -ForegroundColor DarkGray
   Wait-Process -Id $be.Id, $fe.Id
 } finally {

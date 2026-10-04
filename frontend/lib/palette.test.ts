@@ -8,10 +8,10 @@ const here = dirname(fileURLToPath(import.meta.url));
 const read = (rel: string) => readFileSync(join(here, "..", rel), "utf8");
 
 const css = read("app/globals.css");
-const tailwind = read("tailwind.config.ts");
 const layout = read("app/layout.tsx");
 const toggle = read("components/ui/theme-toggle.tsx");
-const signin = read(join("app", "(auth)", "sign-in", "_components", "modern-animated-sign-in.tsx"));
+const authShell = read(join("app", "(auth)", "_components", "auth-shell.tsx"));
+const signup = read(join("app", "(auth)", "sign-up", "sign-up-form.tsx"));
 const button = read("components/ui/button.tsx");
 const input = read("components/ui/input.tsx");
 const badge = read("components/ui/badge.tsx");
@@ -31,8 +31,12 @@ test("shared tokens exist in light and dark themes", () => {
   }
   assert.ok(css.includes("--background: 210 33% 6%"), "dark background is neutral #0a0f14, not blue");
   for (const color of ["accent", "accent-foreground", "accent-hover", "muted", "warning", "danger", "panel"]) {
-    assert.ok(tailwind.includes(color), `tailwind must map ${color}`);
+    assert.ok(css.includes(`--color-${color}:`), `Tailwind theme must map ${color}`);
   }
+  assert.ok(css.includes('@custom-variant dark (&:where(.dark, .dark *))'), "dark utilities follow the html class");
+  assert.ok(css.includes("--font-mono:"), "custom mono font utility remains available");
+  assert.ok(css.includes("--shadow-input:"), "custom input shadow utility remains available");
+  assert.ok(css.includes("--animate-ripple:"), "custom animations remain available");
 });
 
 test("fonts load once in the root layout, not per page", () => {
@@ -52,13 +56,14 @@ test("dark stays the default and the preference key is shared", () => {
 });
 
 test("sign-in follows the shared palette in both themes", () => {
-  assert.ok(signin.includes("bg-background"), "sign-in base uses the theme token");
-  assert.ok(signin.includes("dark:bg-[#0a0f14]"), "sign-in dark keeps the reference surface");
-  assert.ok(!/(?<!dark:)bg-\[#0a0f14\]/.test(signin.replaceAll("dark:bg-[#0a0f14]", "")), "no light-mode #0a0f14 leak");
-  assert.ok(signin.includes("text-slate-900 dark:text-neutral-100"), "headings pair light/dark");
-  assert.ok(signin.includes("text-accent"), "emerald text uses the global accent token");
-  assert.ok(signin.includes("bg-accent"), "emerald fills use the global accent token");
-  assert.ok(!signin.includes("00E59B"), "no hardcoded emerald hex in sign-in");
+  assert.ok(authShell.includes("bg-background"), "auth base uses the theme token");
+  assert.ok(authShell.includes("dark:bg-[#0a0f14]"), "auth dark keeps the reference surface");
+  assert.ok(!/(?<!dark:)bg-\[#0a0f14\]/.test(authShell.replaceAll("dark:bg-[#0a0f14]", "")), "no light-mode #0a0f14 leak");
+  assert.ok(authShell.includes("text-slate-900 dark:text-neutral-100"), "headings pair light/dark");
+  assert.ok(authShell.includes("text-accent"), "emerald text uses the global accent token");
+  assert.ok(authShell.includes("bg-accent"), "emerald fills use the global accent token");
+  assert.ok(!authShell.includes("00E59B"), "no hardcoded emerald hex in auth shell");
+  assert.ok(signup.includes("AuthShell"), "sign-up shares the auth shell");
 });
 
 test("landing sections pair light/dark text, borders and surfaces", () => {

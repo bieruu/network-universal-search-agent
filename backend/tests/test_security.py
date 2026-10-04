@@ -1,11 +1,12 @@
 import base64
-import hashlib
 import hmac
-import json
-import time
+from urllib.parse import quote
 
 import pytest
 from fastapi import HTTPException
+from pydantic import ValidationError
+from sqlalchemy import text
+from sqlalchemy.ext.asyncio import async_sessionmaker, create_async_engine
 
 from app.core import rate_limit
 from app.core.security import assert_target_allowed, require_user
@@ -29,7 +30,7 @@ def test_private_ip_blocked():
 @pytest.mark.asyncio
 async def test_unaauthed_401():
     with pytest.raises(HTTPException) as e:
-        await require_user(authorization=None, cookie=None)
+        await require_user(session=None, authorization=None, cookie=None)
     assert e.value.status_code == 401
 
 
@@ -42,7 +43,7 @@ async def test_random_bearer_rejected_fail_closed():
         "Bearer a-very-long-forged-token",
     ):
         with pytest.raises(HTTPException) as e:
-            await require_user(authorization=junk, cookie=None)
+            await require_user(session=None, authorization=junk, cookie=None)
         assert e.value.status_code == 401
 
 
@@ -50,29 +51,96 @@ async def test_random_bearer_rejected_fail_closed():
 async def test_fake_cookie_rejected_fail_closed(monkeypatch):
     from app.core.config import settings
 
-    monkeypatch.setattr(settings, "better_auth_secret", "s3cr3t-shared-value-32chars!!")
-    with pytest.raises(HTTPException) as e:
-        await require_user(
-            authorization=None, cookie="better-auth.session_token=abc; other=1"
+    monkeypatch.setattr(
+        settings, "better_auth_secret", "s3cr3t-shared-value-32chars!!-extra"
+    )
+    monkeypatch.setattr(
+        settings, "database_url", "postgresql+asyncpg://localhost/osint"
+    )
+    engine = create_async_engine("sqlite+aiosqlite:///:memory:")
+    async with engine.begin() as connection:
+        await connection.execute(
+            text(
+                'CREATE TABLE "session" (token TEXT PRIMARY KEY, "userId" TEXT, "expiresAt" TEXT)'
+            )
         )
+    factory = async_sessionmaker(engine, expire_on_commit=False)
+    async with factory() as session:
+        with pytest.raises(HTTPException) as e:
+            await require_user(
+                authorization=None,
+                cookie="better-auth.session_token=not-a-real-session; other=1",
+                session=session,
+            )
     assert e.value.status_code == 401
+    await engine.dispose()
 
 
 @pytest.mark.asyncio
-async def test_signed_cookie_accepted(monkeypatch):
+async def test_better_auth_cookie_requires_active_database_session(monkeypatch):
     from app.core.config import settings
 
-    secret = "s3cr3t-shared-value-32chars!!"
+    secret = "s3cr3t-shared-value-32chars!!-extra"
     monkeypatch.setattr(settings, "better_auth_secret", secret)
-    payload = {"sub": "alice@example.com", "exp": int(time.time()) + 60}
-    payload_bytes = json.dumps(payload, separators=(",", ":"), sort_keys=True).encode("utf-8")
-    raw = base64.urlsafe_b64encode(payload_bytes).rstrip(b"=").decode("ascii")
-    signature = hmac.new(secret.encode("utf-8"), payload_bytes, hashlib.sha256).hexdigest()
-    uid = await require_user(
-        authorization=None,
-        cookie=f"better-auth.session_token={raw}.{signature}; other=1",
+    monkeypatch.setattr(
+        settings, "database_url", "postgresql+asyncpg://localhost/osint"
     )
-    assert uid == "user:alice@example.com"
+    engine = create_async_engine("sqlite+aiosqlite:///:memory:")
+    async with engine.begin() as connection:
+        await connection.execute(
+            text(
+                'CREATE TABLE "session" (token TEXT PRIMARY KEY, "userId" TEXT, "expiresAt" TEXT)'
+            )
+        )
+        await connection.execute(
+            text("""INSERT INTO "session" (token, "userId", "expiresAt")
+               VALUES ('opaque-valid-token', 'user_123', '2099-01-01 00:00:00'),
+                      ('opaque-expired-token', 'user_456', '2000-01-01 00:00:00')""")
+        )
+    factory = async_sessionmaker(engine, expire_on_commit=False)
+    async with factory() as session:
+        token = "opaque-valid-token"
+        signature = base64.b64encode(
+            hmac.new(secret.encode(), token.encode(), "sha256").digest()
+        ).decode("ascii")
+        uid = await require_user(
+            authorization=None,
+            cookie=f"better-auth.session_token={quote(f'{token}.{signature}', safe='.')}",
+            session=session,
+        )
+        assert uid == "user:user_123"
+        with pytest.raises(HTTPException) as forged:
+            await require_user(
+                authorization=None,
+                cookie=f"better-auth.session_token={token}.invalid-signature",
+                session=session,
+            )
+        assert forged.value.status_code == 401
+        with pytest.raises(HTTPException) as expired:
+            await require_user(
+                authorization=None,
+                cookie="better-auth.session_token=opaque-expired-token",
+                session=session,
+            )
+        assert expired.value.status_code == 401
+    await engine.dispose()
+
+
+@pytest.mark.asyncio
+async def test_cookie_auth_fails_closed_without_postgres_session_store(monkeypatch):
+    from app.core.config import settings
+
+    monkeypatch.setattr(
+        settings, "better_auth_secret", "s3cr3t-shared-value-32chars!!-extra"
+    )
+    monkeypatch.setattr(settings, "database_url", "sqlite+aiosqlite:///./data/cache.db")
+    with pytest.raises(HTTPException) as error:
+        await require_user(
+            session=None,
+            authorization=None,
+            cookie="better-auth.session_token=opaque-token",
+        )
+    assert error.value.status_code == 503
 
 
 @pytest.mark.asyncio
@@ -89,6 +157,14 @@ async def test_service_bearer_accepted_only_on_exact_secret(monkeypatch):
             authorization="Bearer s3cr3t-shared-value-32chars!?", cookie=None
         )
     assert e.value.status_code == 401
+
+
+def test_production_rejects_placeholder_auth_secret(monkeypatch):
+    from app.core.config import Settings
+
+    monkeypatch.setenv("APP_ENV", "production")
+    with pytest.raises(ValidationError):
+        Settings(better_auth_secret="replace-with-at-least-32-random-characters")
 
 
 def test_cors_locked_down():

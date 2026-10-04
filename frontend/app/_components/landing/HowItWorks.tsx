@@ -56,7 +56,7 @@ export default function HowItWorks() {
               <div className="h-4 w-5/6 rounded-full bg-slate-300 dark:bg-neutral-700" />
               <div className="h-4 w-2/5 rounded-full bg-accent/25" />
             </div>
-            <div className="mt-8 space-y-3 rounded-xl border border-neutral-200 bg-white/70 p-3 shadow-sm dark:border-neutral-800 dark:bg-neutral-900/80">
+            <div className="mt-8 space-y-3 rounded-xl border border-neutral-200 bg-white/70 p-3 shadow-xs dark:border-neutral-800 dark:bg-neutral-900/80">
               <div className="flex items-center justify-between text-xs text-slate-600 dark:text-neutral-400">
                 <span>risk signal</span>
                 <span className="font-mono text-accent">heuristic</span>

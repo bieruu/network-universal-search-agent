@@ -26,6 +26,10 @@ async def _no_cache_set(*args, **kwargs):
     return None
 
 
+async def _missing_subfinder(target):
+    raise RuntimeError("Subfinder CLI is unavailable on PATH")
+
+
 def _stub_cache(monkeypatch):
     monkeypatch.setattr(orchestrator.cache_mod, "cache_get_async", _no_cache_get)
     monkeypatch.setattr(orchestrator.cache_mod, "cache_set_async", _no_cache_set)
@@ -55,6 +59,7 @@ async def test_crtsh_timeout_becomes_partial_not_500(monkeypatch):
 
     monkeypatch.setattr(orchestrator.shodan_service, "lookup", _ok_shodan)
     monkeypatch.setattr(orchestrator.crtsh_service, "lookup", slow_crtsh)
+    monkeypatch.setattr(orchestrator.subfinder_service, "lookup", _missing_subfinder)
     monkeypatch.setattr(orchestrator.whois_service, "lookup", _ok_whois)
 
     payload = await orchestrator.run_scan(
@@ -135,17 +140,23 @@ async def test_full_failure_all_sources_down_never_raises(monkeypatch):
 
     monkeypatch.setattr(orchestrator.shodan_service, "lookup", shodan_down)
     monkeypatch.setattr(orchestrator.crtsh_service, "lookup", crtsh_slow)
+    monkeypatch.setattr(orchestrator.subfinder_service, "lookup", _missing_subfinder)
     monkeypatch.setattr(orchestrator.whois_service, "lookup", whois_down)
 
     results, errors = await orchestrator.gather_results("example.com", force=True)
     assert results == {}
-    assert {e["source"] for e in errors} == {"shodan", "crtsh", "whois"}
+    assert {e["source"] for e in errors} == {
+        "shodan",
+        "crtsh",
+        "subfinder",
+        "whois",
+    }
 
     payload = await orchestrator.run_scan(
         "example.com", "u1", force=True
     )  # must not raise
     assert payload["status"] == "failed"
-    assert len(payload["errors"]) == 3
+    assert len(payload["errors"]) == 4
 
 
 @pytest.mark.asyncio
@@ -187,6 +198,7 @@ async def test_shodan_403_cdn_ip_becomes_partial_without_key_leak(monkeypatch):
 
     monkeypatch.setattr(orchestrator.shodan_service, "lookup", shodan_403)
     monkeypatch.setattr(orchestrator.crtsh_service, "lookup", crtsh_timeout)
+    monkeypatch.setattr(orchestrator.subfinder_service, "lookup", _missing_subfinder)
     monkeypatch.setattr(orchestrator.whois_service, "lookup", _ok_whois)
 
     payload = await orchestrator.run_scan("discord.com", "u1", force=True)

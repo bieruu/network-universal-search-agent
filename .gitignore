@@ -10,3 +10,5 @@ __pycache__/
 dist/
 .vscode
 *.tsbuildinfo
+.github
+.ruff_cache

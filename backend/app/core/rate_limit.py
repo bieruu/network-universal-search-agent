@@ -1,4 +1,5 @@
 """In-memory per-user fixed-window rate limiter (10/hour default)."""
+
 from __future__ import annotations
 
 import time

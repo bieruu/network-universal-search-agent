@@ -253,15 +253,24 @@ async def test_orchestrator_failed_when_all_sources_fail(monkeypatch):
     async def boom_whois(target):
         raise RuntimeError("down")
 
+    async def subfinder_down(target):
+        raise RuntimeError("Subfinder CLI is unavailable on PATH")
+
     monkeypatch.setattr(orchestrator.shodan_service, "lookup", boom)
     monkeypatch.setattr(orchestrator.crtsh_service, "lookup", boom)
+    monkeypatch.setattr(orchestrator.subfinder_service, "lookup", subfinder_down)
     monkeypatch.setattr(orchestrator.whois_service, "lookup", boom_whois)
     monkeypatch.setattr(orchestrator.cache_mod, "cache_get_async", _no_cache_get)
     monkeypatch.setattr(orchestrator.cache_mod, "cache_set_async", _no_cache_set)
 
     results, errors = await orchestrator.gather_results("example.com", force=True)
     assert results == {}
-    assert {e["source"] for e in errors} == {"shodan", "crtsh", "whois"}
+    assert {e["source"] for e in errors} == {
+        "shodan",
+        "crtsh",
+        "subfinder",
+        "whois",
+    }
 
     payload = await orchestrator.run_scan("example.com", "u1", force=True)
     assert payload["status"] == "failed"

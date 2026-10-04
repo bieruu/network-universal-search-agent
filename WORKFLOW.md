@@ -1,132 +1,140 @@
 # WORKFLOW — Dev, Run, Ship
 
-## 1. Prereqs
+## 1. Prerequisites
 
-- Node 20+ (pnpm), Python 3.11+, Docker (for Postgres)
-- Shodan API key: https://account.shodan.io/ (free tier OK for 1-2 hosts)
+- Node.js 20.6+, npm, Python 3.11+, and Docker with Compose
+- A Shodan API key for host lookups: https://account.shodan.io/
+- Optional Subfinder CLI on the backend `PATH` for crt.sh outage fallback (host install; the backend Docker image bundles v2.16.0)
+- Optional Google/GitHub OAuth app credentials for social sign-in
 
-## 2. First-Time Setup
+## 2. First-time setup
 
-```bash
-# 1. Clone + env
-git clone <repo> network-universal-search-agent && cd network-universal-search-agent
-cp frontend/.env.local.example frontend/.env.local
-cp backend/.env.example backend/.env
-# Edit: SHODAN_API_KEY, BETTER_AUTH_SECRET (32+ random), DATABASE_URL
-
-# 2. DB
-docker compose up -d postgres
-# DATABASE_URL=postgresql+asyncpg://osint:osint@localhost:5432/osint
-
-# 3. Backend
-cd backend && python -m venv .venv && source .venv/bin/activate  # Windows: .venv\Scripts\activate
-pip install -r requirements.txt
-alembic upgrade head
-uvicorn app.main:app --reload --port 8000  # http://localhost:8000/docs
-
-# 4. Frontend (new terminal)
-cd frontend && pnpm install && pnpm dlx shadcn@latest init -y
-pnpm dev  # http://localhost:3000
-```
-
-Minimal `requirements.txt`:
-
-```
-fastapi uvicorn[standard] httpx pydantic-settings sqlalchemy[asyncio]
-asyncpg alembic python-whois structlog python-dotenv
-pytest pytest-asyncio respx
-```
-
-## 3. Env Reference
-
-```bash
-# frontend/.env.local
-NEXT_PUBLIC_APP_URL=http://localhost:3000
-NEXT_PUBLIC_API_URL=http://localhost:3000/api
-BETTER_AUTH_SECRET=dev-secret-min-32-chars-change-me
-BETTER_AUTH_URL=http://localhost:3000
-DATABASE_URL=postgresql+asyncpg://osint:osint@localhost:5432/osint
-
-# backend/.env
-SHODAN_API_KEY=xxx
-DATABASE_URL=postgresql+asyncpg://osint:osint@localhost:5432/osint
-SQLITE_PATH=./data/cache.db
-CACHE_BACKEND=sqlite  # postgres in prod (no volume) — uses osint_cache table
-BETTER_AUTH_SECRET=same-as-frontend
-CORS_ORIGINS=http://localhost:3000
-SCAN_TIMEOUT_SHODAN=12
-SCAN_TIMEOUT_CRTSH=15
-SCAN_TIMEOUT_WHOIS=10
-RATE_LIMIT_PER_HOUR=10
-```
-
-Generate secret: `openssl rand -base64 32`.
-
-## 4. Daily Run
-
-One script (Windows): from the repo root, just run — backend + frontend start together,
-missing venv/deps install themselves, busy ports are reclaimed, and the browser opens
-already logged in (dev cookie via `/dev-login`):
+Copy the environment examples and use the same PostgreSQL database for Better Auth and the backend. The frontend uses `postgresql://`; SQLAlchemy in the backend uses `postgresql+asyncpg://`.
 
 ```powershell
-.\dev.ps1
-```
-
-Manual alternative (any OS):
-
-```bash
+Copy-Item frontend\.env.local.example frontend\.env.local
+Copy-Item backend\.env.example backend\.env
 docker compose up -d postgres
-# T1 backend
-cd backend && source .venv/bin/activate && uvicorn app.main:app --reload --port 8000
-# T2 frontend
-cd frontend && pnpm dev
-```
-Then open `http://localhost:3000/dev-login` once for the dev session cookie.
-
-Flow: Sign in → `/dashboard` → type `example.com` → watch per-card skeletons → charts populate → History saves automatically.
-
-Proxy: browser → `Next /api/scan/*` (attaches session) → `FastAPI /api/v1/scan/*`. Never call `:8000` directly from browser in dev.
-
-## 5. Branching & Commits
-
-```bash
-git checkout -b feat/shodan-service
-# ... code + tests ...
-pnpm lint && pnpm tsc --noEmit
-pytest -q && ruff check . && black --check .
-git commit -m "feat: shodan lookup with timeout + cache"
-gh pr create --fill
 ```
 
-Branches: `feat/*`, `fix/*`, `chore/*`, `docs/*`. One concern per PR. Update TODO.md checkbox in same PR.
+Set the same random `BETTER_AUTH_SECRET` (at least 32 characters) in both env files. Never use the example placeholder in a running environment. Set `SHODAN_API_KEY` in `backend/.env`; add OAuth provider credentials only if using those providers.
 
-## 6. Testing & Checks
+Create Better Auth's user/session/account/verification tables once:
 
-```bash
-# Backend — mock external, test partial
-pytest -q -k "orchestrator or shodan or auth"
+```powershell
+cd frontend
+npm install
+npm run auth:migrate
+```
+
+Then initialize the application schema and run the backend:
+
+```powershell
+cd ..\backend
+python -m venv .venv
+.venv\Scripts\Activate.ps1
+pip install -r requirements.txt
+alembic upgrade head
+uvicorn app.main:app --reload --port 8000
+```
+
+FastAPI no longer creates or alters application tables during startup; schema changes are managed by Alembic before serving traffic. For a brand-new database, `alembic upgrade head` creates the application tables. If upgrading a database created by the previous `create_all` startup path, first verify that its `targets`, `scans`, and `findings` tables match the initial revision, then record that baseline once with `alembic stamp head`. Do not stamp an unknown or mismatched schema. Alembic intentionally ignores Better Auth-owned tables in the shared database.
+
+In another terminal, start Next.js:
+
+```powershell
+cd frontend
+npm run dev
+```
+
+For Bash, use `cp`, activate `.venv/bin/activate`, and use the same `npm` commands.
+
+## 3. Environment reference
+
+`frontend/.env.local`:
+
+```dotenv
+NEXT_PUBLIC_APP_URL=http://localhost:3000
+NEXT_PUBLIC_API_URL=http://localhost:3000/api
+BETTER_AUTH_URL=http://localhost:3000
+BETTER_AUTH_SECRET=<same-random-secret-as-backend>
+DATABASE_URL=postgresql://osint:osint@localhost:5432/osint
+GOOGLE_CLIENT_ID=
+GOOGLE_CLIENT_SECRET=
+GITHUB_CLIENT_ID=
+GITHUB_CLIENT_SECRET=
+BACKEND_URL=http://localhost:8000
+```
+
+`backend/.env`:
+
+```dotenv
+SHODAN_API_KEY=<key>
+DATABASE_URL=postgresql+asyncpg://osint:osint@localhost:5432/osint
+BETTER_AUTH_SECRET=<same-random-secret-as-frontend>
+CORS_ORIGINS=http://localhost:3000
+APP_URL=http://localhost:3000
+SQLITE_PATH=./data/cache.db
+CACHE_BACKEND=sqlite
+```
+
+Generate a secret with `openssl rand -base64 32` or a trusted password generator. Do not commit real secrets or filled `.env` files.
+
+## 4. Daily development
+
+On Windows, `.\dev.ps1` starts the backend and frontend and opens `/sign-up`. The script does not create or bypass authentication sessions. The Better Auth schema migration in §2 must already have been run.
+
+Create an account at `http://localhost:3000/sign-up`, then sign in at `/sign-in`. After sign-in, open `/dashboard` and scan a public domain such as `example.com`. Use the dashboard Log out control to revoke the session.
+
+Browser API requests go through the Next proxy (`/api/scan/*`) to FastAPI. Do not call Shodan or CT services from the browser.
+
+## 5. OAuth provider setup
+
+OAuth is optional. In the provider console, set the callback URL to:
+
+- Google: `http://localhost:3000/api/auth/callback/google`
+- GitHub: `http://localhost:3000/api/auth/callback/github`
+
+For production, replace the origin with the exact `BETTER_AUTH_URL`. Supply both the client ID and secret for each provider. A provider is not configured unless both are present. Live OAuth must be tested with valid provider credentials; a successful build is not proof of a live callback.
+
+## 6. Tests and checks
+
+```powershell
 # Frontend
-pnpm test && pnpm lint
-# Manual partial: stop network to crt.sh OR set SHODAN_API_KEY=invalid → expect status=partial + badge, not 500
-# Secrets check
-grep -r "SHODAN_API_KEY" frontend/.next frontend/src --include="*.js" --include="*.tsx" | head
+cd frontend
+npm run lint
+npm test
+npm run tsc
+npm run build
+npm audit
+
+# Backend, from backend/ with its environment activated
+alembic check
+pytest -q
+ruff check .
+black --check .
 ```
+
+Backend tests mock upstream OSINT services. For auth, tests verify active/expired/fake session behavior and owner isolation; run the §2 live PostgreSQL setup to validate signup and protected scans end to end.
 
 ## 7. Troubleshooting
 
 | Symptom | Fix |
 |---|---|
-| `401 on /scan` | Sign in again; check `BETTER_AUTH_SECRET` matches FE/BE; inspect cookie Secure on http (set false locally) |
-| `crt.sh timeout` | Normal flakiness → retry, check `errors[]`; increase `SCAN_TIMEOUT_CRTSH=20` |
-| `Shodan 401` | Invalid key; verify at `https://api.shodan.io/api-info?key=` |
-| `WHOIS empty emails` | GDPR redacted — expected, show "redacted" |
-| `DB connect refused` | `docker compose ps`, `alembic upgrade head`, check `DATABASE_URL` asyncpg scheme |
-| `CORS blocked` | `CORS_ORIGINS` must exactly match `http://localhost:3000` |
-| `Charts hydration error` | Ensure `next/dynamic(..., {ssr:false})` for chart components |
+| Redirected to `/sign-in` | Sign in again; check `BETTER_AUTH_URL` matches the browser origin and the session has not expired. |
+| Auth table missing | Run `npm run auth:migrate` from `frontend/` with a valid frontend `DATABASE_URL`. |
+| Scan returns 401 | Confirm frontend and backend point to the same PostgreSQL DB and that the request includes the Better Auth cookie. |
+| Scan returns 503 | Backend auth cannot use SQLite; configure its `DATABASE_URL` with the PostgreSQL `+asyncpg` URL for the shared session store. |
+| OAuth provider unavailable | Configure both provider credentials and the correct callback URL, then restart/redeploy. |
+| Backend unreachable (502) | Start FastAPI on port 8000 and check `BACKEND_URL`. |
+| Private target rejected | Expected: localhost, RFC1918, link-local, and other restricted addresses are blocked. |
+| OneDrive `EINVAL` under `.next` | `npm run clean`, then retry; `predev` and `prebuild` also clean the affected Next.js output. |
 
-## 8. Ship
+## 8. Deployment
 
-- FE → Vercel: import `frontend/`, set env `NEXT_PUBLIC_*`, `BETTER_AUTH_*` (`BETTER_AUTH_URL` = Vercel URL), redeploy.
-- DB → Neon/Supabase: create project, copy pooled connection string into both `DATABASE_URL`s (SQLAlchemy `+asyncpg` scheme on backend), run `alembic upgrade head` from `backend/`.
-- BE → Docker/Fly: `cd backend` then `docker build -t osint-be .` + `docker run -e PORT=8000 --env-file .env -p 8000:8000 osint-be` (image runs `alembic upgrade head` then uvicorn on `$PORT`). Fly: `fly launch --dockerfile Dockerfile` with secrets `SHODAN_API_KEY`, `DATABASE_URL`, `BETTER_AUTH_SECRET`.
-- Prod: set `CACHE_BACKEND=postgres` if SQLite volume not persisted (auto-creates `osint_cache` table); rotate `BETTER_AUTH_SECRET` + `SHODAN_API_KEY` via provider dashboard. Set `CORS_ORIGINS` to the Vercel URL exactly.
+- Frontend: deploy `frontend/` with `BETTER_AUTH_URL`, `BETTER_AUTH_SECRET`, standard PostgreSQL `DATABASE_URL`, `NEXT_PUBLIC_APP_URL`, `BACKEND_URL`, and optional provider credentials.
+- Database: use the same PostgreSQL database for frontend auth and backend application data. Run `npm run auth:migrate` from `frontend/` and `alembic upgrade head` from `backend/` before serving traffic. For an existing database created by the old startup `create_all`, verify its schema before the one-time `alembic stamp head`; never stamp a database whose schema has not been checked.
+- Backend: provide the same secret and database (backend URL uses `postgresql+asyncpg://`), `SHODAN_API_KEY`, exact `CORS_ORIGINS`, and production `APP_ENV=production`.
+- On non-container hosts, install Subfinder separately and make it available on the backend `PATH` to enable the bounded crt.sh fallback; its absence is reported as a source error. The backend Docker image builds and includes Subfinder v2.16.0.
+- Configure OAuth callback URLs for the deployed origin. Do not advertise or mark a provider verified until a live callback succeeds.
+- Rotate secrets through the relevant provider/host dashboards; never place secrets in client-prefixed variables or source control.
