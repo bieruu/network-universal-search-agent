@@ -12,10 +12,12 @@ import socket
 import sys
 import types
 
+import httpx
 import pytest
 
 from app.core.config import settings
 from app.services import (
+    certspotter_service,
     crtsh_service,
     orchestrator,
     shodan_service,
@@ -26,6 +28,7 @@ from app.services import (
 class _FakeResponse:
     def __init__(self, payload):
         self._payload = payload
+        self.status_code = 200
 
     def raise_for_status(self):
         return None
@@ -41,7 +44,7 @@ class _FakeClient:
         self._payload = payload
         self.calls: list[dict] = []
 
-    async def get(self, url, params=None):
+    async def get(self, url, params=None, timeout=None):
         self.calls.append({"url": url, "params": params})
         return _FakeResponse(self._payload)
 
@@ -83,6 +86,96 @@ async def test_shodan_maps_host_and_truncates_banner(shodan_key):
     assert out["services"][1]["transport"] == "tcp"  # default
     assert sorted(out["vulns"]) == ["CVE-2021-1", "CVE-2022-2"]
     assert out["isp"] == "Example ISP"
+    assert out["source"] == "Shodan"
+
+
+@pytest.mark.asyncio
+async def test_shodan_403_falls_back_to_public_internetdb(shodan_key):
+    request = httpx.Request("GET", "https://api.shodan.io/shodan/host/1.1.1.1")
+    denied = httpx.Response(403, request=request)
+
+    class _SequenceClient:
+        def __init__(self):
+            self.responses = [
+                denied,
+                _FakeResponse(
+                    {
+                        "ports": [443, 80, 0, 65536, True],
+                        "vulns": ["CVE-2025-1234", 42],
+                    }
+                ),
+            ]
+            self.calls = []
+
+        async def get(self, url, params=None, timeout=None):
+            self.calls.append({"url": url, "params": params, "timeout": timeout})
+            return self.responses.pop(0)
+
+    client = _SequenceClient()
+    result = await shodan_service.lookup("1.1.1.1", client=client)
+
+    assert result["source"] == "Shodan InternetDB"
+    assert result["ip"] == "1.1.1.1"
+    assert result["ports"] == [443, 80]
+    assert [item["port"] for item in result["services"]] == [443, 80]
+    assert result["vulns"] == ["CVE-2025-1234"]
+    assert client.calls[0]["params"] == {"key": shodan_key}
+    assert client.calls[1]["url"] == "https://internetdb.shodan.io/1.1.1.1"
+    assert client.calls[1]["params"] is None
+    assert client.calls[1]["timeout"] == settings.scan_timeout_shodan
+
+
+@pytest.mark.asyncio
+async def test_shodan_internetdb_404_is_empty_lookup(shodan_key):
+    request = httpx.Request("GET", "https://api.shodan.io/shodan/host/1.1.1.1")
+    denied = httpx.Response(403, request=request)
+    not_found = httpx.Response(
+        404,
+        request=httpx.Request("GET", "https://internetdb.shodan.io/1.1.1.1"),
+    )
+
+    class _SequenceClient:
+        def __init__(self):
+            self.responses = [denied, not_found]
+
+        async def get(self, url, params=None, timeout=None):
+            return self.responses.pop(0)
+
+    result = await shodan_service.lookup("1.1.1.1", client=_SequenceClient())
+
+    assert result["source"] == "Shodan InternetDB"
+    assert result["ports"] == []
+    assert result["services"] == []
+    assert result["vulns"] == []
+
+
+@pytest.mark.asyncio
+async def test_shodan_404_falls_back_to_internetdb(shodan_key):
+    shodan_404 = httpx.Response(
+        404,
+        request=httpx.Request("GET", "https://api.shodan.io/shodan/host/44.228.249.3"),
+    )
+    internetdb = _FakeResponse({"ports": [80, 443], "vulns": ["CVE-2025-1234"]})
+
+    class _SequenceClient:
+        def __init__(self):
+            self.responses = [shodan_404, internetdb]
+            self.urls = []
+
+        async def get(self, url, params=None, timeout=None):
+            self.urls.append(url)
+            return self.responses.pop(0)
+
+    client = _SequenceClient()
+    result = await shodan_service.lookup("44.228.249.3", client=client)
+
+    assert result["source"] == "Shodan InternetDB"
+    assert result["ports"] == [80, 443]
+    assert result["vulns"] == ["CVE-2025-1234"]
+    assert client.urls == [
+        "https://api.shodan.io/shodan/host/44.228.249.3",
+        "https://internetdb.shodan.io/44.228.249.3",
+    ]
 
 
 @pytest.mark.asyncio
@@ -250,6 +343,9 @@ async def test_orchestrator_failed_when_all_sources_fail(monkeypatch):
     async def boom(target, client=None):
         raise RuntimeError("down")
 
+    async def certspotter_down(target, client=None):
+        raise RuntimeError("Cert Spotter is unavailable")
+
     async def boom_whois(target):
         raise RuntimeError("down")
 
@@ -258,6 +354,7 @@ async def test_orchestrator_failed_when_all_sources_fail(monkeypatch):
 
     monkeypatch.setattr(orchestrator.shodan_service, "lookup", boom)
     monkeypatch.setattr(orchestrator.crtsh_service, "lookup", boom)
+    monkeypatch.setattr(certspotter_service, "lookup", certspotter_down)
     monkeypatch.setattr(orchestrator.subfinder_service, "lookup", subfinder_down)
     monkeypatch.setattr(orchestrator.whois_service, "lookup", boom_whois)
     monkeypatch.setattr(orchestrator.cache_mod, "cache_get_async", _no_cache_get)
@@ -268,7 +365,6 @@ async def test_orchestrator_failed_when_all_sources_fail(monkeypatch):
     assert {e["source"] for e in errors} == {
         "shodan",
         "crtsh",
-        "subfinder",
         "whois",
     }
 

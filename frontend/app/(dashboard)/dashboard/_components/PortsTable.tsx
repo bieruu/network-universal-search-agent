@@ -22,6 +22,9 @@ export default function PortsTable({
         <CardDescription>
           {scan?.results.shodan?.ip ? `Host ${scan.results.shodan.ip} · ` : ""}
           {services.length} service{services.length === 1 ? "" : "s"}
+          {scan?.results.shodan?.source
+            ? ` · via ${scan.results.shodan.source}`
+            : ""}
         </CardDescription>
       </CardHeader>
       <CardContent>
@@ -32,7 +35,7 @@ export default function PortsTable({
         ) : services.length === 0 ? (
           <p className="text-sm text-slate-500 dark:text-neutral-500">
             {scan?.errors.some((e) => e.source === "shodan")
-              ? "Shodan returned no data for this host (CDN/WAF IPs often have none) — see the source error above."
+              ? "Shodan and its public InternetDB fallback were unavailable — see the source error above."
               : "No ports found."}
           </p>
         ) : (

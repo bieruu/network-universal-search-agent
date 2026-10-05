@@ -16,9 +16,10 @@ export default function SubdomainsTable({
   return (
     <Card className="flex flex-col">
       <CardHeader>
-        <CardTitle>Subdomains (crt.sh)</CardTitle>
+        <CardTitle>Subdomains</CardTitle>
         <CardDescription>
           {rows.length} subdomain{rows.length === 1 ? "" : "s"} found
+          {scan?.results.crtsh?.source ? ` · via ${scan.results.crtsh.source}` : ""}
         </CardDescription>
       </CardHeader>
       <CardContent>
@@ -27,7 +28,7 @@ export default function SubdomainsTable({
         ) : rows.length === 0 ? (
           <p className="text-sm text-slate-500 dark:text-neutral-500">
             {scan?.errors.some((e) => e.source === "crtsh")
-              ? "crt.sh returned no data (large zones can time out) — see the source error above."
+              ? "Certificate transparency providers returned no data — see the source error above."
               : "No subdomains found."}
           </p>
         ) : (

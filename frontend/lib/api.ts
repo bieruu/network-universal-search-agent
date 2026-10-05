@@ -5,6 +5,33 @@ export interface SourceError {
   message: string;
 }
 
+export type NvdStatus = "found" | "no_match" | "insufficient_evidence" | "unavailable";
+
+export interface NvdCve {
+  id: string;
+  description?: string;
+  cvss?: number | null;
+  severity?: string | null;
+  published?: string;
+  references?: string[];
+  evidence_cpe?: string;
+  vuln_status?: string | null;
+}
+
+export type CveTier = "verified" | "unverified" | "rejected";
+
+export interface NvdCveRow {
+  id: string;
+  tier?: CveTier | string;
+  source?: string;
+  severity?: string | null;
+  cvss?: number | null;
+  evidence_cpe?: string | null;
+  vuln_status?: string | null;
+  description?: string | null;
+  url?: string;
+}
+
 export interface ScanResult {
   scan_id: string;
   target: string;
@@ -12,17 +39,30 @@ export interface ScanResult {
   risk_score: number | null;
   results: {
     shodan?: {
+      source?: string;
       ip?: string;
       ports?: number[];
-      services?: Array<{ port: number; product?: string; version?: string; banner?: string }>;
+      services?: Array<{ port: number; product?: string; version?: string; banner?: string; cpes?: string[] }>;
       vulns?: string[];
+      cpes?: string[];
       isp?: string;
       asn?: string;
       city?: string;
       country?: string;
     };
+    nvd?: {
+      source?: string;
+      status?: NvdStatus;
+      checked_cpes?: string[];
+      cves?: NvdCve[];
+      cve_rows?: NvdCveRow[];
+      truncated?: boolean;
+      errors?: string[];
+      note?: string;
+    };
     crtsh?: {
       domain?: string;
+      source?: string;
       count?: number;
       subdomains?: Array<{ subdomain: string; issuer?: string; not_before?: string; not_after?: string }>;
     };

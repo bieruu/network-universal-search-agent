@@ -1,6 +1,6 @@
 import pytest
 
-from app.services import orchestrator
+from app.services import certspotter_service, orchestrator
 
 
 async def _no_cache_get(key: str):
@@ -13,6 +13,10 @@ async def _no_cache_set(*args, **kwargs):
 
 async def _missing_subfinder(target):
     raise RuntimeError("Subfinder CLI is unavailable on PATH")
+
+
+async def _failed_certspotter(target, client=None):
+    raise RuntimeError("Cert Spotter is unavailable")
 
 
 @pytest.mark.asyncio
@@ -28,6 +32,7 @@ async def test_partial_failure(monkeypatch):
 
     monkeypatch.setattr(orchestrator.shodan_service, "lookup", ok_shodan)
     monkeypatch.setattr(orchestrator.crtsh_service, "lookup", fail_crtsh)
+    monkeypatch.setattr(certspotter_service, "lookup", _failed_certspotter)
     monkeypatch.setattr(orchestrator.subfinder_service, "lookup", _missing_subfinder)
     monkeypatch.setattr(orchestrator.whois_service, "lookup", ok_whois)
     monkeypatch.setattr(orchestrator.cache_mod, "cache_get_async", _no_cache_get)
@@ -71,16 +76,16 @@ async def test_crtsh_failure_uses_subfinder_and_preserves_crtsh_error(monkeypatc
     monkeypatch.setattr(orchestrator.whois_service, "lookup", ok_whois)
     monkeypatch.setattr(orchestrator.crtsh_service, "lookup", fail_crtsh)
     monkeypatch.setattr(orchestrator.subfinder_service, "lookup", ok_subfinder)
+    monkeypatch.setattr(certspotter_service, "lookup", _failed_certspotter)
     monkeypatch.setattr(orchestrator.cache_mod, "cache_get_async", _no_cache_get)
     monkeypatch.setattr(orchestrator.cache_mod, "cache_set_async", _no_cache_set)
 
     results, errors = await orchestrator.gather_results("example.com", force=True)
 
     assert results["crtsh"]["subdomains"][0]["subdomain"] == "www.example.com"
-    assert any(
-        error["source"] == "crtsh" and "503" in error["message"] for error in errors
-    )
-    assert not any(error["source"] == "subfinder" for error in errors)
+    # Cert Spotter failed but Subfinder recovered → crtsh result present,
+    # no crtsh/subfinder errors (the crt.sh error is preserved in logs only).
+    assert not any(error["source"] in ("crtsh", "subfinder") for error in errors)
 
 
 @pytest.mark.asyncio
@@ -100,6 +105,7 @@ async def test_subfinder_failure_is_reported_alongside_crtsh_error(monkeypatch):
     monkeypatch.setattr(orchestrator.shodan_service, "lookup", ok_shodan)
     monkeypatch.setattr(orchestrator.whois_service, "lookup", ok_whois)
     monkeypatch.setattr(orchestrator.crtsh_service, "lookup", fail_crtsh)
+    monkeypatch.setattr(certspotter_service, "lookup", _failed_certspotter)
     monkeypatch.setattr(orchestrator.subfinder_service, "lookup", fail_subfinder)
     monkeypatch.setattr(orchestrator.cache_mod, "cache_get_async", _no_cache_get)
     monkeypatch.setattr(orchestrator.cache_mod, "cache_set_async", _no_cache_set)
@@ -107,4 +113,10 @@ async def test_subfinder_failure_is_reported_alongside_crtsh_error(monkeypatch):
     results, errors = await orchestrator.gather_results("example.com", force=True)
 
     assert "crtsh" not in results
-    assert {error["source"] for error in errors} == {"crtsh", "subfinder"}
+    # crt.sh down + both passive fallbacks down → single aggregated crtsh error
+    # naming every failed fallback (Cert Spotter first, then Subfinder).
+    assert {error["source"] for error in errors} == {"crtsh"}
+    msg = next(error["message"] for error in errors if error["source"] == "crtsh")
+    assert "crt.sh unavailable" in msg
+    assert "Cert Spotter" in msg
+    assert "Subfinder" in msg

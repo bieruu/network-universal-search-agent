@@ -10,7 +10,7 @@
                                                                       │ asyncio.gather
                                     ┌─────────────────┬────────────────┼──────────────┐
                                     ▼                 ▼                ▼              ▼
-                              Shodan API           crt.sh           WHOIS lib     SQLite cache (TTL 24h)
+                              Shodan API      crt.sh / Cert Spotter  WHOIS lib     SQLite cache (TTL 24h)
                                     │                 │                │              │
                                     └─────────────────┴────────────────┴──────┬───────┘
                                                                               ▼
@@ -18,7 +18,7 @@
 ```
 
 Principles:
-- Secrets never leave backend. Frontend never calls Shodan/crt.sh directly.
+- Secrets never leave backend. Frontend never calls external OSINT providers directly.
 - FastAPI is stateless orchestrator; Postgres is source of truth; SQLite is quota-saving cache.
 - Partial failure is first-class: `partial` status + per-source errors.
 
@@ -115,8 +115,11 @@ async def run_scan(target, force=False):
 - Never trust external JSON: Pydantic parse + `.get()` defaults + truncate banners to 2KB.
 
 ### 4.3 Services Detail
-- **Shodan:** `https://api.shodan.io/shodan/host/{ip}?key=` — if target is domain, resolve DNS first (socket, logged). Map `ports, data[{port, transport, product, version, banner}], vulns, isp, asn, city/country`.
-- **crt.sh:** `GET https://crt.sh/?q=%25.{domain}&output=json` — dedup `name_value` split lines, lowercase, strip `*.`, collect `{ subdomain, issuer, not_before/after }`. Limit 500 rows.
+- **Shodan:** `https://api.shodan.io/shodan/host/{ip}?key=` — if target is domain, resolve DNS first (socket, logged). Map `ports, data[{port, transport, product, version, banner, cpes}], vulns, cpes, isp, asn, city/country`. Only exact `cpe:2.3:` identifiers are kept (keyword/product matching rejected). On HTTP 403 or 404, fall back to Shodan's public, keyless InternetDB endpoint for ports, vulnerability identifiers, and CPEs; label fallback data and treat its 404 as no indexed result.
+- **NVD CVE enrichment:** after Shodan succeeds, `nvd_service.enrich_cpes(shodan.cpes)` queries `GET https://services.nvd.nist.gov/rest/json/cves/2.0?cpeName=<exact CPE>` (never `isVulnerable` — verified unstable 2026-10-05). Client-side filter keeps only CVEs whose `configurations[].nodes[].cpeMatch[]` has `vulnerable=true` matching the observed CPE (exact criteria or provable version-range containment). Result contract `results.nvd = { source, status: found|no_match|insufficient_evidence|unavailable, checked_cpes[], cves[{id, description, cvss, severity, published, references[], evidence_cpe}], truncated, errors[], note }`. Caps: `NVD_MAX_CPES=5`, `NVD_CVES_PER_CPE=20`, page `NVD_PAGE_SIZE=100`; sequential requests with 6s delay (0.7s with `NVD_API_KEY`); per-CPE cache 7d; timeout `SCAN_TIMEOUT_NVD=12`. NVD 404 with empty body = `no_match`; timeouts/429/5xx = `unavailable` (+ `errors[]`, scan stays `partial`). Risk scoring unions `shodan.vulns` + `nvd.cves` and flags `breakdown.vulns_incomplete` when coverage is missing — missing data never renders as `0`.
+
+- **CVE validity tiers (Phase 17, 2026-10-05):** `nvd_service.build_cve_rows(shodan.vulns, nvd, client)` cross-checks each Shodan-reported CVE ID against NVD (`GET ...?cveId=<id>`, cap `NVD_CVE_ID_LOOKUP_CAP=20`/scan, per-ID cache 7d keyed `nvd:cve:<id>`). Row contract `results.nvd.cve_rows[] = {id, tier, source, severity, cvss, evidence_cpe, vuln_status, description, url}`. Tiers: `verified` (NVD CPE-exact match, or ID cross-checked with non-rejected status), `unverified` (ID valid-looking but not confirmed: NVD down, cap hit, or CPE mismatch), `rejected` (NVD `vulnStatus` Rejected/Disputed — shown in UI, excluded from scoring). NVD total failure degrades every Shodan ID to `unverified`, never hidden. `risk.score` counts only `verified`+`unverified` IDs, reports `breakdown.rejected_cves`, and keeps `vulns_incomplete`. CPE 2.2 URIs (`cpe:/a:vendor:...`) are normalized to CPE 2.3 by `services/cpe_util.py:normalize_cpe` (deterministic 1-to-1, missing segments → `*`) and accepted by both Shodan CPE collection and NVD validation — this unblocks InternetDB hosts that only emit `cpe:/...`. UI: `VulnerabilitiesCard` renders columns CVE (NVD link) / Tier badge / Severity / CVSS / Evidence CPE / Source, plus a tier legend; `getCveEvidence` excludes `rejected` IDs from the dashboard count. No new env vars; fallback chain (crt.sh → Cert Spotter → Subfinder) unchanged.
+- **Certificate Transparency:** query crt.sh first; on failure use the public Cert Spotter API, then the bounded Subfinder CLI. Successful fallback data is cached and identifies its provider; report an error only when all passive certificate sources fail. Results deduplicate and cap names at 500, retaining `{ subdomain, issuer, not_before/after }`.
 - **WHOIS:** `python-whois` in `asyncio.to_thread` (blocking) — map registrar, creation/expiry, name_servers, emails (may be None due to GDPR — show "redacted").
 
 ## 5. Data Model (PostgreSQL)

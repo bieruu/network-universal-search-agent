@@ -89,6 +89,26 @@ async def test_subfinder_missing_binary_is_reported(monkeypatch):
 
 
 @pytest.mark.asyncio
+async def test_subfinder_not_implemented_runtime_error_is_reported(monkeypatch):
+    monkeypatch.setattr(
+        subfinder_service.shutil, "which", lambda _: r"C:\tools\subfinder.exe"
+    )
+
+    async def unsupported(*args, **kwargs):
+        raise NotImplementedError("asyncio.subprocess is not supported")
+
+    monkeypatch.setattr(
+        subfinder_service.asyncio, "create_subprocess_exec", unsupported
+    )
+
+    with pytest.raises(
+        RuntimeError,
+        match="not available on this runtime|subprocess support is missing",
+    ):
+        await subfinder_service.lookup("example.com")
+
+
+@pytest.mark.asyncio
 async def test_subfinder_nonzero_exit_is_reported(monkeypatch):
     _mock_process(monkeypatch, _FakeProcess(output=b"www.example.com\n", returncode=2))
 

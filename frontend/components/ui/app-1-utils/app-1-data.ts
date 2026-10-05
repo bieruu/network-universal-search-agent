@@ -1,5 +1,6 @@
 import type { ScanResult } from "@/lib/api";
 import { getSubdomainCount } from "@/lib/scan-shape";
+import { getCveEvidence } from "@/lib/scan-shape";
 
 export interface StatItem {
   key: string;
@@ -29,10 +30,11 @@ export function statsFromScan(scan: ScanResult | null): StatItem[] {
     ];
   }
   const hint = `${scan.target} · ${scan.status}`;
+  const evidence = getCveEvidence(scan.results);
   return [
     { key: "ports", label: "Open ports", value: String(scan.results.shodan?.ports?.length ?? 0), hint },
     { key: "services", label: "Services", value: String(scan.results.shodan?.services?.length ?? 0), hint },
-    { key: "vulns", label: "Vulns", value: String(scan.results.shodan?.vulns?.length ?? 0), hint },
+    { key: "vulns", label: "Vulns", value: evidence.count == null ? "—" : String(evidence.count), hint: evidence.hint },
     { key: "subs", label: "Subdomains", value: String(getSubdomainCount(scan.results)), hint },
   ];
 }
@@ -41,7 +43,7 @@ export function latestFindings(scan: ScanResult | null): string[] {
   if (!scan) return [];
   const out: string[] = [];
   for (const p of scan.results.shodan?.ports?.slice(0, 3) ?? []) out.push(`port ${p} open`);
-  for (const v of scan.results.shodan?.vulns?.slice(0, 2) ?? []) out.push(v);
+  for (const v of getCveEvidence(scan.results).ids.slice(0, 2) ?? []) out.push(v);
   for (const s of scan.results.crtsh?.subdomains?.slice(0, 3) ?? []) out.push(s.subdomain);
   return out.slice(0, 6);
 }

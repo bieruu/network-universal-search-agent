@@ -44,7 +44,23 @@ test("SubdomainsTable caps rendered rows", () => {
 });
 
 test("loading skeletons present on data cards", () => {
-  for (const f of ["PortsTable.tsx", "SubdomainsTable.tsx", "WhoisCard.tsx", "OverviewCards.tsx"]) {
+  for (const f of ["PortsTable.tsx", "SubdomainsTable.tsx", "WhoisCard.tsx", "OverviewCards.tsx", "VulnerabilitiesCard.tsx"]) {
     assert.ok(sources[f].includes("Skeleton"), `${f} must render a Skeleton while loading`);
   }
+});
+
+test("vulnerabilities card states never claim zero or safety", () => {
+  const src = sources["VulnerabilitiesCard.tsx"];
+  assert.ok(src.includes("not proof"), "must warn that no_match is not proof of safety");
+  assert.ok(src.includes("not 0") || src.includes("not zero"), "must warn that missing data is not zero");
+  assert.ok(src.includes("Evidence CPE"), "must show the CPE evidence per CVE");
+});
+
+test("vulnerabilities card shows tier badge, NVD link, and source", () => {
+  const src = sources["VulnerabilitiesCard.tsx"];
+  assert.ok(src.includes("nvd.nist.gov/vuln/detail/"), "each CVE must link to NVD");
+  assert.ok(src.includes('"rejected"'), "rejected tier must render");
+  assert.ok(src.includes('"verified"') && src.includes('"unverified"'), "all tiers must render");
+  assert.ok(src.includes("Source"), "source column required");
+  assert.ok(!src.includes("dangerouslySetInnerHTML"), "no raw HTML injection");
 });

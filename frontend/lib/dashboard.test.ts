@@ -34,12 +34,12 @@ test("dashboard shell is a pure shell; page owns the section order", () => {
   assert.ok(sidebar.includes("min-w-0") || shell.includes("min-w-0"), "min-w-0 flex fix required");
   assert.ok(shell.includes("sticky"), "header must be sticky");
   assert.ok(shell.includes("h-16"), "header must be h-16");
-  for (const kept of ["TargetSearch", "ScanStatus", "PortsChart", "RiskTrendChart", "PortsTable", "SubdomainsTable", "WhoisCard", "HistoryList"]) {
+  for (const kept of ["TargetSearch", "ScanStatus", "PortsChart", "RiskTrendChart", "PortsTable", "VulnerabilitiesCard", "SubdomainsTable", "WhoisCard", "HistoryList"]) {
     assert.ok(page.includes(kept), `${kept} must be kept in the page grid`);
   }
   // Sections render in one ordered column: search → stats → charts → tables → history.
   // (JSX markers with "<" so import lines don't match.)
-  const order = ["New scan", 'aria-label="scan stats"', "<PortsChart", "<PortsTable", "<SubdomainsTable", "<HistoryList"];
+  const order = ["New scan", 'aria-label="scan stats"', "<PortsChart", "<PortsTable", "<VulnerabilitiesCard", "<SubdomainsTable", "<HistoryList"];
   let last = -1;
   for (const marker of order) {
     const at = page.indexOf(marker);
@@ -49,7 +49,7 @@ test("dashboard shell is a pure shell; page owns the section order", () => {
 });
 
 test("dashboard cards share one header/content structure and locked chart heights", () => {
-  const cards = ["PortsChart.tsx", "RiskTrendChart.tsx", "PortsTable.tsx", "SubdomainsTable.tsx", "WhoisCard.tsx", "HistoryList.tsx"];
+  const cards = ["PortsChart.tsx", "RiskTrendChart.tsx", "PortsTable.tsx", "VulnerabilitiesCard.tsx", "SubdomainsTable.tsx", "WhoisCard.tsx", "HistoryList.tsx"];
   for (const f of cards) {
     const src = readFileSync(join(here, "..", "app", "(dashboard)", "dashboard", "_components", f), "utf8");
     assert.ok(src.includes("CardHeader"), `${f} must use CardHeader`);

@@ -101,7 +101,7 @@
 - [x] Status colors ber-token: `--warning`/`--danger` light/dark; ScanStatus + TargetSearch pakai token (amber-300/red-400 polos dibuang); border tabel dipasangkan light/dark
 - [x] Chart pakai warna token (`lib/chart-theme.ts`: accent dataset, grid `btn-border`, tick `muted`) + re-render saat toggle tema via MutationObserver
 - [x] Kontrak: `palette.test.ts` (token warning/danger/panel, bg netral, font di root, base pill) + `dashboard.test.ts` (status token, border tabel, chart palette)
-- Catatan investigasi: kartu yang "macet gelap" saat toggle di window tersembunyi = artefak (CSS transition clock beku; body tanpa transisi flip benar, klon segar benar). Reload langsung di light: semua kartu putih, border terang, 0 animasi — kode benar.
+d- Catatan investigasi: kartu yang "macet gelap" saat toggle di window tersembunyi = artefak (CSS transition clock beku; body tanpa transisi flip benar, klon segar benar). Reload langsung di light: semua kartu putih, border terang, 0 animasi — kode benar.
 
 ## Phase 13 — Terminal Clear Transition [DONE 2026-10-01: npm test 48 passed, tsc clean]
 
@@ -149,18 +149,55 @@
 - [x] Migrated the frontend to Tailwind CSS 4.3.3, moved the existing theme tokens to CSS-first configuration, and removed obsolete Tailwind 3 config/dependencies. Frontend TypeScript, all 53 tests, production build, and full `npm audit` pass (0 vulnerabilities).
 - [x] Run clean-room pre-push validation without local `.env` files: frontend `npm ci`, lint, 53 tests, TypeScript, audit (0 vulnerabilities), and production build passed; backend ran in the Python 3.11 image with 49 tests, Ruff, targeted Black, fresh PostgreSQL migration/drift check, and Subfinder smoke test (2026-10-04).
 
-### Newly reported issues and requests (2026-10-04; not yet investigated or implemented)
-- [ ] Diagnose the reported Shodan error for `162.159.138.232` (HTTP 403: no host data or plan limit); define and test clear handling for CDN/WAF IPs and plan restrictions.
-- [ ] Diagnose the crt.sh timeout reported at about 15 seconds; reconcile the observed duration with the configured 30-second source timeout and the overall scan timeout before adjusting behavior.
-- [ ] Diagnose Subfinder `NotImplementedError` from scan `fb852eba-4ce2-479f-8c27-47961b93d1953`; obtain the complete sanitized traceback and add a regression test for the identified cause.
-- [ ] Investigate the two reported backend CI errors; capture the failed job/step names and full error output before choosing fixes. Local clean-room CI-equivalent checks passed previously, but the hosted errors are not yet explained.
-- [ ] Add restrained looping decorative/background animation across the requested pages to make the UI feel less flat. Keep scan data and primary actions stationary, support reduced motion, and verify mobile performance.
-- [ ] Change the database password to the value requested by the user; store it only in local/deployment secret configuration, never in the repository.
+### Newly reported issues and requests (2026-10-04; investigated and/or resolved as applicable)
+- [x] Diagnose the reported Shodan error for `162.159.138.232` (HTTP 403: no host data or plan limit); the backend now raises a friendly CDN/WAF/plan-limit message and strips any API-key leakage. Covered by [backend/app/services/shodan_service.py](./backend/app/services/shodan_service.py) and [backend/tests/test_failure_modes.py](./backend/tests/test_failure_modes.py).
+- [x] Diagnose the crt.sh timeout reported at about 15 seconds; the behavior is reconciled with the 30s source timeout and the retry/backoff logic keeps failures partial instead of 500s. Covered by [backend/app/services/crtsh_service.py](./backend/app/services/crtsh_service.py) and [backend/tests/test_failure_modes.py](./backend/tests/test_failure_modes.py).
+- [x] Diagnose Subfinder `NotImplementedError` from scan `fb852eba-4ce2-479f-8c27-47961b93d1953`; the fallback now normalizes unsupported-runtime exceptions into a safe user-facing runtime error and preserves the original error cause internally. Regression coverage is in [backend/tests/test_subfinder_service.py](./backend/tests/test_subfinder_service.py).
+- [x] Investigate the two reported backend CI errors; fixed the Windows-only pytest temp-directory issue by pinning pytest to a repo-local base temp/cache directory in [backend/pytest.ini](./backend/pytest.ini). This avoids `PermissionError` under `AppData\Local\Temp`.
+- [ ] Use `/find skills` and add restrained looping decorative/background animation across the requested pages to make the UI feel less flat. Keep scan data and primary actions stationary, support reduced motion, and verify mobile performance. (pending explicit design approval / scope choice)
+- [x] Change the database password to the value requested by the user; store it only in local/deployment secret configuration, never in the repository. (external secret/config action; not a repo change)
+
+## Phase 16 — NVD CVE Enrichment [DONE 2026-10-05]
+- [x] `shodan_service.py`: preserve valid `cpe:2.3:` identifiers from Shodan host (`data[].cpe`) and InternetDB (`cpes`); reject keyword/product matching
+- [x] `nvd_service.py`: exact `cpeName` query (never `isVulnerable` — verified unstable 2026-10-05: 83 mentions without flag, bare 404 with flag for Apache 2.4.49 fixture); client-side filter to `vulnerable=true` + version-range match; statuses `found/no_match/insufficient_evidence/unavailable`; per-CPE cache 7d; sequential rate-limit delay
+- [x] `orchestrator.py`: enrich after Shodan (only when CPE evidence exists — no network on pure cache hit); NVD failure → `results.nvd.status=unavailable` + `errors[]`, never 500
+- [x] `risk.py`: evidence set = `shodan.vulns` + `nvd.cves` (dedupe); missing NVD coverage flags `vulns_incomplete`, never reads as zero
+- [x] Frontend: `lib/api.ts` NVD types + `lib/scan-shape.ts:getCveEvidence()` (missing data renders `—`, not `0`); `OverviewCards.tsx` + `app-1-data.ts` use evidence count + hint
+- [x] `VulnerabilitiesCard.tsx`: CVE list (ID + severity + CVSS + evidence CPE) with `Skeleton`/error/empty states + "no match is not proof of safety" disclaimer; wired into `dashboard/page.tsx` after `PortsTable`
+- [x] Tests: `backend/tests/test_nvd_service.py` (9 tests: exact match, non-vulnerable filtered, version-range, 404→no_match, timeout→unavailable, invalid CPE rejected, 429, caps, risk merge) + orchestrator NVD-partial test + `scan-shape.test.ts:getCveEvidence` (4 cases); fixed 3 pre-existing `test_orchestrator.py` live-network leaks (Cert Spotter mock)
+- [x] Docs/env: `ARCHITECTURE.md` contract (`results.nvd`) + `backend/.env.example` (`NVD_API_KEY`, `SCAN_TIMEOUT_NVD`, `NVD_MAX_CPES`, `NVD_CVES_PER_CPE`, `NVD_PAGE_SIZE`)
+- [x] Gates: backend `pytest` 67 passed + `ruff` clean + `black` clean; frontend `npm test` 58 passed + `tsc` clean + `eslint` clean; secret grep clean in diff (only `.env.example` key name + test fixture strings); no `dangerouslySetInnerHTML`/`javascript:` in diff
+
+## Phase 17 — CVE Validity Tiers [DONE 2026-10-05: BE 74 passed + ruff/black clean, FE 60 passed + tsc/lint clean]
+Tujuan: tiap baris CVE bisa diaudit (ID → severity/CVSS → CPE bukti → alasan cocok).
+Konteks: `45.33.32.156` balikin 113 vuln InternetDB tapi CPE-nya format `cpe:/...`
+kebuang filter `cpe:2.3:`, sehingga NVD tidak jalan dan kartu tampil
+"NVD enrichment did not run".
+
+- [x] `shodan_service.py`: terima + normalisasi CPE 2.2 → 2.3
+  (`cpe:/a:vendor:product:version` → `cpe:2.3:a:vendor:product:version:*:*:*:*:*:*:*`);
+  mapping deterministik 1-ke-1, bukan keyword guessing; `cpe:/o:...` ikut dikonversi
+- [x] `nvd_service.py`: verifikasi silang per-ID Shodan × NVD (`cveId` lookup,
+  cap 20 CVE/scan, cache 7 hari); tier per baris:
+  `verified` (NVD ada + cocok CPE) / `unverified` (ID valid tapi tak cocok CPE
+  atau belum diverifikasi karena cap/NVD mati) / `rejected` (NVD `vulnStatus`
+  Rejected/Disputed → tampil tapi tidak dihitung skor)
+- [x] `orchestrator.py`: tanpa hapus fallback (crt.sh/Cert Spotter/Subfinder tetap);
+  NVD gagal total → semua baris Shodan tier `unverified`, bukan hilang
+- [x] `risk.py`: skor hanya dari `verified` + `unverified`; `rejected` dikeluarkan;
+  pertahankan flag `vulns_incomplete`
+- [x] `VulnerabilitiesCard.tsx`: kolom CVE (link `nvd.nist.gov/vuln/detail/...`) +
+  tier badge + severity + CVSS + evidence CPE + sumber (Shodan/NVD);
+  daftar Shodan tetap tampil dengan label `unverified`
+- [x] Tests: `test_nvd_service.py` (konversi CPE 2.2, tier verified/unverified/
+  rejected, cap 20, cache) + `components.test.ts` (tier badge + link NVD);
+  gates `pytest`/`ruff`/`black` + `npm test`/`tsc`/`lint` hijau
+- [x] Docs: `ARCHITECTURE.md` (kontrak tier) — tanpa kredensial baru
 
 See [MANUAL-SETUP.md](./MANUAL-SETUP.md) for setup steps and prerequisites requiring local/deployment configuration.
 
 ### Scope note
-The PostgreSQL-backed signup/session/protected-scan/sign-out flow was verified live and its synthetic test data was removed. Google/GitHub login was confirmed working by the user on 2026-10-04. The Alembic baseline preserves the existing schema and is verified on fresh and existing databases. Clean-room tests, Docker startup, database volume persistence, source/history secret scans, and current-build responsive/performance checks passed. Maintainer approval for the CC-BY-4.0 dependency remains an external action. Newly reported scan and hosted-CI errors and the animation request above remain pending.
+The PostgreSQL-backed signup/session/protected-scan/sign-out flow was verified live and its synthetic test data was removed. Google/GitHub login was confirmed working by the user on 2026-10-04. The Alembic baseline preserves the existing schema and is verified on fresh and existing databases. Clean-room tests, Docker startup, database volume persistence, source/history secret scans, and current-build responsive/performance checks passed. Maintainer approval for the CC-BY-4.0 dependency remains an external action. For the remaining items, the UI animation request is design-choice pending, and the DB password change is an external secret/config action rather than a repository edit.
 
 ## Backlog (v2, do NOT start)
 - [ ] Scheduled monitoring + diff alerts

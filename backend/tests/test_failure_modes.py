@@ -15,7 +15,12 @@ import httpx
 import pytest
 
 from app.core.config import settings
-from app.services import orchestrator, shodan_service, whois_service
+from app.services import (
+    certspotter_service,
+    orchestrator,
+    shodan_service,
+    whois_service,
+)
 
 
 async def _no_cache_get(key: str):
@@ -28,6 +33,19 @@ async def _no_cache_set(*args, **kwargs):
 
 async def _missing_subfinder(target):
     raise RuntimeError("Subfinder CLI is unavailable on PATH")
+
+
+async def _failed_certspotter(target, client=None):
+    raise RuntimeError("Cert Spotter is unavailable")
+
+
+async def _ok_certspotter(target, client=None):
+    return {
+        "domain": target,
+        "source": "Cert Spotter",
+        "count": 1,
+        "subdomains": [],
+    }
 
 
 def _stub_cache(monkeypatch):
@@ -59,6 +77,7 @@ async def test_crtsh_timeout_becomes_partial_not_500(monkeypatch):
 
     monkeypatch.setattr(orchestrator.shodan_service, "lookup", _ok_shodan)
     monkeypatch.setattr(orchestrator.crtsh_service, "lookup", slow_crtsh)
+    monkeypatch.setattr(certspotter_service, "lookup", _failed_certspotter)
     monkeypatch.setattr(orchestrator.subfinder_service, "lookup", _missing_subfinder)
     monkeypatch.setattr(orchestrator.whois_service, "lookup", _ok_whois)
 
@@ -70,6 +89,27 @@ async def test_crtsh_timeout_becomes_partial_not_500(monkeypatch):
     assert "crtsh" not in payload["results"]
     crtsh_errors = [e for e in payload["errors"] if e["source"] == "crtsh"]
     assert len(crtsh_errors) == 1
+    assert "Cert Spotter" in crtsh_errors[0]["message"]
+
+
+@pytest.mark.asyncio
+async def test_certspotter_fallback_avoids_partial_scan_error(monkeypatch):
+    _stub_cache(monkeypatch)
+
+    async def crtsh_down(target, client=None):
+        raise RuntimeError("crt.sh timed out")
+
+    monkeypatch.setattr(orchestrator.shodan_service, "lookup", _ok_shodan)
+    monkeypatch.setattr(orchestrator.crtsh_service, "lookup", crtsh_down)
+    monkeypatch.setattr(certspotter_service, "lookup", _ok_certspotter)
+    monkeypatch.setattr(orchestrator.subfinder_service, "lookup", _missing_subfinder)
+    monkeypatch.setattr(orchestrator.whois_service, "lookup", _ok_whois)
+
+    payload = await orchestrator.run_scan("example.com", "u1", force=True)
+
+    assert payload["status"] == "completed"
+    assert payload["errors"] == []
+    assert payload["results"]["crtsh"]["source"] == "Cert Spotter"
 
 
 @pytest.mark.asyncio
@@ -140,23 +180,20 @@ async def test_full_failure_all_sources_down_never_raises(monkeypatch):
 
     monkeypatch.setattr(orchestrator.shodan_service, "lookup", shodan_down)
     monkeypatch.setattr(orchestrator.crtsh_service, "lookup", crtsh_slow)
+    monkeypatch.setattr(certspotter_service, "lookup", _failed_certspotter)
     monkeypatch.setattr(orchestrator.subfinder_service, "lookup", _missing_subfinder)
     monkeypatch.setattr(orchestrator.whois_service, "lookup", whois_down)
 
     results, errors = await orchestrator.gather_results("example.com", force=True)
     assert results == {}
-    assert {e["source"] for e in errors} == {
-        "shodan",
-        "crtsh",
-        "subfinder",
-        "whois",
-    }
+    assert {e["source"] for e in errors} == {"shodan", "crtsh", "whois"}
+    assert "Subfinder" in next(e["message"] for e in errors if e["source"] == "crtsh")
 
     payload = await orchestrator.run_scan(
         "example.com", "u1", force=True
     )  # must not raise
     assert payload["status"] == "failed"
-    assert len(payload["errors"]) == 4
+    assert len(payload["errors"]) == 3
 
 
 @pytest.mark.asyncio
@@ -171,24 +208,27 @@ async def test_shodan_403_cdn_ip_becomes_partial_without_key_leak(monkeypatch):
     resp = httpx.Response(403, request=req)
 
     class _Client403:
-        async def get(self, url, params=None):
+        async def get(self, url, params=None, timeout=None):
+            if url == "https://internetdb.shodan.io/162.159.138.232":
+                return httpx.Response(
+                    404,
+                    request=httpx.Request("GET", url),
+                )
             raise httpx.HTTPStatusError(
                 "Client error '403 Forbidden' for url 'https://api.shodan.io/shodan/host/162.159.138.232?key=SECRET-KEY-123'",
                 request=req,
                 response=resp,
             )
 
-    with pytest.raises(RuntimeError, match="CDN/WAF"):
-        await shodan_service.lookup("162.159.138.232", client=_Client403())
-    try:
-        await shodan_service.lookup("162.159.138.232", client=_Client403())
-    except RuntimeError as e:
-        assert "SECRET-KEY-123" not in str(e)
+    fallback = await shodan_service.lookup("162.159.138.232", client=_Client403())
+    assert fallback["source"] == "Shodan InternetDB"
+    assert fallback["ports"] == []
 
     # End-to-end through the orchestrator: partial + sanitized errors[].
     async def shodan_403(target, client=None):
         raise RuntimeError(
-            "Shodan has no data for 162.159.138.232 (likely CDN/WAF IP) or plan limit (HTTP 403)"
+            "Shodan host lookup returned HTTP 403 and its public "
+            "InternetDB fallback failed"
         )
 
     async def crtsh_timeout(target, client=None):
@@ -198,6 +238,7 @@ async def test_shodan_403_cdn_ip_becomes_partial_without_key_leak(monkeypatch):
 
     monkeypatch.setattr(orchestrator.shodan_service, "lookup", shodan_403)
     monkeypatch.setattr(orchestrator.crtsh_service, "lookup", crtsh_timeout)
+    monkeypatch.setattr(certspotter_service, "lookup", _failed_certspotter)
     monkeypatch.setattr(orchestrator.subfinder_service, "lookup", _missing_subfinder)
     monkeypatch.setattr(orchestrator.whois_service, "lookup", _ok_whois)
 
@@ -225,6 +266,43 @@ def test_sanitize_error_strips_api_key():
     msg = orchestrator.sanitize_error("shodan", err)
     assert "SUPERSECRET" not in msg
     assert "403" in msg
+
+
+@pytest.mark.asyncio
+async def test_nvd_down_stays_partial_with_unavailable_status(monkeypatch):
+    """Shodan OK + NVD dead → partial scan, nvd.status=unavailable, never zero."""
+    _stub_cache(monkeypatch)
+
+    async def shodan_with_cpe(target, client=None):
+        return {
+            "ip": "93.184.216.34",
+            "ports": [80],
+            "services": [],
+            "vulns": [],
+            "cpes": ["cpe:2.3:a:apache:http_server:2.4.49:*:*:*:*:*:*:*"],
+        }
+
+    async def nvd_down(raw_cpes, client=None, **kwargs):
+        return {
+            "source": "NVD",
+            "status": "unavailable",
+            "checked_cpes": list(raw_cpes or []),
+            "cves": [],
+            "truncated": False,
+            "errors": ["NVD timed out after 12s"],
+            "note": "NVD unreachable.",
+        }
+
+    monkeypatch.setattr(orchestrator.shodan_service, "lookup", shodan_with_cpe)
+    monkeypatch.setattr(orchestrator.crtsh_service, "lookup", _ok_crtsh)
+    monkeypatch.setattr(orchestrator.whois_service, "lookup", _ok_whois)
+    monkeypatch.setattr(orchestrator.nvd_service, "enrich_cpes", nvd_down)
+
+    payload = await orchestrator.run_scan("example.com", "u1", force=True)
+    assert payload["status"] == "partial"
+    assert payload["results"]["nvd"]["status"] == "unavailable"
+    assert payload["results"]["nvd"]["cves"] == []
+    assert any(e["source"] == "nvd" for e in payload["errors"])
 
 
 @pytest.mark.asyncio

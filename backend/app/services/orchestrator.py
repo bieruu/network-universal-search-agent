@@ -13,7 +13,9 @@ import httpx
 from app.core import cache as cache_mod
 from app.core.config import settings
 from app.services import (
+    certspotter_service,
     crtsh_service,
+    nvd_service,
     risk,
     shodan_service,
     subfinder_service,
@@ -51,10 +53,29 @@ def sanitize_error(source: str, e: BaseException) -> str:
     return f"{source}: {type(e).__name__}: {msg}"[:500]
 
 
+async def _certificate_fallback(target: str, client: httpx.AsyncClient) -> Any:
+    failures: list[str] = []
+    for source, lookup, timeout in (
+        ("Cert Spotter", lambda: certspotter_service.lookup(target, client), 18),
+        (
+            "Subfinder",
+            lambda: subfinder_service.lookup(target),
+            subfinder_service.TIMEOUT_SECONDS,
+        ),
+    ):
+        try:
+            return await _with_timeout(lookup(), timeout, source)
+        except RuntimeError as error:
+            failures.append(f"{source}: {error}")
+    raise RuntimeError(
+        "All passive certificate fallbacks failed: " + "; ".join(failures)
+    )
+
+
 async def gather_results(
     target: str, force: bool = False
 ) -> tuple[dict[str, Any], list[dict[str, str]]]:
-    """Run sources concurrently; fall back to Subfinder if crt.sh fails."""
+    """Run sources concurrently; use passive fallbacks if crt.sh fails."""
     ttl = settings.cache_ttl_hours * 3600
     cached: dict[str, Any] = {}
     async with httpx.AsyncClient(
@@ -96,26 +117,98 @@ async def gather_results(
         errors: list[dict[str, str]] = []
         for source, res in zip(jobs.keys(), settled):
             if isinstance(res, BaseException):
-                errors.append({"source": source, "message": str(res)[:500]})
                 if source == "crtsh":
                     try:
-                        fallback = await _with_timeout(
-                            subfinder_service.lookup(target),
-                            subfinder_service.TIMEOUT_SECONDS,
-                            "subfinder",
-                        )
+                        fallback = await _certificate_fallback(target, client)
                     except RuntimeError as fallback_error:
                         errors.append(
                             {
-                                "source": "subfinder",
-                                "message": str(fallback_error)[:500],
+                                "source": source,
+                                "message": f"{res}; {fallback_error}"[:500],
                             }
                         )
                     else:
                         results[source] = fallback
+                        await cache_mod.cache_set_async(
+                            f"{source}:{target.lower()}", fallback, ttl
+                        )
+                else:
+                    errors.append({"source": source, "message": str(res)[:500]})
             else:
                 results[source] = res
                 await cache_mod.cache_set_async(f"{source}:{target.lower()}", res, ttl)
+        # NVD enrichment runs after Shodan: exact CPEs only, never keywords.
+        # NVD failure stays partial (results["nvd"].status=unavailable), never 500.
+        # Skip when Shodan itself came from cache without CPE evidence to check:
+        # enrichment must never trigger network on a pure cache hit.
+        shodan = results.get("shodan")
+        has_cpes = (
+            isinstance(shodan, dict)
+            and isinstance(shodan.get("cpes"), list)
+            and bool(shodan.get("cpes"))
+        )
+        if has_cpes:
+            assert isinstance(shodan, dict)
+            try:
+                nvd = await nvd_service.enrich_cpes(shodan.get("cpes"), client)
+            except Exception as e:  # noqa: BLE001 — enrichment must never fail a scan
+                nvd = {
+                    "source": "NVD",
+                    "status": "unavailable",
+                    "checked_cpes": [],
+                    "cves": [],
+                    "truncated": False,
+                    "errors": [f"NVD enrichment crashed: {type(e).__name__}"[:300]],
+                    "note": "NVD enrichment failed unexpectedly; counts are partial evidence, not zero.",
+                }
+            results["nvd"] = nvd
+            if nvd.get("status") == "unavailable":
+                for msg in nvd.get("errors") or []:
+                    errors.append({"source": "nvd", "message": str(msg)[:500]})
+        elif isinstance(shodan, dict) and shodan.get("vulns"):
+            # No CPE evidence to exact-match, but Shodan still reported CVE IDs:
+            # keep them visible with an honest coverage status.
+            results["nvd"] = {
+                "source": "NVD",
+                "status": "insufficient_evidence",
+                "checked_cpes": [],
+                "cves": [],
+                "truncated": False,
+                "errors": [],
+                "note": "No CPE identifiers observed, so NVD CPE matching did not run; Shodan IDs are cross-checked by ID only.",
+            }
+        # CVE validity tiers (verified / unverified / rejected). NVD total
+        # failure degrades every Shodan ID to `unverified`, never hidden.
+        shodan = results.get("shodan")
+        nvd = results.get("nvd")
+        if isinstance(shodan, dict) and isinstance(nvd, dict):
+            try:
+                nvd["cve_rows"] = await nvd_service.build_cve_rows(
+                    shodan.get("vulns"), nvd, client
+                )
+            except Exception as e:  # noqa: BLE001 — tiers must never fail a scan
+                shodan_vulns = shodan.get("vulns") or []
+                nvd["cve_rows"] = [
+                    {
+                        "id": str(v)[:30],
+                        "tier": "unverified",
+                        "source": "Shodan",
+                        "severity": None,
+                        "cvss": None,
+                        "evidence_cpe": None,
+                        "vuln_status": None,
+                        "description": None,
+                        "url": f"https://nvd.nist.gov/vuln/detail/{v}"[:120],
+                    }
+                    for v in shodan_vulns
+                    if isinstance(v, str) and v.startswith("CVE-")
+                ][:100]
+                errors.append(
+                    {
+                        "source": "nvd",
+                        "message": f"CVE tiering failed: {type(e).__name__}"[:500],
+                    }
+                )
         return results, errors
 
 

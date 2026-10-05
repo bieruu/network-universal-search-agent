@@ -4,7 +4,8 @@
 
 - Node.js 20.6+, npm, Python 3.11+, and Docker with Compose
 - A Shodan API key for host lookups: https://account.shodan.io/
-- Optional Subfinder CLI on the backend `PATH` for crt.sh outage fallback (host install; the backend Docker image bundles v2.16.0)
+- On Shodan HTTP 403 or 404, the backend also checks Shodan's public keyless InternetDB for the resolved IP.
+- Certificate Transparency lookup tries crt.sh, then the public Cert Spotter API, then optional Subfinder on the backend `PATH` (the backend Docker image bundles Subfinder v2.16.0)
 - Optional Google/GitHub OAuth app credentials for social sign-in
 
 ## 2. First-time setup
@@ -135,6 +136,7 @@ Backend tests mock upstream OSINT services. For auth, tests verify active/expire
 - Frontend: deploy `frontend/` with `BETTER_AUTH_URL`, `BETTER_AUTH_SECRET`, standard PostgreSQL `DATABASE_URL`, `NEXT_PUBLIC_APP_URL`, `BACKEND_URL`, and optional provider credentials.
 - Database: use the same PostgreSQL database for frontend auth and backend application data. Run `npm run auth:migrate` from `frontend/` and `alembic upgrade head` from `backend/` before serving traffic. For an existing database created by the old startup `create_all`, verify its schema before the one-time `alembic stamp head`; never stamp a database whose schema has not been checked.
 - Backend: provide the same secret and database (backend URL uses `postgresql+asyncpg://`), `SHODAN_API_KEY`, exact `CORS_ORIGINS`, and production `APP_ENV=production`.
-- On non-container hosts, install Subfinder separately and make it available on the backend `PATH` to enable the bounded crt.sh fallback; its absence is reported as a source error. The backend Docker image builds and includes Subfinder v2.16.0.
+- On non-container hosts, install Subfinder separately and make it available on the backend `PATH` to enable the final bounded certificate-transparency fallback. The backend Docker image builds and includes Subfinder v2.16.0.
+- If crt.sh is unavailable, the backend tries Cert Spotter before Subfinder. A successful fallback is shown as the provider for the certificate-transparency results and cached. Cert Spotter's anonymous free tier limits full-domain queries to 10 per hour; a source error is reported only if every passive fallback fails.
 - Configure OAuth callback URLs for the deployed origin. Do not advertise or mark a provider verified until a live callback succeeds.
 - Rotate secrets through the relevant provider/host dashboards; never place secrets in client-prefixed variables or source control.

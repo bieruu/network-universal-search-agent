@@ -14,6 +14,7 @@ import RiskTrendChart from "./_components/RiskTrendChart";
 import PortsTable from "./_components/PortsTable";
 import SubdomainsTable from "./_components/SubdomainsTable";
 import WhoisCard from "./_components/WhoisCard";
+import VulnerabilitiesCard from "./_components/VulnerabilitiesCard";
 import HistoryList from "./_components/HistoryList";
 import AppShell from "./_components/app-shell";
 
@@ -131,6 +132,9 @@ export default function DashboardPage() {
 
       {/* 4 — Open ports & services, full width */}
       <PortsTable scan={scan} loading={loading} error={null} />
+
+      {/* 4b — CVE evidence, full width */}
+      <VulnerabilitiesCard scan={scan} loading={loading} />
 
       {/* 5 — Subdomains + WHOIS side by side */}
       <div className="grid gap-4 lg:grid-cols-2">

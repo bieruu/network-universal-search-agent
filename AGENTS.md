@@ -60,6 +60,7 @@ DO:
 - Add tests for new service + orchestrator partial-failure path.
 - Update TODO.md checkbox + ARCHITECTURE.md if contract changes.
 - Use `X-Request-ID` in logs, return `errors: [{source, message}]`.
+- Always do task with multiple agent
 
 DON'T:
 - Don't call Shodan/crt.sh from browser. Don't add active scanning (nmap) in v1.

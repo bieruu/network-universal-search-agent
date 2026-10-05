@@ -17,6 +17,11 @@ class Settings(BaseSettings):
     scan_timeout_shodan: int = 12
     scan_timeout_crtsh: int = 30
     scan_timeout_whois: int = 10
+    scan_timeout_nvd: int = 12
+    nvd_api_key: str = ""
+    nvd_max_cpes: int = 5
+    nvd_cves_per_cpe: int = 20
+    nvd_page_size: int = 100
     rate_limit_per_hour: int = 10
     cache_ttl_hours: int = 24
 

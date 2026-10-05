@@ -92,6 +92,10 @@ async def lookup(target: str) -> dict[str, Any]:
             stdout=asyncio.subprocess.PIPE,
             stderr=asyncio.subprocess.DEVNULL,
         )
+    except NotImplementedError as exc:
+        raise RuntimeError(
+            "Subfinder fallback is not available on this runtime; subprocess support is missing"
+        ) from exc
     except OSError as exc:
         raise RuntimeError("Subfinder CLI could not be started") from exc
 

@@ -12,3 +12,5 @@ dist/
 *.tsbuildinfo
 .github
 .ruff_cache
+.pytest_cache/
+.tmp-pytest/
