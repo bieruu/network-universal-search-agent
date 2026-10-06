@@ -8,7 +8,18 @@ from app.core.logging import RequestIDMiddleware
 
 
 def create_app() -> FastAPI:
-    app = FastAPI(title="OSINT Dashboard API", version="1.0.0")
+    # Never expose schema/docs endpoints in production (they reveal the full
+    # API surface to unauthenticated callers).
+    docs_url = None if settings.is_production else "/docs"
+    redoc_url = None if settings.is_production else "/redoc"
+    openapi_url = None if settings.is_production else "/openapi.json"
+    app = FastAPI(
+        title="OSINT Dashboard API",
+        version="1.0.0",
+        docs_url=docs_url,
+        redoc_url=redoc_url,
+        openapi_url=openapi_url,
+    )
     app.add_middleware(RequestIDMiddleware)
     app.add_middleware(
         CORSMiddleware,

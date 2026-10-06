@@ -14,6 +14,9 @@ class Settings(BaseSettings):
     cache_backend: Literal["sqlite", "postgres"] = "sqlite"
     shodan_api_key: str = ""
     better_auth_secret: str = "change-me-32-chars-min"
+    # Separate machine-to-machine token for `Authorization: Bearer ...`.
+    # Never reuse better_auth_secret here (it signs session cookies).
+    service_token: str = ""
     scan_timeout_shodan: int = 12
     scan_timeout_crtsh: int = 30
     scan_timeout_whois: int = 10
@@ -49,6 +52,25 @@ class Settings(BaseSettings):
             raise ValueError(
                 "BETTER_AUTH_SECRET must be set to a non-default value in production"
             )
+
+        if self.is_production:
+            # CORS "*" + allow_credentials=True reflects any origin — never allow
+            # it in production.
+            if "*" in self.cors_list:
+                raise ValueError(
+                    "CORS_ORIGINS must not contain '*' in production; list explicit origins"
+                )
+            # Fail closed on plaintext database connections in production. Local
+            # Docker Postgres (localhost) stays exempt for development.
+            db = self.database_url.lower()
+            if db.startswith(("postgresql://", "postgresql+asyncpg://")):
+                host = db.split("@", 1)[-1].split("/", 1)[0].split(":", 1)[0]
+                local = host in {"localhost", "127.0.0.1", "::1"}
+                tls = "sslmode=require" in db or "ssl=require" in db
+                if not local and not tls:
+                    raise ValueError(
+                        "DATABASE_URL must use sslmode=require in production"
+                    )
 
 
 settings = Settings()

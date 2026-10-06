@@ -102,7 +102,10 @@ async def require_user(
 
     if authorization and authorization.lower().startswith("bearer "):
         token = authorization.split(" ", 1)[1].strip()
-        if token and hmac.compare_digest(token, secret):
+        # Fail closed: only a dedicated SERVICE_TOKEN grants service access.
+        # The session-signing secret must never work as an API key.
+        service_token = (settings.service_token or "").strip()
+        if token and service_token and hmac.compare_digest(token, service_token):
             return "user:service"
         raise HTTPException(
             status_code=status.HTTP_401_UNAUTHORIZED, detail="Unauthorized"

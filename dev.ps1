@@ -13,7 +13,7 @@
   Ctrl+C stops both servers (whole process trees are killed).
 
 REQUIREMENTS
-  Node.js (npm) + backend\.venv with deps installed (pip install -r requirements.txt).
+  Node.js (npm) + backend\.venv with deps installed (pip install -r requirements-dev.txt).
 #>
 param(
   [switch]$NoBrowser
@@ -38,7 +38,7 @@ if (-not (Test-Path $py)) {
   Write-Host "Backend venv missing - creating .venv and installing requirements (one time, may take minutes)..." -ForegroundColor Yellow
   & python -m venv (Join-Path $backendDir ".venv")
   if ($LASTEXITCODE -ne 0) { throw "python not found. Install Python 3.11+ first." }
-  & $py -m pip install -r (Join-Path $backendDir "requirements.txt")
+  & $py -m pip install -r (Join-Path $backendDir "requirements-dev.txt")
 }
 $nodeSrc = (Get-Command node -ErrorAction SilentlyContinue).Source
 if (-not $nodeSrc) { throw "node not found. Install Node.js 20+ first." }
@@ -52,8 +52,8 @@ if (-not (Test-Path (Join-Path $frontendDir "node_modules"))) {
   & $npm install --prefix $frontendDir
 }
 try { & $py -c "import uvicorn, fastapi" 2>$null } catch {
-  Write-Host "Backend deps missing - running pip install -r requirements.txt..." -ForegroundColor Yellow
-  & $py -m pip install -r (Join-Path $backendDir "requirements.txt")
+  Write-Host "Backend deps missing - running pip install -r requirements-dev.txt..." -ForegroundColor Yellow
+  & $py -m pip install -r (Join-Path $backendDir "requirements-dev.txt")
 }
 
 foreach ($p in @($bePort, $fePort)) {

@@ -17,7 +17,7 @@ npm install && npm run dev        # http://localhost:3000 (lockfile: package-loc
 npm run lint && npm run tsc --noEmit && npm test
 
 # Backend (backend/)
-python -m venv .venv && pip install -r requirements.txt
+python -m venv .venv && pip install -r requirements-dev.txt
 uvicorn app.main:app --reload --port 8000
 pytest -q && ruff check . && black --check .
 

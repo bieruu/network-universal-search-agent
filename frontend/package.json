@@ -12,7 +12,7 @@
     "lint": "eslint . --max-warnings=0",
     "tsc": "tsc --noEmit",
     "auth:migrate": "node --env-file=.env.local node_modules/auth/dist/index.mjs migrate --config ./lib/auth.ts",
-    "test": "node --test lib/validators.test.ts lib/components.test.ts lib/landing.test.ts lib/scan-shape.test.ts lib/login.test.ts lib/signup.test.ts lib/dashboard.test.ts lib/palette.test.ts lib/devlogin.test.ts"
+    "test": "node --test lib/validators.test.ts lib/components.test.ts lib/landing.test.ts lib/scan-shape.test.ts lib/login.test.ts lib/signup.test.ts lib/dashboard.test.ts lib/palette.test.ts lib/devlogin.test.ts lib/security-headers.test.ts"
   },
   "dependencies": {
     "@phosphor-icons/react": "^2.1.10",

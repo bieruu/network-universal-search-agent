@@ -154,8 +154,10 @@ CREATE TABLE IF NOT EXISTS cache(key TEXT PRIMARY KEY, payload TEXT, expires_at 
 ## 6. Auth & Security
 
 - Better Auth (OAuth + email/password) issues session cookie (httpOnly, Secure, SameSite=Lax).
-- Next `middleware.ts` guards `/dashboard/*`. Next proxy `app/api/scan/[...path]/route.ts` reads session, forwards `Authorization: Bearer <session-token>` or cookie to FastAPI.
-- FastAPI `core/security.py: require_user()` verifies via Better Auth JWKS/shared secret; rejects missing/invalid with 401. Enforces per-user rate limit (in-memory + Postgres counter, or Redis later).
+- Next `middleware.ts` guards `/dashboard/*` and fails closed (503) when `BETTER_AUTH_URL` is non-localhost plain http in production. Next proxy `app/api/scan/[...path]/route.ts` reads session, forwards it (cookie / `Authorization` header) to FastAPI.
+- FastAPI `core/security.py: require_user()` verifies the Better Auth session via the shared secret + shared PostgreSQL session store; rejects missing/invalid with 401. Enforces per-user rate limit (in-memory fixed window; see limitation below).
+- Machine-to-machine access uses a dedicated `SERVICE_TOKEN` env (`Authorization: Bearer <token>` → `user:service`); the session-signing `BETTER_AUTH_SECRET` is never accepted as an API key.
+- **Known limitation — rate limiting:** `app/core/rate_limit.py` is a per-process in-memory fixed window. Counters reset on restart and are not shared across uvicorn workers, so the effective limit multiplies with worker count. Run a single worker in production (the default) or move the counter to Redis/Postgres before scaling out (v2).
 - Hardening: CORS allowlist only `APP_URL`, `TrustedHost`, Pydantic input regex + block private ranges, ORM parametrized, no `eval`, banners rendered as text (no `dangerouslySetInnerHTML`), structlog without passwords/keys, `X-Request-ID` tracing.
 
 ## 7. Observability & Config

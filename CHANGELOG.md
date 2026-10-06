@@ -2,6 +2,26 @@
 
 > Completed work, newest first (bottom = oldest). Open items → [TODO.md](./TODO.md) · setup → [WORKFLOW.md](./WORKFLOW.md) · requirements → [PRD.md](./PRD.md).
 
+## 2026-10-06 — Security hardening (pre-deployment audit P1 + P2 done)
+
+All 12 items under "Security hardening" in TODO.md resolved:
+
+- **Pinned backend deps**: new `backend/requirements.in` / `requirements-dev.in`, compiled to pinned + hashed `requirements.txt` (runtime) / `requirements-dev.txt` (dev tooling) via `uv pip compile --generate-hashes`; Dockerfile installs runtime-only with `--require-hashes`
+- **Non-root container**: `USER app` with chowned `/srv/app` (+ `data/` for the SQLite cache)
+- **npm audit**: `source-map-js` fixed → `npm audit` reports **0 vulnerabilities**
+- **Docs off in prod**: `docs_url`/`redoc_url`/`openapi_url` = `None` when `APP_ENV/NODE_ENV=production`
+- **CORS guard**: production raises if `CORS_ORIGINS` contains `*` (would reflect any origin with `allow_credentials=True`)
+- **CSP + HSTS**: `Content-Security-Policy-Report-Only` (with `sha256-` hash of the inline theme script in `app/layout.tsx`) + `Strict-Transport-Security`; enforcement still needs a nonce for Next.js hydration scripts. The declared hash had gone stale against the current theme script (harmless while Report-Only, but it would have blocked the script the moment CSP is enforced) — recomputed, and `lib/security-headers.test.ts` now fails if the hash, the Report-Only status, the baseline headers, or the locked-down directives drift.
+- **Service token split**: new `SERVICE_TOKEN` env for `Authorization: Bearer` machine access; `BETTER_AUTH_SECRET` is no longer accepted as an API key, and Bearer fails closed when the token is unset (breaks the old `Bearer <BETTER_AUTH_SECRET>` flow — rotate to `SERVICE_TOKEN`)
+- **Compose**: `version:` dropped, Postgres now bound to `127.0.0.1:5432` with a note that prod uses internal-only networking
+- **Rate limit**: documented in ARCHITECTURE.md §6 as a per-process in-memory limitation (resets on restart, × worker count; single worker in prod or Redis/Postgres in v2)
+- **`/ready`**: returns plain `degraded` in production; exception class name only in dev
+- **CI gates**: required-check list (npm audit, pip-audit/`uv pip compile --check`, lint/tsc/test/build, secret scan) documented in WORKFLOW.md §6 for when `.github/` is re-enabled
+- **TLS**: production `Settings` rejects non-localhost Postgres URLs without `sslmode=require`; Next middleware returns 503 when `BETTER_AUTH_URL` is non-localhost http in production
+- Env plumbing: `SERVICE_TOKEN` added to `backend/.env.example` + WORKFLOW.md (§2 install now uses `requirements-dev.txt`); ARCHITECTURE.md §6 session/proxy wording corrected
+
+Gates: `pytest` 78 passed + `ruff`/`black` clean; `npm test` 70 passed + `lint`/`tsc`/`audit`/`build` clean.
+
 ## 2026-10-06 — Docs consolidation
 
 - README rewritten: one quickstart; duplicated troubleshooting/env/test-score sections replaced with links to WORKFLOW.md

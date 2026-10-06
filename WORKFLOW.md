@@ -34,9 +34,16 @@ Then initialize the application schema and run the backend:
 cd ..\backend
 python -m venv .venv
 .venv\Scripts\Activate.ps1
-pip install -r requirements.txt
+pip install -r requirements-dev.txt   # pinned + hashed; runtime-only → requirements.txt
 alembic upgrade head
 uvicorn app.main:app --reload --port 8000
+```
+
+`requirements.txt` (runtime) and `requirements-dev.txt` (runtime + test/lint tooling) are compiled from `requirements.in` / `requirements-dev.in` with hashes. After editing a `.in` file, recompile:
+
+```powershell
+uv pip compile --universal --python-version 3.11 --generate-hashes requirements.in -o requirements.txt
+uv pip compile --universal --python-version 3.11 --generate-hashes requirements-dev.in -o requirements-dev.txt
 ```
 
 FastAPI no longer creates or alters application tables during startup; schema changes are managed by Alembic before serving traffic. For a brand-new database, `alembic upgrade head` creates the application tables. If upgrading a database created by the previous `create_all` startup path, first verify that its `targets`, `scans`, and `findings` tables match the initial revision, then record that baseline once with `alembic stamp head`. Do not stamp an unknown or mismatched schema. Alembic intentionally ignores Better Auth-owned tables in the shared database.
@@ -73,6 +80,9 @@ BACKEND_URL=http://localhost:8000
 SHODAN_API_KEY=<key>
 DATABASE_URL=postgresql+asyncpg://osint:osint@localhost:5432/osint
 BETTER_AUTH_SECRET=<same-random-secret-as-frontend>
+# Optional machine-to-machine token for Authorization: Bearer. Must differ from
+# BETTER_AUTH_SECRET; leave empty to disable Bearer auth.
+SERVICE_TOKEN=
 CORS_ORIGINS=http://localhost:3000
 APP_URL=http://localhost:3000
 SQLITE_PATH=./data/cache.db
@@ -114,6 +124,7 @@ npm test
 npm run tsc
 npm run build
 npm audit
+npm audit --audit-level=high   # fail the build on high/critical
 
 # Backend, from backend/ with its environment activated
 alembic check
@@ -121,6 +132,8 @@ pytest -q
 ruff check .
 black --check .
 ```
+
+> **CI security gates:** `.github/` is intentionally git-ignored (no CI decision yet — see TODO.md). If CI is ever enabled, make these required checks: `npm run lint && npm run tsc && npm test && npm run build`, `npm audit --audit-level=high`, `pytest -q && ruff check . && black --check .`, plus `pip-audit` / `uv pip compile --check` against `requirements.in` and a secret scan of the diff.
 
 Backend tests mock upstream OSINT services. For auth, tests verify active/expired/fake session behavior and owner isolation; run the §2 live PostgreSQL setup to validate signup and protected scans end to end.
 

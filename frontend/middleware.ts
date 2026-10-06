@@ -7,6 +7,22 @@ export async function middleware(req: NextRequest) {
     return new NextResponse("Authentication is not configured", { status: 503 });
   }
 
+  // Production auth must ride on TLS; fail closed on plain http.
+  // Localhost stays exempt so `npm run build && npm start` works without TLS.
+  if (process.env.NODE_ENV === "production") {
+    try {
+      const url = new URL(authBaseURL);
+      const local = url.hostname === "localhost" || url.hostname === "127.0.0.1";
+      if (url.protocol !== "https:" && !local) {
+        return new NextResponse("Authentication URL must use HTTPS in production", {
+          status: 503,
+        });
+      }
+    } catch {
+      return new NextResponse("Authentication URL is misconfigured", { status: 503 });
+    }
+  }
+
   try {
     const response = await fetch(new URL("/api/auth/get-session", authBaseURL), {
       headers: { cookie: req.headers.get("cookie") ?? "" },

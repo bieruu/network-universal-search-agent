@@ -147,15 +147,32 @@ async def test_cookie_auth_fails_closed_without_postgres_session_store(monkeypat
 async def test_service_bearer_accepted_only_on_exact_secret(monkeypatch):
     from app.core.config import settings
 
-    monkeypatch.setattr(settings, "better_auth_secret", "s3cr3t-shared-value-32chars!!")
+    monkeypatch.setattr(settings, "service_token", "svc-token-32chars-minimum-value!")
     uid = await require_user(
-        authorization="Bearer s3cr3t-shared-value-32chars!!", cookie=None
+        authorization="Bearer svc-token-32chars-minimum-value!", cookie=None
     )
     assert uid == "user:service"
+    # The session-signing secret must never work as an API key.
+    monkeypatch.setattr(settings, "better_auth_secret", "s3cr3t-shared-value-32chars!!")
     with pytest.raises(HTTPException) as e:
         await require_user(
-            authorization="Bearer s3cr3t-shared-value-32chars!?", cookie=None
+            authorization="Bearer s3cr3t-shared-value-32chars!!", cookie=None
         )
+    assert e.value.status_code == 401
+    with pytest.raises(HTTPException) as e:
+        await require_user(
+            authorization="Bearer svc-token-32chars-minimum-value!?", cookie=None
+        )
+    assert e.value.status_code == 401
+
+
+@pytest.mark.asyncio
+async def test_service_bearer_fails_closed_when_token_unset(monkeypatch):
+    from app.core.config import settings
+
+    monkeypatch.setattr(settings, "service_token", "")
+    with pytest.raises(HTTPException) as e:
+        await require_user(authorization="Bearer anything", cookie=None)
     assert e.value.status_code == 401
 
 
@@ -165,6 +182,49 @@ def test_production_rejects_placeholder_auth_secret(monkeypatch):
     monkeypatch.setenv("APP_ENV", "production")
     with pytest.raises(ValidationError):
         Settings(better_auth_secret="replace-with-at-least-32-random-characters")
+
+
+def test_production_rejects_wildcard_cors(monkeypatch):
+    from app.core.config import Settings
+
+    monkeypatch.setenv("APP_ENV", "production")
+    with pytest.raises(ValidationError):
+        Settings(
+            better_auth_secret="s3cr3t-shared-value-32chars!!-extra",
+            cors_origins="*",
+        )
+
+
+def test_production_requires_tls_database_url(monkeypatch):
+    from app.core.config import Settings
+
+    monkeypatch.setenv("APP_ENV", "production")
+    good_secret = "s3cr3t-shared-value-32chars!!-extra"
+    with pytest.raises(ValidationError):
+        Settings(
+            better_auth_secret=good_secret,
+            database_url="postgresql+asyncpg://user:pass@db.example.com/osint",
+        )
+    # Explicit TLS passes.
+    Settings(
+        better_auth_secret=good_secret,
+        database_url="postgresql+asyncpg://user:pass@db.example.com/osint?sslmode=require",
+    )
+    # Local Docker Postgres stays exempt for development.
+    Settings(
+        better_auth_secret=good_secret,
+        database_url="postgresql+asyncpg://user:pass@localhost:5432/osint",
+    )
+
+
+def test_docs_disabled_in_production(monkeypatch):
+    monkeypatch.setenv("APP_ENV", "production")
+    from app.main import create_app
+
+    app = create_app()
+    assert app.docs_url is None
+    assert app.redoc_url is None
+    assert app.openapi_url is None
 
 
 def test_cors_locked_down():
