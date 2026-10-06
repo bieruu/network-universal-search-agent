@@ -1,5 +1,6 @@
 import { Card, CardTitle } from "@/components/ui/card";
 import { Certificate, Database, HardDrives, LockKey, TrendUp } from "@phosphor-icons/react/dist/ssr";
+import { BentoGridVisual, BentoMetricsVisual } from "./BentoVisuals";
 import Reveal from "./Reveal";
 
 const CELLS = [
@@ -36,25 +37,8 @@ const CELLS = [
 ];
 
 function Visual({ kind }: { kind: (typeof CELLS)[number]["visual"] }) {
-  if (kind === "grid")
-    return (
-      <div className="mt-4 grid h-36 grid-cols-3 gap-2 rounded-xl border border-accent/15 bg-slate-900/95 p-2">
-        <div className="rounded-md bg-accent/30" />
-        <div className="rounded-md bg-slate-700" />
-        <div className="rounded-md bg-accent/20" />
-        <div className="rounded-md bg-slate-800" />
-        <div className="rounded-md bg-accent/35" />
-        <div className="rounded-md bg-slate-700" />
-      </div>
-    );
-  if (kind === "metrics")
-    return (
-      <div className="mt-4 flex h-36 items-end gap-2 rounded-xl border border-accent/15 bg-slate-900/95 p-3">
-        {[26, 34, 62, 48, 72, 58, 92].map((value, index) => (
-          <div key={value + index} className="flex-1 rounded-t-md bg-gradient-to-t from-accent/70 to-emerald-300/90" style={{ height: `${value}px` }} />
-        ))}
-      </div>
-    );
+  if (kind === "grid") return <BentoGridVisual />;
+  if (kind === "metrics") return <BentoMetricsVisual />;
   if (kind === "tint")
     return (
       <div aria-hidden="true" className="mt-4 rounded-xl border border-accent/25 bg-accent/5 p-3 font-mono text-xs text-slate-700 dark:text-neutral-300">
@@ -79,7 +63,7 @@ export default function FeatureBento() {
       <div className="mt-10 grid gap-4 sm:grid-cols-2 lg:grid-cols-3">
         {CELLS.map((c, i) => (
           <Reveal key={c.title} delay={Math.min(i * 0.05, 0.15)} className={i === 0 ? "sm:col-span-2 lg:col-span-1" : undefined}>
-            <Card className="h-full rounded-2xl border-neutral-200 bg-panel p-5 dark:border-neutral-800">
+            <Card className="h-full rounded-2xl border-neutral-200 bg-panel p-5 transition-all duration-200 hover:-translate-y-1 hover:border-accent/40 hover:shadow-lg hover:shadow-accent/10 motion-reduce:transition-none motion-reduce:hover:translate-y-0 dark:border-neutral-800">
               <c.icon size={22} weight="regular" className="text-accent" aria-hidden="true" />
               <CardTitle className="mt-3 text-base text-slate-900 dark:text-neutral-100">{c.title}</CardTitle>
               <p className="mt-2 text-sm leading-relaxed text-slate-600 dark:text-neutral-400">{c.body}</p>

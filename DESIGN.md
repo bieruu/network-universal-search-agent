@@ -98,6 +98,14 @@ Flat surfaces, token borders, emerald tint wash (`bg-accent/5`), mono terminal w
 
 - **Physics:** Spring `type:"spring", stiffness:100, damping:20` for reveals; terminal types 28ms/char → prints lines every 320ms → blinking cursor, then loops 3 sample targets — typing `clear` then wiping the screen out (staggered fade + `y:-6` slide-up, ~220ms/line, 45ms top-to-bottom cascade) so the rotation reads as one continuous shell session.
 - **Entry animations:** `Reveal` (`whileInView`, opacity + `y:24→0`); list cascades stagger ≤0.15s. Reduced-motion collapses everything to static.
+- **Motion budget expanded (approved 2026-10-06):** full ambient layer, landing + login only, dashboard data 100% static. Transform/opacity only, every piece gated by `motion-safe:`/`useReducedMotion`/`motion-reduce:`:
+  - `ScrollProgress` — emerald hairline progress bar on the sticky nav (`scaleX` spring).
+  - `ParallaxField` — two accent washes drifting at different scroll speeds behind the hero (decorative, `aria-hidden`).
+  - `AmbientBackdrop` — CSS-only keyframes (`ambient-drift` 26s, `ambient-pulse` 9s); rendered as a **full-bleed page-level layer** behind nav + hero (`page.tsx`, `-z-10`, `h-[100dvh]`, mask fade at bottom → no hard "cut-off" edges on wide screens); also on the CTA band + login panel; static baseline for no-JS/reduced-motion.
+  - `BentoVisuals` — port-grid cells breathe with staggered `ambient-pulse`; metric bars grow via `scaleY` spring on scroll-in.
+  - `RiskMeter` — How-it-works risk bar fills via `scaleX` spring on scroll-in.
+  - Hover micro-interactions — CTAs and bento cards lift `-translate-y` + accent shadow, disabled under `motion-reduce:`.
+  - **Looping set** (approved 2026-10-06): keyframes `bob` 4.5s / `sweep` 2.4s / `blip` 1.3s / `eq` 1.6s / `breathe` 2.6s in `globals.css` — staggered traffic-light dots + eyebrow live-ping (Hero), **`breathe` halo** on primary CTA + nav monogram (ring materializes at the edge, dissolves out to max 1.12× — never reaches neighbors, replaces the abrupt `ping` after user feedback), rotating dashed dial + ping at the terminal corner, bobbing logo strip & security icons, scanline sweep across the bento port grid, equalizer bars (`scaleY` loop after grow-in), shimmer on `RiskMeter`, blinking+pinging `live` dot + breathing ops bars (HowItWorks), resting pulse on parallax washes. Visibility pass: wash opacities raised (light .11 / dark .14), grid alpha up, drift 26s→14s with −30px amplitude, pulse 9s→5s. CTA hover ease softened to `duration-300 ease-out`. All `motion-safe:` gated (contract-tested: zero ungated loops in landing source, including `pulse`).
 - **Hover states:** accent fill → `hover:bg-accent-hover`; outline/ghost/nav/table/history rows → `hover:bg-accent/10` (+ `hover:border-accent/40` untuk bordered); text links → `hover:text-accent`; 200ms. No lifts, no glows, no slate/neutral hover fills.
 - **Page transitions:** None — sticky nav + instant theme class swap.
 - **Performance:** Only `transform` + `opacity` animated. No scroll listeners (`whileInView` only). Fonts via `next/font`, no Google Fonts `<link>`.
@@ -128,7 +136,7 @@ Base corner radius: 8px (`--radius: 0.5rem`). Cards `rounded-2xl` (16px), button
 
 - No emojis in UI — Phosphor (`@phosphor-icons/react`, `weight="regular"`) only; no CDN icon scripts
 - No pure black surfaces in dark — use `#0a0f14` family
-- No purple/blue AI-glow, no gradient text, no outer glow, no custom cursor, no marquee (motion budget goes to Reveal + terminal)
+- No purple/blue AI-glow, no gradient text, no outer glow, no custom cursor, no marquee (motion budget: Reveal + terminal + the approved full ambient layer — see Motion section; landing/login only)
 - No hardcoded `#00E59B` / `emerald-*` in source — token utilities only
 - No 3-equal-column feature layouts — bento/asymmetry only; one layout family max 1x per page; zigzag image+text max 2 sections in a row; eyebrow max 1 per 3 sections
 - No split-header (left-H1/right-paragraph) as default

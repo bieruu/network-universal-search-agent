@@ -1,4 +1,5 @@
 import Reveal from "./Reveal";
+import RiskMeter from "./RiskMeter";
 
 const STEPS = [
   {
@@ -49,12 +50,18 @@ export default function HowItWorks() {
           <div className="flex h-full flex-col justify-between">
             <div className="flex items-center justify-between text-[10px] uppercase tracking-[0.2em] text-slate-500 dark:text-neutral-400">
               <span>ops</span>
-              <span>live</span>
+              <span className="flex items-center gap-1.5">
+                <span aria-hidden="true" className="relative inline-flex h-1.5 w-1.5">
+                  <span className="h-full w-full rounded-full bg-accent motion-safe:animate-blip" />
+                  <span className="absolute inset-0 rounded-full bg-accent motion-safe:animate-[ping_1.8s_ease-out_infinite]" />
+                </span>
+                live
+              </span>
             </div>
             <div className="mt-6 grid gap-2">
-              <div className="h-4 w-2/3 rounded-full bg-accent/40" />
-              <div className="h-4 w-5/6 rounded-full bg-slate-300 dark:bg-neutral-700" />
-              <div className="h-4 w-2/5 rounded-full bg-accent/25" />
+              <div className="h-4 w-2/3 rounded-full bg-accent/40 motion-safe:animate-ambient-pulse" style={{ animationDelay: "0s" }} />
+              <div className="h-4 w-5/6 rounded-full bg-slate-300 motion-safe:animate-ambient-pulse dark:bg-neutral-700" style={{ animationDelay: "1.5s" }} />
+              <div className="h-4 w-2/5 rounded-full bg-accent/25 motion-safe:animate-ambient-pulse" style={{ animationDelay: "3s" }} />
             </div>
             <div className="mt-8 space-y-3 rounded-xl border border-neutral-200 bg-white/70 p-3 shadow-xs dark:border-neutral-800 dark:bg-neutral-900/80">
               <div className="flex items-center justify-between text-xs text-slate-600 dark:text-neutral-400">
@@ -62,7 +69,7 @@ export default function HowItWorks() {
                 <span className="font-mono text-accent">heuristic</span>
               </div>
               <div className="h-2 overflow-hidden rounded-full bg-slate-200 dark:bg-neutral-800">
-                <div className="h-full w-1/3 rounded-full bg-gradient-to-r from-emerald-400 to-accent" />
+                <RiskMeter />
               </div>
             </div>
           </div>

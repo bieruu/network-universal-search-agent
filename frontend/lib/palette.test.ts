@@ -25,6 +25,18 @@ const landing: Record<string, string> = Object.fromEntries(
 );
 const landingAll = Object.values(landing).join("\n");
 
+// String checks cannot catch CSS syntax errors (e.g. `//` comments inside
+// @theme) — compile globals.css through the real Tailwind pipeline instead.
+test("globals.css compiles through Tailwind — no syntax errors", async () => {
+  const postcss = (await import("postcss")).default;
+  const tailwind = (await import("@tailwindcss/postcss")).default;
+  const result = await postcss([tailwind()]).process(css, {
+    from: join(here, "..", "app", "globals.css"),
+  });
+  assert.ok(result.css.includes("@keyframes breathe"), "breathe keyframe must survive compilation");
+  assert.ok(result.css.includes("@keyframes eq"), "eq keyframe must survive compilation");
+});
+
 test("shared tokens exist in light and dark themes", () => {
   for (const token of ["--background", "--foreground", "--accent", "--accent-foreground", "--accent-hover", "--muted", "--warning", "--danger", "--panel"]) {
     assert.ok(css.includes(token), `globals.css must define ${token}`);

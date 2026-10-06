@@ -33,6 +33,7 @@ test("login accent uses the global token, no hardcoded hex", () => {
 
 test("login motion is transform/opacity with reduced-motion fallback", () => {
   assert.ok(shell.includes("useReducedMotion"), "reduced-motion fallback required");
+  assert.ok(shell.includes("motion-safe:animate-ambient"), "login ambient must be motion-safe CSS only");
   assert.ok(!shell.includes("addEventListener"), "no manual listeners");
 });
 

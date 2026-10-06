@@ -36,7 +36,13 @@ export default function SecurityStrip() {
         {ITEMS.map((c, i) => (
           <li key={c.title} className="border-l-2 border-accent/60 pl-4">
             <Reveal delay={Math.min(i * 0.05, 0.15)}>
-              <c.icon size={20} weight="regular" className="text-accent" aria-hidden="true" />
+              <c.icon
+                size={20}
+                weight="regular"
+                className="text-accent motion-safe:animate-bob"
+                style={{ animationDelay: `${i * 0.6}s` }}
+                aria-hidden="true"
+              />
               <h3 className="mt-2 text-sm font-semibold text-slate-900 dark:text-neutral-100">{c.title}</h3>
               <p className="mt-1 text-sm leading-relaxed text-slate-600 dark:text-neutral-400">{c.body}</p>
             </Reveal>

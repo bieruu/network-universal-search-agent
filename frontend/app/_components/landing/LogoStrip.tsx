@@ -14,14 +14,27 @@ export default function LogoStrip() {
   return (
     <section aria-label="Sources and stack" className="border-y border-neutral-200 dark:border-neutral-800/80">
       <div className="mx-auto flex max-w-7xl flex-wrap items-center justify-center gap-x-10 gap-y-4 px-4 py-6 sm:px-6">
-        {LOGOS.map((l) => (
+        {LOGOS.map((l, i) => (
           <Reveal key={l.name}>
-            <img src={l.src} alt={l.name} width={28} height={28} loading="lazy" />
+            <img
+              src={l.src}
+              alt={l.name}
+              width={28}
+              height={28}
+              loading="lazy"
+              className="motion-safe:animate-bob"
+              style={{ animationDelay: `${i * 0.5}s` }}
+            />
           </Reveal>
         ))}
-        {MONOGRAMS.map((m) => (
+        {MONOGRAMS.map((m, i) => (
           <Reveal key={m}>
-            <span className="font-mono text-sm font-semibold text-accent">{m}</span>
+            <span
+              className="font-mono text-sm font-semibold text-accent motion-safe:animate-bob"
+              style={{ animationDelay: `${(LOGOS.length + i) * 0.5}s` }}
+            >
+              {m}
+            </span>
           </Reveal>
         ))}
       </div>

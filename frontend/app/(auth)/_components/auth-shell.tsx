@@ -49,8 +49,8 @@ export function AuthShell({
         <ThemeToggle className="border border-border/60 bg-background/80 text-foreground hover:bg-accent/10" />
       </div>
       <div className="relative hidden items-center justify-center overflow-hidden border-r border-neutral-200 dark:border-neutral-800 lg:flex">
-        <div aria-hidden="true" className="pointer-events-none absolute inset-0 bg-[radial-gradient(circle_at_50%_42%,rgba(0,229,155,0.09),transparent_62%)]" />
-        <div aria-hidden="true" className="pointer-events-none absolute inset-0 bg-[radial-gradient(rgba(255,255,255,0.055)_1px,transparent_1px)] [background-size:22px_22px]" />
+        <div aria-hidden="true" className="pointer-events-none absolute inset-0 bg-[radial-gradient(circle_at_50%_42%,rgba(0,229,155,0.09),transparent_62%)] motion-safe:animate-ambient-pulse" />
+        <div aria-hidden="true" className="pointer-events-none absolute inset-0 bg-[radial-gradient(rgba(255,255,255,0.055)_1px,transparent_1px)] [background-size:22px_22px] motion-safe:animate-ambient-drift" />
         <div
           className="relative flex h-[clamp(18rem,30vw,24rem)] w-[clamp(18rem,30vw,24rem)] items-center justify-center"
           aria-hidden="true"

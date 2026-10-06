@@ -81,6 +81,13 @@ test("mobile sheet sidebar stays visible below md", () => {
   );
 });
 
+test("dashboard data surfaces stay static — ambient motion is landing/auth only", () => {
+  for (const banned of ["animate-ambient", "AmbientBackdrop"]) {
+    assert.ok(!shell.includes(banned), `dashboard shell: no ${banned}`);
+    assert.ok(!page.includes(banned), `dashboard page: no ${banned}`);
+  }
+});
+
 test("button forwards ref for asChild triggers", () => {
   const button = readFileSync(join(here, "..", "components", "ui", "button.tsx"), "utf8");
   assert.ok(button.includes("forwardRef"), "Button must forward ref so Radix asChild triggers work");

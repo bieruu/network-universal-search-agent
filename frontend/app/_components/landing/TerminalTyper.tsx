@@ -146,7 +146,7 @@ export default function TerminalTyper() {
             <span className="text-accent">$ </span>
             <span className="text-slate-900 dark:text-neutral-100">{scan.command.slice(0, chars)}</span>
             {!commandDone && (
-              <span aria-hidden="true" className="ml-0.5 inline-block h-4 w-2 animate-pulse bg-accent" />
+              <span aria-hidden="true" className="ml-0.5 inline-block h-4 w-2 bg-accent motion-safe:animate-pulse" />
             )}
           </motion.p>
         )}
@@ -187,7 +187,7 @@ export default function TerminalTyper() {
               </motion.span>
             )}
           </AnimatePresence>
-          <span aria-hidden="true" className="ml-0.5 inline-block h-4 w-2 animate-pulse bg-accent" />
+          <span aria-hidden="true" className="ml-0.5 inline-block h-4 w-2 bg-accent motion-safe:animate-pulse" />
         </p>
       )}
     </div>
