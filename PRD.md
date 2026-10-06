@@ -2,7 +2,7 @@
 
 **Version:** 1.0.0
 **Date:** 2026-09-27
-**Status:** Draft for Implementation
+**Status:** v1 implemented (acceptance verified 2026-09/10; history → [CHANGELOG.md](./CHANGELOG.md))
 **Stack:** Next.js (App Router) + Tailwind + shadcn/ui + Chart.js | FastAPI + PostgreSQL + SQLite + Better Auth
 
 ## 1. Vision & Objective
@@ -28,7 +28,7 @@ Core value:
 ## 3. Technology Stack (Locked)
 
 ### Frontend
-- Next.js 14+ (App Router, TypeScript strict)
+- Next.js 15+ (App Router, TypeScript strict)
 - Tailwind CSS + shadcn/ui (Radix primitives) — responsive, accessible
 - Chart.js via `react-chartjs-2` — trends only, no custom canvas lib
 - Better Auth client for session, `fetch` to FastAPI via Next Route Handler proxy (to hide internal URLs)
@@ -116,27 +116,7 @@ Trend: store `risk_score` per scan, chart last 10 scans per target.
 
 ## 9. Environment Variables
 
-```bash
-# Frontend (.env.local)
-NEXT_PUBLIC_APP_URL=http://localhost:3000
-NEXT_PUBLIC_API_URL=http://localhost:3000/api  # Next proxy
-BETTER_AUTH_SECRET=change-me-32-chars
-BETTER_AUTH_URL=http://localhost:3000
-DATABASE_URL=postgresql+asyncpg://osint:osint@localhost:5432/osint
-
-# Backend (backend/.env)
-SHODAN_API_KEY=your-shodan-key
-DATABASE_URL=postgresql+asyncpg://osint:osint@localhost:5432/osint
-SQLITE_PATH=./data/cache.db
-BETTER_AUTH_SECRET=same-as-frontend
-CORS_ORIGINS=http://localhost:3000
-SCAN_TIMEOUT_SHODAN=12
-SCAN_TIMEOUT_CRTSH=15
-SCAN_TIMEOUT_WHOIS=10
-RATE_LIMIT_PER_HOUR=10
-```
-
-See WORKFLOW.md for full setup.
+Single source of truth: [backend/.env.example](./backend/.env.example) and [frontend/.env.local.example](./frontend/.env.local.example), documented in [WORKFLOW.md §3](./WORKFLOW.md#3-environment-reference). Do not duplicate env values in this document.
 
 ## 10. Milestones
 

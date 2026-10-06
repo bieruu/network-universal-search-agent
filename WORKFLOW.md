@@ -77,6 +77,12 @@ CORS_ORIGINS=http://localhost:3000
 APP_URL=http://localhost:3000
 SQLITE_PATH=./data/cache.db
 CACHE_BACKEND=sqlite
+NVD_API_KEY=                # optional — raises NVD rate limits
+SCAN_TIMEOUT_NVD=12
+NVD_MAX_CPES=5
+NVD_CVES_PER_CPE=20
+NVD_PAGE_SIZE=100
+RATE_LIMIT_PER_HOUR=10
 ```
 
 Generate a secret with `openssl rand -base64 32` or a trusted password generator. Do not commit real secrets or filled `.env` files.

@@ -7,14 +7,14 @@
 - `frontend/` — Next.js App Router + TypeScript + Tailwind + shadcn/ui + react-chartjs-2.
 - `backend/` — FastAPI async + SQLAlchemy + Pydantic v2. Services: shodan, crtsh, whois, orchestrator, risk.
 - DB: PostgreSQL (truth) + SQLite (TTL cache). Auth: Better Auth (session-gated).
-- Docs: PRD.md (what), ARCHITECTURE.md (how), TODO.md (order), WORKFLOW.md (commands).
+- Docs: README.md (start here), PRD.md (what), ARCHITECTURE.md (how), DESIGN.md (UI), WORKFLOW.md (commands), TODO.md (open items), CHANGELOG.md (history).
 
 ## 2. Commands (Use These, Don't Invent)
 
 ```bash
 # Frontend (frontend/)
-pnpm install && pnpm dev          # http://localhost:3000
-pnpm lint && pnpm tsc --noEmit && pnpm test
+npm install && npm run dev        # http://localhost:3000 (lockfile: package-lock.json)
+npm run lint && npm run tsc --noEmit && npm test
 
 # Backend (backend/)
 python -m venv .venv && pip install -r requirements.txt
@@ -60,7 +60,7 @@ DO:
 - Add tests for new service + orchestrator partial-failure path.
 - Update TODO.md checkbox + ARCHITECTURE.md if contract changes.
 - Use `X-Request-ID` in logs, return `errors: [{source, message}]`.
-- Always do task with multiple agent
+- Parallelize independent subtasks (multiple agents / tool calls) when they do not share state.
 
 DON'T:
 - Don't call Shodan/crt.sh from browser. Don't add active scanning (nmap) in v1.
@@ -69,7 +69,7 @@ DON'T:
 
 ## 8. PR Checklist
 
-- [ ] `pnpm lint && pnpm tsc` + `pytest && ruff` pass
+- [ ] `npm run lint && npm run tsc` + `pytest && ruff` pass
 - [ ] No secrets in diff, inputs validated FE+BE, partial-failure tested (kill one source)
 - [ ] Screenshots for UI change (dark + light), charts with real + empty data
 - [ ] Docs updated if API/env/schema changed
