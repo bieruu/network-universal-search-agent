@@ -23,7 +23,9 @@ Free Shodan key: https://account.shodan.io/
 # 1. env + database (use `cp` on macOS/Linux)
 Copy-Item frontend\.env.local.example frontend\.env.local
 Copy-Item backend\.env.example backend\.env   # fill SHODAN_API_KEY + BETTER_AUTH_SECRET (32+)
-docker compose up -d postgres
+# POSTGRES_PASSWORD has no default in docker-compose.yml — set it before Compose starts:
+$env:POSTGRES_PASSWORD = "pick-any-local-password"
+docker compose up -d postgres   # use the same password in both DATABASE_URL values
 
 # 2. backend (terminal 1)
 cd backend

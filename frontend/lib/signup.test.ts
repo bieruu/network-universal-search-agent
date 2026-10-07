@@ -24,7 +24,12 @@ test("sign-up validates email, password length, and confirmation", () => {
 
 test("Better Auth is server-backed by PostgreSQL with a mounted API route", () => {
   assert.ok(auth.includes("new Pool({ connectionString: databaseUrl })"), "PostgreSQL adapter required");
-  assert.ok(auth.includes("emailAndPassword: { enabled: true }"), "email/password auth must be enabled");
+  // Matched structurally, not by literal: the object also carries the
+  // sign-up gate (`disableSignUp`), but email/password auth must stay enabled.
+  assert.ok(
+    /emailAndPassword:\s*\{\s*enabled:\s*true/.test(auth),
+    "email/password auth must be enabled",
+  );
   assert.ok(auth.includes("GOOGLE_CLIENT_ID") && auth.includes("GITHUB_CLIENT_ID"), "OAuth credentials are configurable");
   assert.ok(route.includes("toNextJsHandler(auth)"), "Better Auth Next.js handler required");
 });

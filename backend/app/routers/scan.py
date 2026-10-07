@@ -8,7 +8,11 @@ from sqlalchemy import select
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from app.core.rate_limit import check_rate_limit
-from app.core.security import assert_target_allowed, require_user
+from app.core.security import (
+    assert_resolved_target_allowed,
+    assert_target_allowed,
+    require_user,
+)
 from app.db.session import get_session
 from app.models.scan import Scan
 from app.models.target import Target
@@ -56,11 +60,19 @@ async def post_scan(
 ) -> dict:
     assert_target_allowed(body.target)
     check_rate_limit(user_id)
+    # The resolved-IP check runs after the rate limit on purpose: it costs a DNS
+    # query, and it has to happen here rather than in a source service because
+    # the orchestrator folds every source exception into errors[] (HTTP 200).
+    # It hands back the IP it resolved so the Shodan source can reuse it instead
+    # of resolving the same name a second time; None means "resolve it yourself",
+    # which is what an unresolvable name leaves behind.
+    resolved_ip = await assert_resolved_target_allowed(body.target)
     payload = await orchestrator.run_scan(
         body.target.lower(),
         user_id,
         force=body.force,
         persist=lambda **kw: _persist(session=session, **kw),
+        resolved_ip=resolved_ip,
     )
     return {"scan_id": payload["scan_id"], "status": payload["status"]}
 

@@ -10,6 +10,7 @@ import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { authClient } from "@/lib/auth-client";
+import { SIGNUP_RESTRICTED_BODY } from "@/lib/signup-gate";
 
 const signUpSchema = z.object({
   name: z.string().trim().min(1, "Enter your name").max(100),
@@ -21,7 +22,26 @@ const signUpSchema = z.object({
   message: "Passwords do not match",
 });
 
-export default function SignUpForm() {
+/**
+ * Better Auth answers a blocked account creation with a deliberately generic
+ * FAILED_TO_CREATE_USER / EMAIL_PASSWORD_SIGN_UP_DISABLED — it will not tell an
+ * anonymous caller whether the email is allowlisted or the master switch is
+ * off, and neither should we. But "Failed to create user" is useless to a
+ * legitimate user who mistyped their address, so map it to actionable copy.
+ */
+function describeSignUpError(message: string | undefined): string {
+  const text = (message ?? "").toLowerCase();
+  if (
+    text.includes("failed to create user") ||
+    text.includes("sign up is not enabled") ||
+    text.includes("user already exists")
+  ) {
+    return "Sign-up is not available for this email address. Ask an administrator for access.";
+  }
+  return message ?? "Account creation failed";
+}
+
+export default function SignUpForm({ restricted = false }: { restricted?: boolean }) {
   const router = useRouter();
   const [name, setName] = useState("");
   const [email, setEmail] = useState("");
@@ -48,7 +68,7 @@ export default function SignUpForm() {
         callbackURL: "/dashboard",
       });
       if (result.error) {
-        setErrorField(result.error.message ?? "Account creation failed");
+        setErrorField(describeSignUpError(result.error.message));
         return;
       }
       router.push("/dashboard");
@@ -75,6 +95,11 @@ export default function SignUpForm() {
 
   return (
     <AuthShell title="Create account" description="Create an account to start a private OSINT workspace.">
+      {restricted && (
+        <p className="mt-4 rounded-2xl border border-amber-200 bg-amber-50 p-3 text-xs text-amber-800 dark:border-amber-900/60 dark:bg-amber-950/30 dark:text-amber-200">
+          {SIGNUP_RESTRICTED_BODY}
+        </p>
+      )}
       <form onSubmit={handleSignUp} className="mt-6 flex flex-col gap-2">
         <div className="flex flex-col gap-2">
           <Label htmlFor="name">Name</Label>

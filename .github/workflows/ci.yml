@@ -1,0 +1,168 @@
+name: CI
+
+on:
+  push:
+  pull_request:
+
+permissions:
+  contents: read
+
+jobs:
+  backend:
+    runs-on: ubuntu-latest
+    services:
+      postgres:
+        image: postgres:16
+        env:
+          POSTGRES_DB: osint
+          POSTGRES_USER: osint
+          POSTGRES_PASSWORD: osint
+        ports:
+          - 5432:5432
+        options: >-
+          --health-cmd "pg_isready -U osint -d osint"
+          --health-interval 5s
+          --health-timeout 5s
+          --health-retries 10
+    env:
+      DATABASE_URL: postgresql+asyncpg://osint:osint@localhost:5432/osint
+      BETTER_AUTH_SECRET: ci-only-secret-not-for-deployment-000000000000000000
+      APP_URL: http://localhost:3000
+      CORS_ORIGINS: http://localhost:3000
+      SHODAN_API_KEY: ci-placeholder
+    steps:
+      # v6+ of the first-party actions: GitHub removed Node 20 from runners on
+      # 2026-09-23, and @v4/@v5 declare `runs.using: node20`.
+      - uses: actions/checkout@v6
+      - uses: actions/setup-python@v6
+        with:
+          python-version: "3.11"
+          cache: pip
+          cache-dependency-path: backend/requirements.txt
+      - name: Install backend dependencies
+        working-directory: backend
+        run: python -m pip install -r requirements.txt
+      - name: Apply and verify database migrations
+        working-directory: backend
+        run: |
+          alembic upgrade head
+          alembic check
+      - name: Run backend tests
+        working-directory: backend
+        run: pytest -q
+      - name: Check backend style
+        working-directory: backend
+        run: |
+          ruff check .
+          black --check .
+      - name: Audit backend dependencies
+        # requirements.txt / requirements-dev.txt are `uv pip compile` output: every
+        # entry is pinned and hashed. --require-hashes makes pip-audit fail closed if a
+        # requirement is ever unpinned or hashless, and --disable-pip skips dependency
+        # resolution entirely, so the audit reads the exact pinned set from the file
+        # instead of re-resolving against the live index (no network, deterministic).
+        working-directory: backend
+        run: |
+          python -m pip install --disable-pip-version-check "pip-audit==2.10.1"
+          pip-audit --require-hashes --disable-pip -r requirements.txt
+          pip-audit --require-hashes --disable-pip -r requirements-dev.txt
+
+  frontend:
+    runs-on: ubuntu-latest
+    env:
+      DATABASE_URL: postgresql://osint:osint@localhost:5432/osint
+      BETTER_AUTH_SECRET: ci-only-secret-not-for-deployment-000000000000000000
+      BETTER_AUTH_URL: http://localhost:3000
+      NEXT_PUBLIC_APP_URL: http://localhost:3000
+      NEXT_PUBLIC_API_URL: http://localhost:3000/api
+      BACKEND_URL: http://localhost:8000
+      NEXT_TELEMETRY_DISABLED: "1"
+    steps:
+      - uses: actions/checkout@v6
+      - uses: actions/setup-node@v6
+        with:
+          # This is the project's own Node, not the action runtime. Keep it aligned
+          # with the "Node >= 20" prerequisite in README.md / WORKFLOW.md §1.
+          node-version: 20
+          cache: npm
+          cache-dependency-path: frontend/package-lock.json
+      - name: Install frontend dependencies
+        working-directory: frontend
+        run: npm ci
+      - name: Lint, type-check, and test frontend
+        working-directory: frontend
+        run: |
+          npm run lint
+          npm run tsc
+          npm test
+      - name: Audit frontend dependencies
+        working-directory: frontend
+        run: npm audit --audit-level=moderate
+      - name: Build frontend
+        working-directory: frontend
+        run: npm run build
+
+  secrets:
+    name: Secret scan
+    runs-on: ubuntu-latest
+    permissions:
+      contents: read
+    steps:
+      - uses: actions/checkout@v6
+        with:
+          # gitleaks needs the commit range to diff against, so history must be present.
+          fetch-depth: 0
+      - name: Install gitleaks
+        env:
+          GITLEAKS_VERSION: 8.30.1
+          GITLEAKS_SHA256: 551f6fc83ea457d62a0d98237cbad105af8d557003051f41f3e7ca7b3f2470eb
+        run: |
+          set -euo pipefail
+          archive="gitleaks_${GITLEAKS_VERSION}_linux_x64.tar.gz"
+          curl -fsSL --retry 3 -o "$archive" \
+            "https://github.com/gitleaks/gitleaks/releases/download/v${GITLEAKS_VERSION}/${archive}"
+          echo "${GITLEAKS_SHA256}  ${archive}" | sha256sum --check --strict
+          tar -xzf "$archive" gitleaks
+          sudo mv gitleaks /usr/local/bin/gitleaks
+          rm -f "$archive"
+          gitleaks version
+      - name: Scan pushed commits for secrets
+        # Range-limited to what this event introduced: PRs scan base..HEAD, pushes scan
+        # the commits added by the push. Output is fully redacted, so a detected value
+        # is never echoed into the log.
+        env:
+          EVENT_NAME: ${{ github.event_name }}
+          PR_BASE_SHA: ${{ github.event.pull_request.base.sha }}
+          PUSH_BEFORE_SHA: ${{ github.event.before }}
+          GITLEAKS_CONFIG_TOML: |
+            [extend]
+            useDefault = true
+
+            # Allowlist is deliberately narrow: only committed env *templates*, which
+            # hold documentation placeholders by definition. Real `.env` files are
+            # already gitignored and stay fully scanned.
+            [[allowlists]]
+            description = "Env templates carry placeholders, not live credentials"
+            paths = [
+              '''(^|/)\.env(\.[a-zA-Z0-9_-]+)*\.(example|template)$''',
+            ]
+        run: |
+          set -euo pipefail
+          if [ "$EVENT_NAME" = "pull_request" ]; then
+            base="$PR_BASE_SHA"
+          else
+            base="$PUSH_BEFORE_SHA"
+          fi
+          # All-zero SHA means a newly created branch: nothing to diff against.
+          if [ -z "$base" ] || printf '%s' "$base" | grep -qE '^0+$'; then
+            log_opts="--all"
+          else
+            log_opts="${base}..HEAD"
+          fi
+          gitleaks git \
+            --redact \
+            --no-banner \
+            --platform github \
+            --exit-code 1 \
+            --log-opts="$log_opts" \
+            "$GITHUB_WORKSPACE"

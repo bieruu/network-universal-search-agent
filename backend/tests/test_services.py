@@ -10,12 +10,15 @@ from __future__ import annotations
 import asyncio
 import socket
 import sys
+import time
 import types
 
 import httpx
 import pytest
+from fastapi import HTTPException
 
 from app.core.config import settings
+from app.core.security import resolve_target_ip
 from app.services import (
     certspotter_service,
     crtsh_service,
@@ -203,6 +206,139 @@ async def test_shodan_dns_failure_raises(shodan_key, monkeypatch):
     monkeypatch.setattr(socket, "gethostbyname", _boom)
     with pytest.raises(RuntimeError, match="DNS resolve failed"):
         await shodan_service.lookup("nonexistent.invalid", client=_FakeClient({}))
+
+
+@pytest.mark.asyncio
+async def test_shodan_rejects_domain_resolving_to_blocked_ip(shodan_key, monkeypatch):
+    # The hostname looks public, so only the resolved IP can catch loopback /
+    # link-local. Nothing may be sent to Shodan or its InternetDB fallback.
+    for blocked_ip in ("127.0.0.1", "169.254.169.254", "10.0.0.5"):
+        monkeypatch.setattr(socket, "gethostbyname", lambda host, ip=blocked_ip: ip)
+        client = _FakeClient({"ports": [], "data": []})
+        with pytest.raises(HTTPException) as e:
+            await shodan_service.lookup("internal.example.com", client=client)
+        assert e.value.status_code == 400
+        assert e.value.detail == "Private/localhost targets are blocked"
+        assert client.calls == []
+
+
+@pytest.mark.asyncio
+async def test_shodan_allows_domain_resolving_to_public_ip(shodan_key, monkeypatch):
+    monkeypatch.setattr(socket, "gethostbyname", lambda host: "93.184.216.34")
+    client = _FakeClient({"ports": [443], "data": []})
+    out = await shodan_service.lookup("example.com", client=client)
+    assert out["ip"] == "93.184.216.34"
+    assert client.calls[0]["url"].endswith("/shodan/host/93.184.216.34")
+
+
+@pytest.mark.asyncio
+async def test_shodan_dns_timeout_error_is_clean(shodan_key, monkeypatch):
+    def _timeout(host):
+        raise TimeoutError("timed out")
+
+    monkeypatch.setattr(socket, "gethostbyname", _timeout)
+    with pytest.raises(RuntimeError, match="DNS resolve failed"):
+        await shodan_service.lookup("slow.example.com", client=_FakeClient({}))
+
+
+@pytest.mark.asyncio
+async def test_shodan_dns_resolution_is_bounded_by_timeout(shodan_key, monkeypatch):
+    # A resolver that never answers must release the caller instead of pinning
+    # the worker, so the lookup gives up on the same budget as the Shodan call.
+    monkeypatch.setattr(settings, "scan_timeout_shodan", 0.05)
+
+    def _hang(host):
+        time.sleep(1.0)
+        return "9.9.9.9"  # pragma: no cover — always outrun by the timeout
+
+    monkeypatch.setattr(socket, "gethostbyname", _hang)
+    started = time.monotonic()
+    with pytest.raises(RuntimeError, match="DNS resolve failed"):
+        await shodan_service.lookup("blackhole.example.com", client=_FakeClient({}))
+    assert time.monotonic() - started < 0.5
+
+
+def test_shodan_lookup_never_resolves_dns_on_the_event_loop():
+    # AGENTS.md §3: the async path must not block; the resolver belongs in a
+    # thread. Guard regression against a re-inlined socket.gethostbyname.
+    import inspect
+
+    src = inspect.getsource(shodan_service.lookup)
+    assert "gethostbyname" not in src
+    assert "socket" not in src
+    assert "to_thread" in inspect.getsource(resolve_target_ip)
+
+
+# --- POST /scan: the 400 must survive the orchestrator --------------------
+
+
+@pytest.fixture
+def scan_client(monkeypatch):
+    """POST /scan with auth + DB stubbed; the rate-limit bucket is reset."""
+    from fastapi.testclient import TestClient
+
+    from app.core import rate_limit
+    from app.core.security import require_user
+    from app.db.session import get_session
+    from app.main import create_app
+
+    monkeypatch.setattr(settings, "rate_limit_per_hour", 100)
+    rate_limit.reset_for_tests()
+    app = create_app()
+    app.dependency_overrides[require_user] = lambda: "user:test"
+    app.dependency_overrides[get_session] = lambda: None
+    with TestClient(app) as client:
+        yield client
+    rate_limit.reset_for_tests()
+
+
+def test_scan_endpoint_400s_on_domain_resolving_to_blocked_ip(scan_client, monkeypatch):
+    # The orchestrator swallows every source exception into errors[] and still
+    # answers 200, so a blocked resolved IP has to be rejected before the
+    # fan-out or the client never sees the 400.
+    from app.routers import scan as scan_router
+
+    async def _never_scan(*args, **kwargs):
+        raise AssertionError("a blocked target must not reach the orchestrator")
+
+    monkeypatch.setattr(socket, "gethostbyname", lambda host: "127.0.0.1")
+    monkeypatch.setattr(scan_router.orchestrator, "run_scan", _never_scan)
+
+    response = scan_client.post(
+        "/api/v1/scan", json={"target": "internal.example.com", "force": True}
+    )
+
+    assert response.status_code == 400
+    assert response.json()["detail"] == "Private/localhost targets are blocked"
+
+
+def test_scan_endpoint_allows_domain_resolving_to_public_ip(scan_client, monkeypatch):
+    # Counter-test for the guard above: a public target must still scan.
+    from app.routers import scan as scan_router
+
+    seen: dict = {}
+
+    async def _fake_scan(
+        target, user_id, force=False, persist=None, *, resolved_ip=None
+    ):
+        # The pre-flight IP has to reach the orchestrator, otherwise Shodan
+        # resolves the same name a second time.
+        seen["resolved_ip"] = resolved_ip
+        return {
+            "scan_id": "11111111-1111-1111-1111-111111111111",
+            "status": "completed",
+        }
+
+    monkeypatch.setattr(socket, "gethostbyname", lambda host: "93.184.216.34")
+    monkeypatch.setattr(scan_router.orchestrator, "run_scan", _fake_scan)
+
+    response = scan_client.post(
+        "/api/v1/scan", json={"target": "example.com", "force": False}
+    )
+
+    assert response.status_code == 200
+    assert response.json()["status"] == "completed"
+    assert seen["resolved_ip"] == "93.184.216.34"
 
 
 # --- crt.sh ---------------------------------------------------------------

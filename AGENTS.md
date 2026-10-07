@@ -22,7 +22,7 @@ uvicorn app.main:app --reload --port 8000
 pytest -q && ruff check . && black --check .
 
 # DB
-docker compose up -d postgres    # DATABASE_URL=postgresql://osint:osint@localhost:5432/osint
+docker compose up -d postgres    # DATABASE_URL=postgresql+asyncpg://owner:<password>@localhost:5432/osint
 alembic upgrade head
 ```
 
@@ -61,6 +61,7 @@ DO:
 - Update TODO.md checkbox + ARCHITECTURE.md if contract changes.
 - Use `X-Request-ID` in logs, return `errors: [{source, message}]`.
 - Parallelize independent subtasks (multiple agents / tool calls) when they do not share state.
+- **At push time (not before), move what you finished from TODO.md into CHANGELOG.md**, newest section first, and fix older entries this push made wrong (§9).
 
 DON'T:
 - Don't call Shodan/crt.sh from browser. Don't add active scanning (nmap) in v1.
@@ -73,5 +74,40 @@ DON'T:
 - [ ] No secrets in diff, inputs validated FE+BE, partial-failure tested (kill one source)
 - [ ] Screenshots for UI change (dark + light), charts with real + empty data
 - [ ] Docs updated if API/env/schema changed
+- [ ] Finished TODO items ticked `[x]` as they completed (§9)
+- [ ] TODO.md → CHANGELOG.md swept at push time: ticked items moved out and deleted from TODO, new section on top, superseded entries annotated (§9)
+
+## 9. TODO.md → CHANGELOG.md
+
+`TODO.md` tracks work; `CHANGELOG.md` records what shipped. The two are linked but move on different triggers:
+
+- **Tick `[x]` as soon as an item is genuinely done.** It stays in TODO.md, ticked, until a push sweeps it.
+- **Moving to CHANGELOG.md happens at push time, in the same commit as the code** — never as a separate docs commit afterwards.
+
+So a finished item sitting in TODO.md with a `[x]` is the *expected* resting state, not a failure. A ticked item only goes wrong when it is left behind forever: if a sweep passes and a `[x]` is still in TODO.md, that item was never moved, and it is a missed item.
+
+While working:
+
+1. Tick `[x]` each item as it is actually completed — same commit as the code that completes it, or any later one in the same push.
+2. Leave the item in TODO.md, ticked. Do not pre-write CHANGELOG prose for work that is not pushed; it would claim a ship that has not happened.
+3. Keep everything genuinely open unticked.
+
+At push time:
+
+1. Collect every `[x]` item in TODO.md that belongs to this push.
+2. Move those items **out of** TODO.md into one new dated `## YYYY-MM-DD — <title>` section in CHANGELOG.md, and delete them from TODO.md.
+3. Newest section goes **first**, directly under the header block. Existing entries are never reordered or renumbered; one push = one new top section.
+4. State what changed and the gate numbers in the entry — the CHANGELOG is the record of what actually shipped.
+5. Anything still open stays in TODO.md, unticked. A `[x]` that survives a push is the failure mode: the sweep missed it.
+
+Before you push, also correct CHANGELOG entries that this push made wrong: an entry that is now inaccurate or superseded gets a dated inline note (`superseded YYYY-MM-DD` / `reversed YYYY-MM-DD`) pointing at the newer entry. Leave the original claim visible — the history is the point; silently rewriting it destroys the audit trail.
+
+Honesty rules for both files:
+
+- Only tick an item that is genuinely done. A plan or a review finding is still open work.
+- Never claim a gate passed without running it in this session; write the numbers you observed.
+- If a gate did not run, say so in the entry instead of implying it passed.
+- Mark anything unverified as unverified. Do not present an assumption about a dependency's defaults as a finding.
+- A tick asserts the work exists and its gates ran — not that it was deployed. Deployment stays in its own section until it happens.
 
 When in doubt: fail closed (401/429/partial), log structured, keep UI usable.

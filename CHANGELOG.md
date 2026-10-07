@@ -1,6 +1,74 @@
 # Changelog — Network Universal Search Agent
 
-> Completed work, newest first (bottom = oldest). Open items → [TODO.md](./TODO.md) · setup → [WORKFLOW.md](./WORKFLOW.md) · requirements → [PRD.md](./PRD.md).
+> Completed work only, newest section at the top. Open items → [TODO.md](./TODO.md) · setup → [WORKFLOW.md](./WORKFLOW.md) · requirements → [PRD.md](./PRD.md).
+> Anything finished in a push moves here from TODO.md in that same commit, newest section at the top — see AGENTS.md §9.
+
+## 2026-10-07 — Security review residual: scan-quota budget, bucket ceilings, single DNS resolve, Better Auth sign-up bucket verified
+
+Closes three of the four items under "Residual dari security review" in TODO.md. The fourth is verified and partially mitigated, with its residual stated rather than closed.
+
+**Scan quota for a public domain** (TODO residual #1)
+
+- `rate_limit_per_hour` default `10 → 5`, and `PRODUCTION_RATE_LIMIT_CEILING = 5` is now a module constant in `app/core/config.py` with the billing reasoning in the comment. At 5/hour one account draws at most ~3.6k Shodan queries per 30-day month; at the old 10 it could draw ~7.2k on its own, and that scales with account count.
+- **Production refuses to boot** unless `RATE_LIMIT_PER_HOUR` is present, a whole number, ≥1, and ≤ the ceiling — same fail-closed shape as the existing secret / CORS / `sslmode=require` guards. Presence is checked via `os.getenv`, not the field value, because a Pydantic default cannot distinguish "unset" from "deliberately 5" and an unset quota on a paid key is a silent budget decision. Documented consequence: it must be a real environment variable, not only a `.env` file inside the image (WORKFLOW.md §8.4).
+- `RATE_LIMIT_DAILY_TOTAL` (default `0`, disabled): opt-in instance-wide ceiling on *admitted* scans per rolling 24h, counted in hourly buckets so the counter stays at ≤25 entries. Exists because a per-account quota cannot express a budget for the shared key. Ships disabled because the right number is a billing decision, and guessed in either direction it either breaks paying users or spends money quietly.
+- **Account-age quota weighting (option b) evaluated and rejected, not skipped.** The limiter receives the opaque `user:<id>` string with no DB session, so weighting needs an awaitable query on the hot path of every scan inside a module that is currently synchronous and dependency-free — and it would fail open exactly when the database is down. The daily cap covers the same blast-radius concern without the per-request cost.
+
+**Absolute ceiling on `_buckets`** (TODO residual #3)
+
+`RATE_LIMIT_MAX_KEYS` (default 10000). At the cap, an *unknown* key is refused with 429 until the next sweep. **Fail closed, deliberately:** LRU eviction would hand a live user back their remaining quota, so anyone able to mint keys could mint free scans on a paid key — and since the sweep orders by newest stamp, the flood victims are exactly the newest keys, i.e. active users. Fail-closed costs at most one sweep interval of new signups and cannot touch an existing bucket. The 429 body is byte-identical to a quota rejection on purpose; a distinct message would be a probe for how full the map is.
+
+**One DNS resolution per scan** (TODO residual #4)
+
+`assert_resolved_target_allowed` now returns the resolved IP, threaded as a keyword-only `resolved_ip` through `orchestrator.run_scan` → `gather_results` → `shodan_service.lookup`. Hostname scans go from two resolutions to one. Two decisions worth recording: a failed pre-flight forwards `None` so the service resolves for itself (otherwise a transient resolver blip becomes a permanent Shodan error), and an IP literal returns `None` because `_is_ip` already bypasses the resolver. `assert_target_allowed(ip)` now runs on **every** path rather than only the hostname branch, so a caller-supplied `resolved_ip` nobody validated still costs zero Shodan requests. Two resolutions remain only when pre-flight itself fails — both attempts failing, deliberately. Cache keys unchanged, and a Shodan cache hit still makes no service-side resolve because the kwarg is read inside the job body, not when building it.
+
+**Better Auth sign-up bucket: claim confirmed, residual open** (TODO residual #2)
+
+Verified against installed `better-auth@1.7.7` rather than assumed: `getIPFromHeader` returns `null` for a multi-hop `x-forwarded-for` with no `trustedProxies` (`@better-auth/core/dist/utils/ip.mjs:190`), production has no localhost fallback (`:217-218`), `null` becomes the literal key `no-trusted-ip` (`rate-limiter/index.mjs:236,248`), and `/sign-up*` is capped at 3 requests / 10s (`:305-312`). Every sign-up therefore shares one bucket — abuse self-limits, and one attacker can exhaust everyone's sign-up quota.
+
+Partially mitigated by `BETTER_AUTH_TRUSTED_PROXIES` (default empty) whose parser is stricter than Better Auth's: `0.0.0.0/0`, `::/0`, and bare `0.0.0.0` are rejected, because they make the limiter trust the client-supplied leftmost token and match every address. A test asserts anything we accept Better Auth also accepts.
+
+**Not closed:** on Vercel this knob will typically stay empty, since Vercel publishes no edge ingress ranges, so the shared bucket persists there. Header reordering does not help (`x-real-ip` is documented as identical to `x-forwarded-for`), and `rateLimit.customRules` cannot re-key — the key is computed before rules resolve, and a rule can only narrow or widen. The practical mitigation is leaving sign-up closed or allowlisted (WORKFLOW.md §8.3); closing it properly needs a limiter outside Better Auth (v2). Pinned by `frontend/lib/auth-rate-limit.test.ts`, which imports the real installed helpers so an upgrade that changes the fallback, key, or 3/10s rule fails the suite instead of regressing silently.
+
+Gates run in this session: backend `pytest` **285 passed** + `ruff` clean + `black --check` clean (50 files) · frontend `npm test` **108 passed** + `npm run lint` clean + `npm run tsc` clean + `npm run build` succeeded. Docs synced for the changed default: `WORKFLOW.md` §8.4 (new) and §8.5 (new), §8.3, §8.2 step 4, the §8 env list, `ARCHITECTURE.md` §6, `backend/.env.example`, `frontend/lib/signup-gate.ts`.
+
+One agent run of `pytest` hit a 600s timeout mid-task; the cause was three agents running gates concurrently, not a regression — a clean re-run finished in 16s and every subsequent run has been green.
+
+**Still open, not addressed here:** the five "Deploy readiness" items need real infrastructure (managed DB, secrets provider, GitHub branch protection, a production domain). No `gh` CLI and no `GITHUB_TOKEN` in this environment, so branch protection is not actionable from here.
+
+## 2026-10-07 — Deploy readiness: boot blockers, live CI, Vercel disclosure
+
+Closes all P1–P3 items from "Deploy readiness" in TODO.md. Target topology documented as **Vercel (frontend) + container (backend)**; nothing is deployed yet.
+
+**P1 — app gagal start**
+
+- **`.env.example` driver URL**: `postgresql://` → `postgresql+asyncpg://`. The backend opens the DB with `create_async_engine()` (`app/db/session.py`) and `psycopg` is not in `requirements.txt`, so a copied-as-is env file died at boot with `ModuleNotFoundError: No module named 'psycopg'`. Three comment lines added explaining why, so it does not get reverted. `AGENTS.md` (which carried the same wrong scheme in its DB snippet) resynced.
+- **Alembic fallback credentials**: `osint:osint` → `owner:owner` in `backend/alembic/env.py`, matching `${POSTGRES_USER:-owner}` / `${POSTGRES_DB:-osint}` in `docker-compose.yml`. Previously a container starting without `DATABASE_URL` failed migration auth.
+- **Regression test** `backend/tests/test_config.py` (new, 4 tests): the example URL is engine-constructible, its scheme is `postgresql+asyncpg`, and its user/db match `docker-compose.yml`; the Alembic fallback is held to the same contract; and plain `postgresql://` is asserted to actually fail (`ModuleNotFoundError`), which pins the reason for the fix instead of just the symptom. Backend `pytest` 78 → 82.
+
+**P1b — onboarding hole found while closing P1**
+
+`docker-compose.yml` requires `POSTGRES_PASSWORD` with no default (`:?` → hard fail), but neither quickstart ever mentioned it, so `docker compose up -d postgres` failed for anyone following the docs literally. `README.md` and `WORKFLOW.md` §2 now set it first and use one password in both `DATABASE_URL` values.
+
+**P2 — CI is now tracked and runs**
+
+- `.github` removed from `.gitignore`; `git check-ignore` exits 1 and `.github/workflows/ci.yml` is tracked.
+- New `Audit backend dependencies` step: `pip-audit --require-hashes --disable-pip` over both `requirements.txt` and `requirements-dev.txt`. Chosen over `uv pip compile --check` because that flag does not exist on `uv pip compile`; `--require-hashes` gives the stronger property here — the step fails closed if any compiled entry ever loses its pin or hash — and `--disable-pip` audits the exact pinned set without re-resolving against the live index.
+- New `secrets` job: gitleaks 8.30.1 as a SHA256-verified pinned binary (the official action needs `GITLEAKS_LICENSE` and `pull-requests: write`, which conflicts with `contents: read` and no-token). `--redact`, range `base..HEAD` on PRs and `before..HEAD` on pushes, `--all` for a new branch, no SARIF upload. The allowlist is one narrow regex for committed env *templates* only — required, because `backend/.env.example` otherwise trips `generic-api-key` on an empty `NVD_API_KEY` line; real `.env` files stay fully scanned. Verified with positive and negative controls (full history clean, injected `ghp_…` PAT caught).
+- **First-party actions bumped to Node 24 majors**: `checkout@v4`→`@v6`, `setup-python@v5`→`@v6`, `setup-node@v4`→`@v6`. GitHub removed Node 20 from runners on 2026-09-23 and the `ACTIONS_ALLOW_USE_UNSECURE_NODE_VERSION` opt-out went with it, so `@v4`/`@v5` still declare `runs.using: node20`. `node-version: 20` (the project's own Node) is deliberately unchanged — that is a different thing from the action runtime and stays consistent with the documented "Node ≥20" prerequisite.
+- `WORKFLOW.md` §6: the note claiming `.github/` is intentionally git-ignored is gone, replaced by the gate list read from `ci.yml` plus branch-protection instructions.
+
+**P3 — Vercel disclosure**
+
+- `frontend/vercel.json` (new): `framework: "nextjs"` + `$schema`. Deliberately no `regions` — nothing in the repo fixes where the database or backend runs, so pinning one would be a guess that then constrains every function. No in-file comments: the Vercel CLI parses strict JSON and `//` would break the deploy, so the reasoning lives in `WORKFLOW.md` §8.
+- **Connection pooler requirement documented** (`WORKFLOW.md` §8.1): `lib/auth.ts:42` uses `new Pool({ connectionString })` from `pg`, a direct TCP connection. Short-lived horizontally-scaled serverless instances each open their own connection and will exhaust the database's slots, hanging sign-in and session reads. Production `DATABASE_URL` must be a pooled endpoint (Supabase pooler / Neon pooled / PgBouncer), with TLS still required.
+- **Deploy runbook** (`WORKFLOW.md` §8.2): 6 ordered steps — database + pooled URL → `alembic upgrade head` → `npm run auth:migrate` (reads `frontend/.env.local`, so it must not run inside the Vercel build) → only then set `BETTER_AUTH_URL` / `NEXT_PUBLIC_APP_URL` / `CORS_ORIGINS` / `APP_URL` → deploy backend then frontend → verify signup/scan/sign-out on the production domain.
+
+**Not run in this session:** no GitHub Actions execution happened (no push), so the three jobs are verified by YAML parse and by running each step's logic locally — the gitleaks and pip-audit steps were exercised against the real files, but CI itself has never been green yet.
+
+Gates run locally in this session: backend `pytest` **82 passed** + `ruff` clean + `black --check` clean (46 files) · frontend `npm test` **70 passed** + `npm run lint` clean + `npm run tsc` clean + `npm run build` succeeded (9 routes) · `npm audit` **0 vulnerabilities**.
+
+Follow-up review of the same code found three public-exposure blockers (blocking DNS in the async path, target validation not applied to resolved IPs, ungated sign-up). Those are open work in TODO.md, not part of this entry.
 
 ## 2026-10-06 — Security hardening (pre-deployment audit P1 + P2 done)
 
@@ -16,7 +84,7 @@ All 12 items under "Security hardening" in TODO.md resolved:
 - **Compose**: `version:` dropped, Postgres now bound to `127.0.0.1:5432` with a note that prod uses internal-only networking
 - **Rate limit**: documented in ARCHITECTURE.md §6 as a per-process in-memory limitation (resets on restart, × worker count; single worker in prod or Redis/Postgres in v2)
 - **`/ready`**: returns plain `degraded` in production; exception class name only in dev
-- **CI gates**: required-check list (npm audit, pip-audit/`uv pip compile --check`, lint/tsc/test/build, secret scan) documented in WORKFLOW.md §6 for when `.github/` is re-enabled
+- **CI gates**: required-check list (npm audit, pip-audit/`uv pip compile --check`, lint/tsc/test/build, secret scan) documented in WORKFLOW.md §6 for when `.github/` is re-enabled — **superseded 2026-10-07**: `.github/` is now tracked and these gates are live jobs in `ci.yml`, not a documented intention. The `uv pip compile --check` suggestion was replaced by `pip-audit --require-hashes --disable-pip`.
 - **TLS**: production `Settings` rejects non-localhost Postgres URLs without `sslmode=require`; Next middleware returns 503 when `BETTER_AUTH_URL` is non-localhost http in production
 - Env plumbing: `SERVICE_TOKEN` added to `backend/.env.example` + WORKFLOW.md (§2 install now uses `requirements-dev.txt`); ARCHITECTURE.md §6 session/proxy wording corrected
 
@@ -27,7 +95,7 @@ Gates: `pytest` 78 passed + `ruff`/`black` clean; `npm test` 70 passed + `lint`/
 - README rewritten: one quickstart; duplicated troubleshooting/env/test-score sections replaced with links to WORKFLOW.md
 - MANUAL-SETUP.md dissolved: setup steps → WORKFLOW.md, open external actions → TODO.md
 - TODO history archived in this file; PRD marked implemented; AGENTS commands corrected (pnpm → npm)
-- `.github` remains git-ignored (owner request 2026-10-06) — the local CI workflow is not shipped; MIT LICENSE added
+- `.github` remained git-ignored here (owner request 2026-10-06) — the local CI workflow was not shipped; **reversed 2026-10-07**, the workflow is now tracked and running. MIT LICENSE added
 
 ## Phase 17 — CVE Validity Tiers [DONE 2026-10-05: BE 74 passed + ruff/black clean, FE 60 passed + tsc/lint clean]
 Tujuan: tiap baris CVE bisa diaudit (ID → severity/CVSS → CPE bukti → alasan cocok).
@@ -99,7 +167,7 @@ kebuang filter `cpe:2.3:`, sehingga NVD tidak jalan dan kartu tampil
 - [x] Diagnose the crt.sh timeout reported at about 15 seconds; the behavior is reconciled with the 30s source timeout and the retry/backoff logic keeps failures partial instead of 500s. Covered by [backend/app/services/crtsh_service.py](./backend/app/services/crtsh_service.py) and [backend/tests/test_failure_modes.py](./backend/tests/test_failure_modes.py).
 - [x] Diagnose Subfinder `NotImplementedError` from scan `fb852eba-4ce2-479f-8c27-47961b93d1953`; the fallback now normalizes unsupported-runtime exceptions into a safe user-facing runtime error and preserves the original error cause internally. Regression coverage is in [backend/tests/test_subfinder_service.py](./backend/tests/test_subfinder_service.py).
 - [x] Investigate the two reported backend CI errors; fixed the Windows-only pytest temp-directory issue by pinning pytest to a repo-local base temp/cache directory in [backend/pytest.ini](./backend/pytest.ini). This avoids `PermissionError` under `AppData\Local\Temp`.
-- [x] Use `/find skills` and add restrained looping decorative/background animation or motion across the requested pages to make the UI feel less flat. Keep scan data and primary actions stationary, support reduced motion, and verify mobile performance. (pending explicit design approval / scope choice)
+- [x] Use `/find skills` and add restrained looping decorative/background animation or motion across the requested pages to make the UI feel less flat. Keep scan data and primary actions stationary, support reduced motion, and verify mobile performance. — done 2026-10-06, scope approved and expanded across two follow-up passes; see the `AmbientBackdrop` / `ScrollProgress` / `ParallaxField` / `BentoVisuals` / `RiskMeter` entries under Phase 8 and the looping passes below
 - [x] Change the database password to the value requested by the user; store it only in local/deployment secret configuration, never in the repository. (external secret/config action; not a repo change)
 
 ## Phase 15 — Dashboard Layout + Hover Palette + discord.com Errors [DONE 2026-10-01]
@@ -231,6 +299,6 @@ d- Catatan investigasi: kartu yang "macet gelap" saat toggle di window tersembun
 Open items live in [TODO.md](./TODO.md); setup steps in [WORKFLOW.md](./WORKFLOW.md).
 
 ### Scope note
-The PostgreSQL-backed signup/session/protected-scan/sign-out flow was verified live and its synthetic test data was removed. Google/GitHub login was confirmed working by the user on 2026-10-04. The Alembic baseline preserves the existing schema and is verified on fresh and existing databases. Clean-room tests, Docker startup, database volume persistence, source/history secret scans, and current-build responsive/performance checks passed. Maintainer approval for the CC-BY-4.0 dependency remains an external action. For the remaining items, the UI animation request is design-choice pending, and the DB password change is an external secret/config action rather than a repository edit.
+The PostgreSQL-backed signup/session/protected-scan/sign-out flow was verified live and its synthetic test data was removed. Google/GitHub login was confirmed working by the user on 2026-10-04. The Alembic baseline preserves the existing schema and is verified on fresh and existing databases. Clean-room tests, Docker startup, database volume persistence, source/history secret scans, and current-build responsive/performance checks passed. Maintainer approval for the CC-BY-4.0 dependency remains an external action. The UI animation request was approved and shipped on 2026-10-06 (see Phase 8 and the looping entries below), so it is no longer pending; the DB password change is an external secret/config action rather than a repository edit.
 
 ## Backlog (v2, do NOT start) — moved to TODO.md

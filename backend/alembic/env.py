@@ -12,7 +12,9 @@ from app.db.base import Base
 from app.models import finding, scan, target  # noqa: F401
 
 config = context.config
-url = os.getenv("DATABASE_URL", "postgresql+asyncpg://osint:osint@localhost:5432/osint")
+# Fallback must match docker-compose.yml credentials (POSTGRES_USER=owner,
+# POSTGRES_DB=osint) and stay on the asyncpg driver for create_async_engine().
+url = os.getenv("DATABASE_URL", "postgresql+asyncpg://owner:owner@localhost:5432/osint")
 target_metadata = Base.metadata
 
 

@@ -2,9 +2,11 @@
 
 from __future__ import annotations
 
+import asyncio
 import base64
 import hmac
 import ipaddress
+import socket
 from urllib.parse import unquote
 
 from fastapi import Depends, Header, HTTPException, status
@@ -78,6 +80,67 @@ def assert_target_allowed(target: str) -> None:
         raise HTTPException(
             status_code=400, detail="Private/localhost targets are blocked"
         )
+
+
+def _looks_like_ip(target: str) -> bool:
+    try:
+        ipaddress.ip_address(target.strip())
+        return True
+    except ValueError:
+        return False
+
+
+def _sync_resolve(host: str) -> str:
+    """Blocking resolver body. Only ever reached through asyncio.to_thread."""
+    return socket.gethostbyname(host)
+
+
+async def resolve_target_ip(target: str) -> str:
+    """Resolve a hostname off the event loop, bounded by the Shodan budget.
+
+    gethostbyname blocks for as long as the resolver takes, which would stall
+    every other request on the worker (AGENTS.md §3), so the call goes to a
+    thread. wait_for releases the caller on time; the stuck thread itself cannot
+    be cancelled and finishes on its own.
+    """
+    try:
+        return await asyncio.wait_for(
+            asyncio.to_thread(_sync_resolve, target),
+            timeout=settings.scan_timeout_shodan,
+        )
+    # OSError covers socket.gaierror; the TimeoutError wait_for raises subclasses
+    # it too, so both paths keep the DNS failure wording callers already expect.
+    except (OSError, asyncio.TimeoutError) as e:
+        raise RuntimeError(f"DNS resolve failed: {e}") from e
+
+
+async def assert_resolved_target_allowed(target: str) -> str | None:
+    """Extend assert_target_allowed to the IP a hostname actually points at.
+
+    A public-looking name can still resolve to 127.0.0.1 or 169.254.169.254,
+    which the string check cannot see, and resolution here also keeps the scan
+    endpoint from doubling as a free DNS oracle for enumerating internal names.
+    An unresolvable name is left to the normal per-source error path — a failing
+    source is a partial result, never a 500 (AGENTS.md §5.4).
+
+    Returns the IP a *hostname* target resolved to, so the caller can hand that
+    answer down instead of paying for the same lookup a second time, or None
+    when there is nothing to hand down:
+      - an unresolvable name (the source still resolves for itself, so a
+        transient resolver blip here is not turned into a permanent shodan
+        failure by us);
+      - an IP literal, which shodan_service already uses verbatim without ever
+        calling the resolver, so threading it would change nothing.
+    """
+    assert_target_allowed(target)
+    if _looks_like_ip(target):
+        return None
+    try:
+        ip = await resolve_target_ip(target)
+    except RuntimeError:
+        return None
+    assert_target_allowed(ip)
+    return ip
 
 
 async def require_user(

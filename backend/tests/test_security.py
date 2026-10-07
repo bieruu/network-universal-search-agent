@@ -199,6 +199,10 @@ def test_production_requires_tls_database_url(monkeypatch):
     from app.core.config import Settings
 
     monkeypatch.setenv("APP_ENV", "production")
+    # Stated so this test keeps asserting the TLS rule: the production scan-quota
+    # guard (RATE_LIMIT_PER_HOUR must be in the process environment) would
+    # otherwise fail these Settings() calls before the database URL is checked.
+    monkeypatch.setenv("RATE_LIMIT_PER_HOUR", "5")
     good_secret = "s3cr3t-shared-value-32chars!!-extra"
     with pytest.raises(ValidationError):
         Settings(

@@ -72,10 +72,32 @@ async def _certificate_fallback(target: str, client: httpx.AsyncClient) -> Any:
     )
 
 
+async def _shodan_lookup(
+    target: str, client: httpx.AsyncClient, resolved_ip: str | None
+) -> dict[str, Any]:
+    """Shodan job body, carrying the router's pre-flight answer if there is one.
+
+    The pre-flight in the scan router already resolved this target — it has to,
+    to reject a name pointing at a blocked IP with a 400 instead of a silent
+    partial — so its IP is threaded down rather than resolved a second time.
+    Forwarded only when present: with nothing pre-resolved the service resolves
+    for itself, which is what every caller that skips the router gets.
+    """
+    if resolved_ip is None:
+        return await shodan_service.lookup(target, client)
+    return await shodan_service.lookup(target, client, resolved_ip=resolved_ip)
+
+
 async def gather_results(
-    target: str, force: bool = False
+    target: str, force: bool = False, *, resolved_ip: str | None = None
 ) -> tuple[dict[str, Any], list[dict[str, str]]]:
-    """Run sources concurrently; use passive fallbacks if crt.sh fails."""
+    """Run sources concurrently; use passive fallbacks if crt.sh fails.
+
+    `resolved_ip` is the caller's already-validated answer for this target (see
+    _shodan_lookup). It is only consulted by the Shodan job, and that job is
+    never built on a cache hit, so a cached Shodan still costs zero DNS queries
+    and zero requests here.
+    """
     ttl = settings.cache_ttl_hours * 3600
     cached: dict[str, Any] = {}
     async with httpx.AsyncClient(
@@ -88,7 +110,7 @@ async def gather_results(
         for source, fn, timeout in (
             (
                 "shodan",
-                lambda: shodan_service.lookup(target, client),
+                lambda: _shodan_lookup(target, client, resolved_ip),
                 settings.scan_timeout_shodan,
             ),
             (
@@ -213,11 +235,16 @@ async def gather_results(
 
 
 async def run_scan(
-    target: str, user_id: str, force: bool = False, persist=None
+    target: str,
+    user_id: str,
+    force: bool = False,
+    persist=None,
+    *,
+    resolved_ip: str | None = None,
 ) -> dict[str, Any]:
     """Full scan: gather, score, optionally persist via callback. Returns API payload."""
     scan_id = str(uuid.uuid4())
-    results, errors = await gather_results(target, force=force)
+    results, errors = await gather_results(target, force=force, resolved_ip=resolved_ip)
     risk_score, breakdown = risk.score(results)
     ok = len(results)
     status = "completed" if not errors else ("partial" if ok else "failed")

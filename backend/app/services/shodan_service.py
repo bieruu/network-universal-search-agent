@@ -2,12 +2,12 @@
 
 from __future__ import annotations
 
-import socket
 from typing import Any
 
 import httpx
 
 from app.core.config import settings
+from app.core.security import assert_target_allowed, resolve_target_ip
 from app.services.cpe_util import normalize_cpe
 
 BASE = "https://api.shodan.io"
@@ -93,16 +93,31 @@ async def _lookup_internetdb(ip: str, client: httpx.AsyncClient) -> dict[str, An
 
 
 async def lookup(
-    target: str, client: httpx.AsyncClient | None = None
+    target: str,
+    client: httpx.AsyncClient | None = None,
+    *,
+    resolved_ip: str | None = None,
 ) -> dict[str, Any]:
+    """Look a target up on Shodan, with InternetDB as the free fallback.
+
+    `resolved_ip` lets a caller that already resolved this target (the scan
+    router's pre-flight, which must run to answer a blocked IP with a 400) hand
+    that answer down instead of making us resolve the same name twice. It is
+    keyword-only and optional: called without it, as every direct caller does,
+    the hostname is resolved here exactly as before.
+    """
     if not settings.shodan_api_key:
         raise RuntimeError("SHODAN_API_KEY not configured")
-    ip = target
-    if not _is_ip(target):
-        try:
-            ip = socket.gethostbyname(target)
-        except OSError as e:
-            raise RuntimeError(f"DNS resolve failed: {e}") from e
+    ip = target if resolved_ip is None else resolved_ip
+    if not _is_ip(ip):
+        # Either a hostname, or a handed-down value that is not a usable IP: fall
+        # back to resolving the target ourselves rather than trusting the input.
+        ip = await resolve_target_ip(target)
+    # The hostname string passed validation but the IP actually sent to
+    # Shodan/InternetDB is what has to be allowed, whichever path produced it.
+    # This is the guarantee that a blocked IP costs zero outbound requests, even
+    # for a resolved_ip nobody here resolved or validated.
+    assert_target_allowed(ip)
     url = f"{BASE}/shodan/host/{ip}"
     own = client is None
     if own:
