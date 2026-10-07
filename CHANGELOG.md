@@ -3,9 +3,50 @@
 > Completed work only, newest section at the top. Open items → [TODO.md](./TODO.md) · setup → [WORKFLOW.md](./WORKFLOW.md) · requirements → [PRD.md](./PRD.md).
 > Anything finished in a push moves here from TODO.md in that same commit, newest section at the top — see AGENTS.md §9.
 
+## 2026-10-07 — Pre-deployment security review closed: async DNS, resolved-IP validation, sign-up gate, bucket sweep, SQLi control
+
+Closes every item the "Security review pra-deploy publik" pass raised. That review ran against the code itself, after the P1–P3 deploy-readiness blockers were closed. Three P1 items are fixed; the four P2 items are fixed or recorded as explicit known limitations. The four follow-up items it filed under "Residual" shipped in the same push and are written up in the next section — three closed, one still open.
+
+**P1 — blocking DNS on the async path**
+
+`socket.gethostbyname` ran inside `async def` in `shodan_service`, which breaks AGENTS.md §3 and is a cheap DoS: a domain with a slow resolver stalls every other request on that worker, not just its own. Moved to `core/security.py:resolve_target_ip` as `asyncio.to_thread` under `wait_for(SCAN_TIMEOUT_SHODAN)`, matching how `whois_service` already did it. `wait_for` releases the caller on time; the stuck thread itself is not cancellable and drains on its own. Resolver failure and timeout both surface as `RuntimeError`, keeping the DNS wording callers already expected.
+
+**P1 — target validation never reached the IP a hostname points at**
+
+`assert_target_allowed` only inspected the string and returned `False` for a non-IP without resolving, so a public-looking name pointing at `127.0.0.1` or `169.254.169.254` was forwarded to Shodan. Blast radius is bounded — Shodan is an external service and the backend never connects to the internal host — but the resolver had no turnaround bound, which also made the scan endpoint a DNS oracle for enumerating internal names.
+
+The check lands in `routers/scan.py:assert_resolved_target_allowed`, not in a service, for a structural reason: `orchestrator.fold` turns every service exception into `errors[]` with HTTP 200, so an `HTTPException` raised inside a source service could never reach the client. It runs deliberately **after** `check_rate_limit`, because it costs a DNS query; the cheap string check still runs before the limiter, so the ordering does not become a free oracle. `shodan_service` also calls `assert_target_allowed(resolved_ip)` as the point that guarantees zero Shodan requests for an unvalidated address. Regression coverage: a domain resolving to a blocked IP is refused with 400 rather than forwarded.
+
+**P1 — self-service sign-up was a cost vector, and the review's open question is answered**
+
+The backend quota is per user, so N self-service accounts meant N × quota scans per hour against one paid Shodan key. The review deliberately left "does Better Auth already rate-limit this?" marked unverified rather than guessing in either direction. It is now verified against the installed `better-auth@1.7.7` — full reading in the next section: the limiter keys on `ip|path`, **not** per user, so it does not touch the cost vector at all, and `requireEmailVerification` would have been the wrong remedy, because no mail transport is configured in this repo, so Better Auth would write the user row and then fail closed at sign-in and leave accounts that can never log in.
+
+Shipped instead, in `frontend/lib/signup-gate.ts` and wired through `lib/auth.ts`: `SIGNUP_ENABLED` (master switch; unset = closed under `NODE_ENV=production`, and an unparseable value counts as unset, so a forgotten deploy fails closed) and `SIGNUP_EMAIL_ALLOWLIST` (accepts `user@example.com`, `@example.com`, `*@example.com`, or a bare domain). Enforcement is in `databaseHooks.user.create.before`, chosen over `disableSignUp` alone because it is the one choke point Better Auth also runs for OAuth account creation — `disableSignUp` closes only the email endpoint and would leave "Continue with Google" open. Returning `false` aborts the insert before any row exists. Operator steps in WORKFLOW.md §8.3, and the policy module is deliberately dependency-free and synchronous so it is testable without a database, session, or network.
+
+**P2 — rate-limiter buckets were never evicted**
+
+`_buckets` is keyed per user and only pruned when *that same user* returned, so a user who scanned once and never came back leaked its key for the life of the process — unbounded growth for the container's whole lifetime, not theoretical once sign-up is open. Fixed with an amortized sweep every 300s inside `check_rate_limit`: one O(#keys) pass per interval instead of one per request, evicting only buckets whose *newest* stamp already fell out of the window, so one live stamp keeps its bucket and its remaining quota. `max(stamps)` rather than `stamps[-1]` because a backwards clock jump can leave the list unsorted, and wall-clock time rather than monotonic so the sweep guard ages exactly like the stamps it prunes. The bound this gives is "keys touched in the last ~65 minutes", not an absolute size — that is the separate `RATE_LIMIT_MAX_KEYS` ceiling in the next section.
+
+**P2 — three items resolved as documentation, not code**
+
+None of these was a misconfiguration. Each is now stated as a *Known limitation* so it cannot later be counted as a control that exists:
+- CSP is report-only, so XSS enforcement is absent (ARCHITECTURE.md §6) — the other headers shipped in the same block (`X-Content-Type-Options`, `X-Frame-Options`, `Referrer-Policy`, `Permissions-Policy`, HSTS) *are* enforced.
+- `alembic upgrade head` runs in the container CMD (ARCHITECTURE.md §8) — correct for one replica, racy on scale-out, and it duplicates release step WORKFLOW.md §8.2 step 2.
+- Every `SERVICE_TOKEN` maps to `user:service`, so all machine-to-machine scans share one owner, one history row per target, and one rate-limit bucket (ARCHITECTURE.md §6).
+
+**SQLi suite sensitivity control** (shipped in this push, previously unrecorded)
+
+`backend/scripts/sqli_control_probe.py` exists because a green suite proves nothing until it has been shown to go red against a broken build. It copies the source tree to a temp directory, breaks one defense layer at a time, re-runs the pinned test, and refuses to count a crash as detection: a mutated build that dies on `NameError` or `SyntaxError` never executed an injectable query, so it is reported `INVALID`, not `CAUGHT`. Three mutations are covered — the ORM comparison in `routers/scan.py` turned into string-concatenated `text()`, the SQLite cache key turned into an f-string, and the asyncpg cache key turned into an inlined literal.
+
+Gates run in this session: backend `pytest` **285 passed** + `ruff` clean + `black --check` clean (50 files) · frontend `npm test` **108 passed** + `npm run lint` clean + `npm run tsc --noEmit` clean + `npm run build` succeeded (9 routes) + `npm audit` **0 vulnerabilities** · the SQLi control probe itself: baseline `tests/test_sqli.py` **151 passed**, and all three mutations reported `CAUGHT` — `CONTROL PASSED`. The ORM mutation is caught as 60 database errors (the injected SQL reached the driver), the two cache mutations as 10 and 30 assertion failures (the payload was observed as data).
+
+Secret grep over `origin/main..HEAD` is clean: the only matches are placeholders, doc snippets, and test fixtures (`<password>`, `pick-any-local-password`, `your-own-password-here`, `s3cr3t-shared-value-32chars!!-extra`).
+
+Not run in this session: nothing was deployed and no live Shodan scan was made, and this entry was written before the push, so the three `ci.yml` jobs have still never executed. The five "Deploy readiness" items and the one open residual item (Better Auth's shared `/sign-up` bucket on Vercel) are untouched here and stay open in TODO.md.
+
 ## 2026-10-07 — Security review residual: scan-quota budget, bucket ceilings, single DNS resolve, Better Auth sign-up bucket verified
 
-Closes three of the four items under "Residual dari security review" in TODO.md. The fourth is verified and partially mitigated, with its residual stated rather than closed.
+Closes three of the four items under "Residual dari security review" in TODO.md. The fourth is verified and partially mitigated, with its residual stated rather than closed. — **swept 2026-10-07**: the three closed items were removed from TODO.md by the push that shipped them (AGENTS.md §9), so that section now tracks only the still-open fourth item.
 
 **Scan quota for a public domain** (TODO residual #1)
 
@@ -68,7 +109,7 @@ Closes all P1–P3 items from "Deploy readiness" in TODO.md. Target topology doc
 
 Gates run locally in this session: backend `pytest` **82 passed** + `ruff` clean + `black --check` clean (46 files) · frontend `npm test` **70 passed** + `npm run lint` clean + `npm run tsc` clean + `npm run build` succeeded (9 routes) · `npm audit` **0 vulnerabilities**.
 
-Follow-up review of the same code found three public-exposure blockers (blocking DNS in the async path, target validation not applied to resolved IPs, ungated sign-up). Those are open work in TODO.md, not part of this entry.
+Follow-up review of the same code found three public-exposure blockers (blocking DNS in the async path, target validation not applied to resolved IPs, ungated sign-up). Those are open work in TODO.md, not part of this entry. — **superseded 2026-10-07**: all three were closed in the entries above, and the review section they lived in was swept out of TODO.md by that push.
 
 ## 2026-10-06 — Security hardening (pre-deployment audit P1 + P2 done)
 
