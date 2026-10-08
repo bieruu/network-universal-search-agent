@@ -25,6 +25,12 @@ _PRIVATE_NETS = [
     ipaddress.ip_network("::1/128"),
     ipaddress.ip_network("fc00::/7"),
     ipaddress.ip_network("fe80::/10"),
+    # "This network" / unspecified. Linux connects 0.0.0.0 to the loopback
+    # interface, so a target that passes only the is_private/loopback/link_local
+    # tests below still reaches localhost. Caught by is_unspecified, which the
+    # flag test also covers for ::.
+    ipaddress.ip_network("0.0.0.0/8"),
+    ipaddress.ip_network("::/128"),
 ]
 
 
@@ -68,6 +74,7 @@ def is_blocked_target(target: str) -> bool:
             or ip.is_link_local
             or ip.is_reserved
             or ip.is_multicast
+            or ip.is_unspecified
         ):
             return True
         return any(ip in net for net in _PRIVATE_NETS)

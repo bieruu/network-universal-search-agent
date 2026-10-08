@@ -10,6 +10,11 @@ const STATUS_COPY: Record<string, string> = {
   no_match: "NVD returned no vulnerable-configuration match for the observed CPEs. This is not proof the host is safe.",
   insufficient_evidence: "No valid CPE identifiers were observed, so NVD was not queried. This count is unknown — not 0.",
   unavailable: "NVD could not be reached. Shown CVEs are partial evidence — not 0.",
+  // Filled by the keyword fallback, which only runs when the CPE path found
+  // nothing. These rows are LEADS: the CVE's description mentions a term, which
+  // is not evidence this host is affected. They never count toward the score.
+  keyword_derived:
+    "Keyword-derived leads: CVEs whose NVD description mentions a detected product term. NOT evidence this host is affected, and none of these count toward the risk score.",
 };
 
 export default function VulnerabilitiesCard({
@@ -49,11 +54,20 @@ export default function VulnerabilitiesCard({
             {status === "insufficient_evidence" && (
               <Badge variant="secondary">No CPE to check — CVE coverage unknown, not zero.</Badge>
             )}
+            {status === "keyword_derived" && (
+              <Badge variant="outline">
+                Keyword leads only — investigate, do not treat as confirmed.
+              </Badge>
+            )}
             <p className="text-sm text-slate-500 dark:text-neutral-500">{STATUS_COPY[status ?? ""] ?? ""}</p>
             {nvd.note && <p className="text-xs opacity-60">{nvd.note}</p>}
             {rows.length === 0 ? (
               <p className="text-sm text-slate-500 dark:text-neutral-500">
-                {status === "found" ? "No CVE rows returned." : "No CVEs matched the observed evidence."}
+                {status === "found"
+                  ? "No CVE rows returned."
+                  : status === "keyword_derived"
+                    ? "The keyword fallback ran and found no CVEs mentioning the detected product terms."
+                    : "No CVEs matched the observed evidence."}
               </p>
             ) : (
               <div className="max-h-[320px] overflow-auto">
@@ -97,7 +111,7 @@ export default function VulnerabilitiesCard({
                         <TD>{c.severity ?? "—"}</TD>
                         <TD className="font-mono">{c.cvss ?? "—"}</TD>
                         <TD className="max-w-xs truncate font-mono text-xs" title={c.evidence_cpe ?? ""}>
-                          {c.evidence_cpe ?? "—"}
+                          {c.evidence_cpe ?? (c.keyword_derived ? "keyword" : "—")}
                         </TD>
                         <TD className="text-xs">{c.source ?? "—"}</TD>
                       </TRow>
@@ -114,6 +128,12 @@ export default function VulnerabilitiesCard({
               confirmed against NVD, rejected = NVD Rejected/Disputed (shown, not scored). No match is
               not proof of safety.
             </p>
+            {status === "keyword_derived" && (
+              <p className="text-xs opacity-60">
+                Keyword rows are leads to investigate: the CVE description mentions a detected product
+                term, which is not confirmation this host is affected. They are never scored.
+              </p>
+            )}
           </div>
         )}
       </CardContent>

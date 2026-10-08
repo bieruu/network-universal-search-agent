@@ -28,11 +28,15 @@ def create_app() -> FastAPI:
         allow_methods=["GET", "POST", "OPTIONS"],
         allow_headers=["content-type", "authorization", "x-request-id"],
     )
-    from app.routers import health, history, scan
+    from app.routers import analysis, health, history, scan
 
     app.include_router(health.router)
     app.include_router(scan.router)
     app.include_router(history.router)
+    # v2 per-capability analysis endpoints. Separate from the scan router on
+    # purpose: each capability is reachable on its own so one failing module
+    # cannot take down a scan, and they draw on their own rate-limit buckets.
+    app.include_router(analysis.router)
     return app
 
 

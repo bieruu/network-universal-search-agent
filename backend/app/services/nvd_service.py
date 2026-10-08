@@ -10,12 +10,23 @@ Verified 2026-10-05 against live NVD API 2.0:
 - NVD answers HTTP 404 with an empty body both when a page is out of range
   and when the queried CPE has zero associated CVEs, so 404 maps to
   `no_match`, never to a transport failure.
+
+Keyword search (`search_keywords`) is a *fallback*, not a second opinion:
+`enrich_cpes` still refuses to guess CVEs from keywords, and this module only
+answers keyword queries when the CPE path produced nothing. NVD's
+`keywordSearch` matches CVE **descriptions** — free text written by analysts —
+not a product identity, so a hit means "a CVE whose text mentions this term
+exists", which is a lead to investigate and nothing more. Those results are
+therefore reported under their own status (`keyword_derived`), carry no
+`evidence_cpe`, and are hard-capped at `unverified` in `build_cve_rows`: they
+can never be presented as "this host is affected".
 """
 
 from __future__ import annotations
 
 import asyncio
 import logging
+import re
 from typing import Any
 
 import httpx
@@ -33,6 +44,64 @@ PAGE_SIZE = 50
 REQUEST_DELAY_SECONDS = 6.0
 REQUEST_DELAY_WITH_KEY_SECONDS = 0.7
 CPE_CACHE_TTL_SECONDS = 7 * 24 * 3600
+
+# --- keyword-search fallback -------------------------------------------------
+# Status and method markers. `keyword_derived` is deliberately a status the CPE
+# path can never emit, so no consumer can mistake a text mention for a CPE
+# match; `build_cve_rows` also refuses to tier these rows `verified`.
+KEYWORD_STATUS = "keyword_derived"
+KEYWORD_METHOD = "keyword_search"
+KEYWORD_CACHE_PREFIX = "nvd:kw:"
+KEYWORD_ROW_SOURCE = "NVD (keyword)"
+# Small on purpose: every term is one more rate-limited NVD request, and the
+# endpoint is the one users hit hardest. Three terms is a lead generator, not a
+# search engine.
+MAX_KEYWORDS_DEFAULT = 3
+CVES_PER_KEYWORD_DEFAULT = 10
+# Absolute ceiling on one keyword's page size, whatever a caller passes.
+MAX_CVES_PER_KEYWORD_CEILING = 25
+KEYWORD_MAX_LEN = 100
+KEYWORD_MIN_LEN = 2
+# Minimum letters for a token promoted out of banner text by derive_keywords.
+KEYWORD_MIN_WORDS = 3
+# Function words and URL scaffolding: they match prose everywhere, so they
+# return noise while still costing a rate-limited request.
+KEYWORD_STOPWORDS = frozenset(
+    {
+        "the",
+        "and",
+        "for",
+        "with",
+        "this",
+        "that",
+        "from",
+        "www",
+        "http",
+        "https",
+        "com",
+        "net",
+        "org",
+        "html",
+        "example",
+        "version",
+        "server",
+        "product",
+        "software",
+        "unknown",
+        "none",
+        "null",
+    }
+)
+DESCRIPTION_MAX_LEN = 300
+NOTE_MAX_LEN = 300
+# Appended verbatim to every note this fallback emits, and never truncated away
+# (`_keyword_note` reserves its space first). This is the honesty contract: a
+# keyword hit is a lead, not a finding about this host.
+KEYWORD_CAVEAT = (
+    "Keyword-derived: these CVEs are ones whose NVD description mentions the "
+    "searched term — not confirmation this host is affected. Treat each as a "
+    "lead to investigate."
+)
 
 
 def _valid_cpe(value: Any) -> str | None:
@@ -297,6 +366,24 @@ def _is_rejected_status(vuln_status: Any) -> bool:
     return str(vuln_status or "").strip().upper() in REJECTED_STATUSES
 
 
+def _is_keyword_derived(cve: Any, nvd: dict[str, Any]) -> bool:
+    """True when a CVE item came from the keyword-search fallback.
+
+    Checked at BOTH levels on purpose. The per-item `keyword_derived` marker is
+    what `search_keywords` stamps on every row it emits, and the result-level
+    `status`/`method` is the belt to that braces: if a consumer rebuilds or
+    forwards only part of the payload and the per-item marker is lost, the
+    status still refuses to treat the rows as CPE evidence. Fails closed to
+    "keyword-derived" whenever either signal is present.
+    """
+    if isinstance(cve, dict) and cve.get("keyword_derived") is True:
+        return True
+    return (
+        str(nvd.get("status") or "") == KEYWORD_STATUS
+        or str(nvd.get("method") or "") == KEYWORD_METHOD
+    )
+
+
 def _cve_id_cache_key(cve_id: str) -> str:
     return f"nvd:cve:{cve_id.lower()}"
 
@@ -369,6 +456,7 @@ def _row(
     evidence_cpe: Any = None,
     vuln_status: Any = None,
     description: Any = None,
+    keyword_derived: bool = False,
 ) -> dict[str, Any]:
     return {
         "id": cve_id[:30],
@@ -379,6 +467,7 @@ def _row(
         "evidence_cpe": evidence_cpe if isinstance(evidence_cpe, str) else None,
         "vuln_status": str(vuln_status or "")[:40] or None,
         "description": str(description or "")[:2000] or None,
+        "keyword_derived": keyword_derived,
         "url": f"https://nvd.nist.gov/vuln/detail/{cve_id}"[:120],
     }
 
@@ -395,7 +484,9 @@ async def build_cve_rows(
       verified   — NVD CPE-exact match, or ID cross-checked against NVD with
                    a non-rejected status
       unverified — valid-looking ID that NVD could not confirm (cap reached,
-                   NVD down, or CPE mismatch)
+                   NVD down, or CPE mismatch), and EVERY keyword-derived row
+                   (a description mentioning a term is not evidence about
+                   this host, so it can never reach `verified`)
       rejected   — NVD vulnStatus Rejected/Disputed; shown but scores 0
 
     Never raises; on NVD total failure every Shodan ID degrades to
@@ -412,16 +503,27 @@ async def build_cve_rows(
         cve_id = str(cve.get("id") or "")
         if not cve_id.startswith("CVE-"):
             continue
-        tier = "rejected" if _is_rejected_status(cve.get("vuln_status")) else "verified"
+        keyword_derived = _is_keyword_derived(cve, nvd)
+        if _is_rejected_status(cve.get("vuln_status")):
+            tier = "rejected"
+        elif keyword_derived:
+            # Hard honesty floor: keyword-derived rows are capped here no
+            # matter what the payload claims. A keyword hit is a lead.
+            tier = "unverified"
+        else:
+            tier = "verified"
         rows[cve_id] = _row(
             cve_id,
             tier=tier,
-            source="NVD",
+            source=KEYWORD_ROW_SOURCE if keyword_derived else "NVD",
             severity=cve.get("severity"),
             cvss=cve.get("cvss"),
-            evidence_cpe=cve.get("evidence_cpe"),
+            # Keyword search produced no CPE evidence; a stale CPE copied onto
+            # the row would be the exact lie this fallback exists to avoid.
+            evidence_cpe=None if keyword_derived else cve.get("evidence_cpe"),
             vuln_status=cve.get("vuln_status"),
             description=cve.get("description"),
+            keyword_derived=keyword_derived,
         )
 
     shodan_ids: list[str] = []
@@ -440,7 +542,10 @@ async def build_cve_rows(
     try:
         for cve_id in shodan_ids:
             if cve_id in rows:
-                rows[cve_id]["source"] = "Shodan+NVD"
+                # Keep the keyword-derived label: Shodan listing the same ID
+                # does not upgrade a description mention into CPE evidence.
+                if not rows[cve_id].get("keyword_derived"):
+                    rows[cve_id]["source"] = "Shodan+NVD"
                 continue
             if lookup_budget <= 0 or client is None or status == "unavailable":
                 rows[cve_id] = _row(cve_id, tier="unverified", source="Shodan")
@@ -587,6 +692,409 @@ async def enrich_cpes(
             "errors": errors[:10],
             "note": note,
         }
+    finally:
+        if own:
+            await client.aclose()
+
+
+# --------------------------------------------------------------------------
+# Keyword-search fallback (status: keyword_derived)
+#
+# FALLBACK ONLY. `enrich_cpes` deliberately refuses to guess CVEs from keywords
+# because keywordSearch matches free-text analyst descriptions, not a product
+# identity: a hit means "some CVE's prose mentions this term", which is a lead
+# to investigate and never evidence that this host is affected. Call this only
+# when the CPE path produced nothing, and surface the returned `note`.
+# --------------------------------------------------------------------------
+
+
+def _int_setting(name: str, default: int, *, low: int) -> int:
+    """Read an int setting defensively: absent or unusable -> the default."""
+    try:
+        return max(int(getattr(settings, name, default)), low)
+    except (TypeError, ValueError):
+        return default
+
+
+def derive_keywords(raw: Any, limit: int | None = None) -> list[str]:
+    """Turn loose banner/product text into keyword-search terms.
+
+    NVD `keywordSearch` is a full-text match over CVE descriptions, so a whole
+    banner is the worst possible query: it matches nothing, costs a rate-limited
+    request, and teaches the user nothing. This splits the text into candidate
+    product words instead, dropping function words, URL scaffolding and
+    version-only tokens like "2.4.49".
+
+    Pure derivation, no network. `limit` defaults to the keyword cap.
+    """
+    values = [raw] if isinstance(raw, str) else raw
+    if not isinstance(values, (list, tuple, set)):
+        return []
+    cap = MAX_KEYWORDS_DEFAULT if limit is None else max(int(limit), 0)
+    if cap <= 0:
+        return []
+    out: list[str] = []
+    seen: set[str] = set()
+    for value in values:
+        if not isinstance(value, str):
+            continue
+        # Split on every non-alphanumeric run first, so "2.4.49" becomes its own
+        # token instead of being glued onto the product name in front of it.
+        for word in re.findall(r"[a-z0-9]+", value.lower()):
+            if len(word) < KEYWORD_MIN_WORDS:
+                continue
+            if word in KEYWORD_STOPWORDS:
+                continue
+            if not any(ch.isalpha() for ch in word):
+                continue  # version-only token, e.g. "249"
+            if word in seen:
+                continue
+            seen.add(word)
+            out.append(word)
+            if len(out) >= cap:
+                return out
+    return out
+
+
+def _unique_keywords(raw: Any, limit: int) -> tuple[list[str], int]:
+    """Bounded, de-duplicated keyword list + the number dropped by the cap.
+
+    Returns `(terms, dropped)` so the caller can say out loud that terms were
+    left unsearched instead of silently narrowing the scan.
+    """
+    out: list[str] = []
+    seen: set[str] = set()
+    dropped = 0
+    cap = max(limit, 0)
+    candidates = [raw] if isinstance(raw, str) else raw
+    for item in candidates if isinstance(candidates, (list, tuple, set)) else []:
+        if not isinstance(item, str):
+            continue
+        cleaned = " ".join(item.split())[:KEYWORD_MAX_LEN]
+        if len(cleaned) < KEYWORD_MIN_LEN or not any(ch.isalpha() for ch in cleaned):
+            continue
+        key = cleaned.casefold()
+        if key in seen:
+            continue
+        seen.add(key)
+        if len(out) >= cap:
+            dropped += 1
+            continue
+        out.append(cleaned)
+    return out, dropped
+
+
+def _map_keyword_cve(item: Any, keyword: str) -> dict[str, Any] | None:
+    """Map one NVD vulnerability entry to a keyword-derived CVE row.
+
+    No `evidence_cpe`: keywordSearch returns no configuration evidence at all,
+    and inventing one would be the exact claim this fallback must not make.
+    """
+    cve = item.get("cve") if isinstance(item, dict) else None
+    if not isinstance(cve, dict):
+        return None
+    cve_id = str(cve.get("id") or "")
+    if not cve_id.startswith("CVE-"):
+        return None
+    score, severity = _best_cvss(cve)
+    refs: list[str] = []
+    for ref in (cve.get("references") or [])[:5]:
+        if isinstance(ref, dict) and ref.get("url"):
+            refs.append(str(ref["url"])[:500])
+    return {
+        "id": cve_id[:30],
+        "description": _english_description(cve)[:DESCRIPTION_MAX_LEN],
+        "cvss": score,
+        "severity": severity,
+        "published": str(cve.get("published") or "")[:30],
+        "references": refs,
+        "evidence_cpe": None,
+        "keyword": keyword,
+        "keyword_derived": True,
+        "vuln_status": str(cve.get("vulnStatus") or "")[:40],
+    }
+
+
+async def _query_keyword(
+    keyword: str,
+    client: httpx.AsyncClient,
+    limit: int,
+    page_size: int,
+) -> tuple[list[dict[str, Any]], str | None, bool]:
+    """Return (mapped CVEs, error message or None, truncated) for one keyword."""
+    params: dict[str, Any] = {
+        "keywordSearch": keyword,
+        "resultsPerPage": max(min(limit, page_size), 1),
+    }
+    headers: dict[str, str] = {}
+    if settings.nvd_api_key:
+        headers["apiKey"] = settings.nvd_api_key
+    try:
+        response = await client.get(
+            BASE,
+            params=params,
+            headers=headers or None,
+            timeout=settings.scan_timeout_nvd,
+        )
+    except (httpx.TimeoutException, TimeoutError) as e:
+        return (
+            [],
+            f"NVD keyword search timed out after {settings.scan_timeout_nvd}s for {keyword!r}: {e}"[
+                :300
+            ],
+            False,
+        )
+    except httpx.HTTPError as e:
+        return (
+            [],
+            f"NVD keyword search failed for {keyword!r}: {type(e).__name__}"[:300],
+            False,
+        )
+    if response.status_code == 404:
+        # Same documented NVD behaviour as cpeName: 404 = nothing matched.
+        return [], None, False
+    if response.status_code in (403, 429):
+        return (
+            [],
+            f"NVD rate limited (HTTP {response.status_code}) — retry later"[:300],
+            False,
+        )
+    if response.status_code >= 400:
+        return (
+            [],
+            f"NVD keyword search failed (HTTP {response.status_code})"[:300],
+            False,
+        )
+    try:
+        payload = response.json()
+    except ValueError as e:
+        return [], f"NVD returned invalid JSON for keyword search: {e}"[:300], False
+    if not isinstance(payload, dict):
+        return [], "NVD returned an invalid keyword-search response"[:300], False
+    vulns = payload.get("vulnerabilities")
+    if not isinstance(vulns, list):
+        # Absent or wrongly-typed field: "nothing found", not invented rows.
+        return [], None, False
+    mapped: list[dict[str, Any]] = []
+    truncated = False
+    for item in vulns:
+        if len(mapped) >= limit:
+            truncated = True
+            break
+        row = _map_keyword_cve(item, keyword)
+        if row:
+            mapped.append(row)
+    # `totalResults` is untrusted and may be absent or non-numeric; when it is
+    # usable it says whether more matches exist upstream of this page.
+    try:
+        total = int(payload.get("totalResults"))  # type: ignore[arg-type]
+    except (TypeError, ValueError):
+        total = None
+    if total is not None and total > len(vulns):
+        truncated = True
+    return mapped, None, truncated
+
+
+def _keyword_result(
+    *,
+    status: str,
+    keywords: list[str],
+    cves: list[dict[str, Any]],
+    truncated: bool,
+    errors: list[str],
+    note: str,
+) -> dict[str, Any]:
+    return {
+        "source": "NVD",
+        "status": status,
+        "method": KEYWORD_METHOD,
+        "keywords": keywords,
+        "checked_cpes": [],
+        "cves": cves,
+        "truncated": truncated,
+        "errors": errors[:10],
+        "note": note[:NOTE_MAX_LEN],
+    }
+
+
+def _keyword_note(
+    status: str,
+    *,
+    empty: bool = False,
+    partial: bool = False,
+    dropped_terms: int = 0,
+    searched: int = 0,
+) -> str:
+    """Build the note. The caveat is load-bearing and never truncated away."""
+    if status == "unavailable":
+        lead = (
+            "NVD keyword search failed for every term; no keyword-derived "
+            "CVEs. Partial evidence, not zero."
+        )
+    elif status == "insufficient_evidence":
+        lead = "No usable keyword term to search; nothing was sent to NVD."
+    elif empty:
+        lead = (
+            "Keyword search ran and found no CVE matching the term; absence "
+            "is not proof the host is safe."
+        )
+    else:
+        lead = (
+            f"Keyword search over {searched} term(s) returned CVEs whose "
+            "descriptions mention them."
+        )
+    extras: list[str] = []
+    if dropped_terms:
+        extras.append(f"Searched {searched} of {searched + dropped_terms} term(s).")
+    if partial:
+        extras.append("Some terms failed; results are partial.")
+    parts = [lead]
+    # Append extras only while they fit: the terms-dropped count is the one a
+    # reader needs to trust the scope, but the caveat outranks both.
+    for extra in extras:
+        if len(" ".join([*parts, extra, KEYWORD_CAVEAT])) <= NOTE_MAX_LEN:
+            parts.append(extra)
+    note = " ".join([*parts, KEYWORD_CAVEAT])
+    if len(note) > NOTE_MAX_LEN:
+        keep = NOTE_MAX_LEN - len(KEYWORD_CAVEAT) - 1
+        head = lead[: max(keep - 3, 0)].rsplit(" ", 1)[0]
+        note = f"{head}... {KEYWORD_CAVEAT}"
+    return note
+
+
+async def search_keywords(
+    keywords: Any,
+    client: httpx.AsyncClient | None = None,
+    per_keyword: int | None = None,
+) -> dict[str, Any]:
+    """Fallback NVD keyword search for targets with no CPE evidence.
+
+    Use ONLY when `enrich_cpes` produced nothing. NVD `keywordSearch` matches
+    CVE *descriptions* — analyst prose — not a product identity, so every row
+    here is a lead to investigate, never a claim that this host is affected.
+    The result says so itself: `status` is the distinct `keyword_derived`,
+    `method` is `keyword_search`, `cves` carry `keyword_derived: True` and no
+    `evidence_cpe`, and `build_cve_rows` caps them at `unverified`.
+
+    Never raises: any transport, parse or shape failure degrades to the same
+    `unavailable` shape the CPE path uses.
+    """
+    # `getattr` for both knobs: `Settings` has `extra="ignore"`, so the module
+    # defaults stand until the matching config fields land (NEEDS INTEGRATION)
+    # and take over the moment they do, with no change here.
+    keyword_cap = _int_setting("nvd_max_keywords", MAX_KEYWORDS_DEFAULT, low=0)
+    per_kw = (
+        _int_setting("nvd_cves_per_keyword", CVES_PER_KEYWORD_DEFAULT, low=1)
+        if per_keyword is None
+        else per_keyword
+    )
+    limit = max(min(per_kw, MAX_CVES_PER_KEYWORD_CEILING), 1)
+    terms, dropped_terms = _unique_keywords(keywords, keyword_cap)
+    if not terms:
+        return _keyword_result(
+            status="insufficient_evidence",
+            keywords=[],
+            cves=[],
+            truncated=False,
+            errors=[],
+            note=_keyword_note("insufficient_evidence"),
+        )
+    own = client is None
+    if own:
+        client = httpx.AsyncClient(
+            timeout=settings.scan_timeout_nvd,
+            headers={"User-Agent": "osint-dashboard/1.0"},
+        )
+    assert client is not None
+    delay = (
+        REQUEST_DELAY_WITH_KEY_SECONDS
+        if settings.nvd_api_key
+        else REQUEST_DELAY_SECONDS
+    )
+    cves: list[dict[str, Any]] = []
+    seen: set[str] = set()
+    errors: list[str] = []
+    truncated = False
+    try:
+        sent = 0  # requests actually put on the wire this call
+        for keyword in terms:
+            cache_key = f"{KEYWORD_CACHE_PREFIX}{keyword.lower()}"
+            cached = await cache_mod.cache_get_async(cache_key)
+            if isinstance(cached, dict) and isinstance(cached.get("cves"), list):
+                # NOTE: only successful lookups are cached. A rate-limit or
+                # timeout blip must not poison the term for the full 7d TTL,
+                # which is the opposite of what a retry would want.
+                for item in cached["cves"]:
+                    if isinstance(item, dict) and item.get("id") not in seen:
+                        seen.add(str(item["id"]))
+                        cves.append(item)
+                continue
+            # Space live requests, not terms: a cache hit in front of a request
+            # must not burn 6s of the scan budget for nothing.
+            if sent:
+                await asyncio.sleep(delay)
+            matched, error, kw_truncated = await _query_keyword(
+                keyword, client, limit, settings.nvd_page_size
+            )
+            sent += 1
+            if error:
+                errors.append(error)
+                log.warning("nvd_keyword_failed kw=%s err=%s", keyword, error[:120])
+                continue
+            await cache_mod.cache_set_async(
+                cache_key, {"cves": matched, "error": None}, CPE_CACHE_TTL_SECONDS
+            )
+            truncated = truncated or kw_truncated
+            for item in matched:
+                if item["id"] not in seen:
+                    seen.add(str(item["id"]))
+                    cves.append(item)
+        hard_cap = limit * max(len(terms), 1)
+        if len(cves) > hard_cap:
+            truncated = True
+            cves = cves[:hard_cap]
+        order = {"CRITICAL": 0, "HIGH": 1, "MEDIUM": 2, "LOW": 3}
+        cves.sort(
+            key=lambda c: (
+                order.get(str(c.get("severity") or "").upper(), 9),
+                -(c.get("cvss") or -1),
+                str(c.get("id")),
+            )
+        )
+        # An empty keyword search is a real answer, not an error: we asked, and
+        # no CVE description mentions the term. Only a total transport failure
+        # is `unavailable` — and even that still carries the caveat.
+        status = "unavailable" if errors and not cves else KEYWORD_STATUS
+        return _keyword_result(
+            status=status,
+            keywords=terms,
+            cves=cves,
+            truncated=truncated or dropped_terms > 0,
+            errors=errors,
+            note=_keyword_note(
+                status,
+                empty=not cves,
+                partial=bool(errors) and bool(cves),
+                dropped_terms=dropped_terms,
+                searched=len(terms),
+            ),
+        )
+    except Exception as e:  # noqa: BLE001 — this fallback must never fail a scan
+        log.warning(
+            "nvd_keyword_search_crashed err=%s msg=%s",
+            type(e).__name__,
+            str(e)[:120],
+        )
+        return _keyword_result(
+            status="unavailable",
+            keywords=terms,
+            cves=[],
+            # Nothing was cut here; nothing came back at all. `truncated` is for
+            # results we shortened, and the UI reads it as "we narrowed this".
+            truncated=False,
+            errors=[f"NVD keyword search failed: {type(e).__name__}"[:300]],
+            note=_keyword_note("unavailable"),
+        )
     finally:
         if own:
             await client.aclose()

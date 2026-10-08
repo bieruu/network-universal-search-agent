@@ -38,7 +38,10 @@ async def test_cache_hit_under_1_5s(monkeypatch, tmp_path):
     results, errors = await orchestrator.gather_results(target, force=False)
     elapsed = time.perf_counter() - start
     print(f"\ncache-hit gather_results: {elapsed:.3f}s")
-    assert set(results) == {"shodan", "crtsh", "whois"}
+    # `host` is host_enrichment_service.enrich() applied to the cached Shodan
+    # payload: a pure synchronous derivation with no I/O, which is why it is
+    # allowed on a cache hit when the network-bound `history` block is not.
+    assert set(results) == {"shodan", "crtsh", "whois", "host"}
     assert errors == []
     assert elapsed < 1.5
 

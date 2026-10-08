@@ -420,11 +420,21 @@ def test_only_one_resolver_exists_in_the_backend():
     # The whole fix assumes there is exactly one place that turns a hostname into
     # an IP. A stray getaddrinfo in a new service would reintroduce both the
     # duplicate lookup and a sync call on the event loop (AGENTS.md §3).
+    #
+    # Two files are exempt, and neither weakens the scan-path guarantee:
+    #   - security.py — the seam itself.
+    #   - core/ssrf.py — the target-fetch guard, which is a different subsystem
+    #     with a different job. It resolves once per *fetch hop*, on purpose,
+    #     because it must re-check every address a redirect target answers with.
+    #     It must use getaddrinfo rather than gethostbyname because the latter is
+    #     IPv4-only and would hide an AAAA record pointing at loopback. It never
+    #     feeds the scan path, so it cannot cause a duplicate scan lookup.
     app_dir = Path(__file__).resolve().parents[1] / "app"
+    exempt = {"security.py", "ssrf.py"}
     offenders = [
         path.relative_to(app_dir.parent).as_posix()
         for path in sorted(app_dir.rglob("*.py"))
-        if path.name != "security.py"
+        if path.name not in exempt
         and any(
             token in path.read_text(encoding="utf-8")
             for token in ("gethostbyname", "getaddrinfo", "gethostbyname_ex")

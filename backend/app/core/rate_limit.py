@@ -6,12 +6,15 @@ keys (memory) and an opt-in instance-wide daily cap (cost).
 
 from __future__ import annotations
 
+import logging
 import time
 from collections import defaultdict
 
 from fastapi import HTTPException, Request
 
 from app.core.config import settings
+
+log = logging.getLogger(__name__)
 
 _buckets: dict[str, list[float]] = defaultdict(list)
 # A bucket is only pruned when that *same* user calls again, so a user who scans
@@ -100,8 +103,63 @@ def _count_instance(now: float) -> None:
     _instance[hour] = _instance.get(hour, 0) + 1
 
 
+def _is_exempt(user_id: str) -> bool:
+    """True when this subject is exempt from the rate-limit buckets.
+
+    Reads `settings.rate_limit_exempt_subjects` (comma-separated exact
+    subjects) on every call rather than caching the parsed set, so toggling the
+    setting takes effect without a restart — which is the whole point for a
+    testing switch. The list is tiny, so re-parsing is cheaper than a stale
+    decision.
+
+    WHY THE SUBJECT, NOT A USER FLAG
+    --------------------------------
+    `require_user()` returns exactly two shapes: `user:<db-id>` for a session
+    cookie, and `user:service` for `Authorization: Bearer <SERVICE_TOKEN>`
+    compared with hmac.compare_digest. Exempting by subject therefore exempts
+    the *service* identity, which needs a secret that never reaches a browser.
+
+    Exempting a browser subject instead would be a real vulnerability: any
+    stolen cookie or XSS would become an unlimited draw on the single paid
+    Shodan key. The per-user quota exists precisely so one compromised account
+    cannot become a cost vector, and an exemption that a cookie can carry
+    deletes that protection.
+
+    Consequently, a `user:<db-id>` subject is only exempt if an operator
+    deliberately puts that exact id in the setting — never by accident, and
+    never by inference. `tests/test_rate_limit_exempt.py` pins this.
+    """
+    raw = getattr(settings, "rate_limit_exempt_subjects", "") or ""
+    subject = (user_id or "").strip()
+    if not subject:
+        return False
+    for candidate in str(raw).split(","):
+        entry = candidate.strip()
+        # Exact match, never a prefix: `user:service` must not exempt
+        # `user:service-admin`, and a bare `user:` prefix must match nothing.
+        if entry and entry == subject:
+            log.warning(
+                "rate_limit_exempt subject=%s bucket=unlimited — "
+                "this request was NOT charged to any quota",
+                subject,
+            )
+            return True
+    return False
+
+
 def check_rate_limit(user_id: str) -> None:
+    """Charge one scan against the per-account quota and the instance budget.
+
+    This bucket is bound to the shared PAID Shodan key (see PRODUCTION_RATE_
+    LIMIT_CEILING in config.py), which is why it also bills the instance-wide
+    daily cap. Free or offline capabilities must NOT reuse it — see
+    `check_free_rate_limit`, which exists because aliasing this one would both
+    spend a scan's quota on work that costs nothing and let a contact lookup
+    consume the scan budget that is supposed to bound active fan-out.
+    """
     global _last_sweep
+    if _is_exempt(user_id):
+        return
     now = time.time()
     window = 3600.0
     limit = settings.rate_limit_per_hour
@@ -144,6 +202,64 @@ def check_rate_limit(user_id: str) -> None:
 def rate_limit(request: Request, user_id: str) -> None:
     _ = request
     check_rate_limit(user_id)
+
+
+def check_free_rate_limit(user_id: str, scope: str) -> None:
+    """Per-account quota for a capability that costs no Shodan credit.
+
+    Deliberately a separate counter with its own key namespace, not a parameter
+    on `check_rate_limit`. Three reasons, each of which is a real regression if
+    aliased:
+
+      1. The hourly quota is a BILLING decision about one shared paid key. An
+         offline phone parse or a contact fetch draws no Shodan query, so
+         charging it there burns real money budget on free work — and, worse,
+         lets a cheap endpoint consume the quota meant to bound active fan-out.
+      2. Coupling them means an address-harvesting primitive can exhaust a
+         user's *scan* allowance, turning a bounded fetch into a denial of the
+         core product.
+      3. `rate_limit_max_keys` is fail-closed by design: once the live key map
+         is full, NEW keys get a 429 that is byte-identical to a quota
+         rejection. A second feature roughly doubles key-creation rate against
+         that shared map, so live accounts hit the ceiling more often.
+
+    Sharing the module's sweep and the absolute key ceiling is still correct:
+    one amortized O(#keys) pass, one memory bound, one fail-closed policy. Only
+    the quota and the keyspace are separate. The instance daily cap is NOT
+    applied here — that cap exists to bound spend on the paid key.
+    """
+    global _last_sweep
+    if _is_exempt(user_id):
+        return
+    now = time.time()
+    window = 3600.0
+    limit = settings.free_rate_limit_per_hour
+    if now - _last_sweep >= _SWEEP_INTERVAL:
+        _last_sweep = now
+        _sweep_expired(now, window)
+        _prune_instance(now)
+
+    # Fail closed, never evict: see the reasoning in check_rate_limit. LRU
+    # eviction would hand the caller a fresh quota.
+    if user_id not in _buckets and len(_buckets) >= settings.rate_limit_max_keys:
+        retry = max(1, int(_SWEEP_INTERVAL - (now - _last_sweep)) + 1)
+        raise HTTPException(
+            status_code=429,
+            detail="Rate limit exceeded",
+            headers={"Retry-After": str(retry)},
+        )
+
+    key = f"free:{scope}:{user_id}"
+    stamps = [t for t in _buckets[key] if now - t < window]
+    _buckets[key] = stamps
+    if len(stamps) >= limit:
+        retry = int(window - (now - stamps[0])) + 1
+        raise HTTPException(
+            status_code=429,
+            detail="Rate limit exceeded",
+            headers={"Retry-After": str(retry)},
+        )
+    stamps.append(now)
 
 
 def reset_for_tests() -> None:

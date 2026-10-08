@@ -3,7 +3,6 @@
 from __future__ import annotations
 
 import asyncio
-import re
 import uuid
 from datetime import datetime, timezone
 from typing import Any
@@ -12,13 +11,18 @@ import httpx
 
 from app.core import cache as cache_mod
 from app.core.config import settings
+from app.core.errors import sanitize_error
 from app.services import (
     certspotter_service,
     crtsh_service,
+    host_enrichment_service,
+    leaklookup_service,
     nvd_service,
+    otx_service,
     risk,
     shodan_service,
     subfinder_service,
+    urlscan_service,
     whois_service,
 )
 
@@ -32,25 +36,6 @@ async def _with_timeout(coro, seconds: int, source: str) -> Any:
         ) from e
     except Exception as e:
         raise RuntimeError(sanitize_error(source, e)) from e
-
-
-def sanitize_error(source: str, e: BaseException) -> str:
-    """Build a user-safe error message. Never leaks query params (API keys)."""
-    status = getattr(getattr(e, "response", None), "status_code", None)
-    msg = str(e)[:500]
-    # Strip anything that looks like an API key in a URL.
-    msg = re.sub(r"([?&]key=)[^&\s]+", r"\1…", msg)
-    msg = re.sub(r"key=\S+", "key=…", msg)
-    # Service-curated messages are already user-safe; don't double-prefix them.
-    if isinstance(e, RuntimeError) and msg.lower().startswith(
-        ("shodan", "crt.sh", "subfinder")
-    ):
-        return msg[:500]
-    if status is not None:
-        return f"{source}: HTTP {status} — {msg}"[:500]
-    if isinstance(e, (asyncio.TimeoutError, TimeoutError)):
-        return f"{source}: timed out — retry with Re-scan"[:500]
-    return f"{source}: {type(e).__name__}: {msg}"[:500]
 
 
 async def _certificate_fallback(target: str, client: httpx.AsyncClient) -> Any:
@@ -70,6 +55,215 @@ async def _certificate_fallback(target: str, client: httpx.AsyncClient) -> Any:
     raise RuntimeError(
         "All passive certificate fallbacks failed: " + "; ".join(failures)
     )
+
+
+async def _threat_history_fallback(
+    target: str, client: httpx.AsyncClient, reason: str
+) -> dict[str, Any]:
+    """Run the breach/defacement sources when official CVE data came back empty.
+
+    WHY THIS EXISTS: when NVD returns nothing for a target, the vulnerability
+    tab is blank, and a blank tab reads as "this host is clean" — the exact
+    opposite of what "we found no official CVEs" means. The history sources give
+    the dashboard something honest to show instead.
+
+    Reuses the `_certificate_fallback` shape deliberately (sequential, per-source
+    timeout, aggregated error) rather than adding a parallel mechanism, so the
+    orchestrator keeps exactly one way of running a fallback chain.
+
+    Two rules this function exists to enforce:
+
+      1. Each source is independent. One being down, unconfigured, or empty must
+         not suppress the others, so a per-source failure is recorded and the
+         chain continues.
+      2. The response must STATE WHY it ran. `trigger_reason` travels with the
+         payload, so a UI can say "no official CVEs; showing breach history
+         instead" instead of silently substituting a different kind of evidence
+         for the one the user asked about.
+
+    Caching is the CALLER's job (see gather_results), which keeps this function
+    a pure "run the chain" and leaves the force=true / cache-hit decision in one
+    place.
+    """
+    sources = (
+        # OTX first: it needs no key, so it is the one block that reliably comes
+        # back with real detail (pulse names, descriptions, dates, malware
+        # families). Leak-Lookup is kept behind it because a free key returns
+        # breach NAMES ONLY with every column stripped.
+        ("otx", otx_service, settings.scan_timeout_otx),
+        ("urlscan", urlscan_service, settings.scan_timeout_urlscan),
+        ("leaklookup", leaklookup_service, settings.scan_timeout_leaklookup),
+    )
+
+    blocks: dict[str, Any] = {}
+    errors: list[dict[str, str]] = []
+    for name, service, timeout in sources:
+        try:
+            blocks[name] = await _with_timeout(
+                service.lookup(target, client), timeout, name
+            )
+        except Exception as e:  # noqa: BLE001 — one dead source must not stop the rest
+            errors.append({"source": name, "message": sanitize_error(name, e)[:500]})
+
+    # Cache-aware like every other job in this orchestrator: never spend an
+    # upstream request on a pure cache hit unless force=true. These sources are
+    # rate-limited and some of them cost money, so this is the difference
+    # between a cheap re-render and a billed one.
+    payload = {
+        "source": "Threat & incident history",
+        "triggered": True,
+        "trigger_reason": reason,
+        "note": (
+            "No official CVE data was available for this target, so threat "
+            "intelligence history is shown instead. Absence of CVEs is not evidence "
+            "of safety, and these sources do not cover the same ground."
+        ),
+        "blocks": blocks,
+        "errors": errors,
+    }
+    # Cache-aware like every other job in this orchestrator: never spend an
+    # upstream request on a pure cache hit unless force=true. Some of these
+    # sources are rate-limited or paid, so this is the difference between a
+    # cheap re-render and a billed one.
+    await cache_mod.cache_set_async(
+        f"history:{target.lower()}", payload, settings.cache_ttl_hours * 3600
+    )
+    return payload
+
+
+def _keyword_inputs(shodan: dict[str, Any], nvd: Any) -> list[str]:
+    """Product strings to derive keyword-search terms from, best source first.
+
+    Three sources, in descending confidence:
+
+      1. `services[].product` — the strongest signal, but Shodan frequently
+         leaves it empty even when it identified the product via CPE.
+      2. **The CPE vendor/product** (`cpe:2.3:a:cloudflare:cloudflare:...`).
+         This is the one that actually rescues the common case: Shodan returns a
+         CPE for a target whose service banners carry no product string, so a
+         fallback keyed only on `product` finds nothing and the card stays at 0.
+         We already queried this CPE, so the vendor/product pair is the highest
+         quality term available.
+      3. Hostnames — weakest, and often just the domain itself.
+
+    Banners are deliberately excluded: `derive_keywords` splits on word
+    boundaries anyway, so a raw banner only contributes noise ahead of the real
+    product under a 3-term cap.
+    """
+    out: list[str] = []
+    seen: set[str] = set()
+
+    def _add(value: Any) -> None:
+        if (
+            isinstance(value, str)
+            and value.strip()
+            and value.strip().lower() not in seen
+        ):
+            seen.add(value.strip().lower())
+            out.append(value.strip())
+
+    for service in shodan.get("services") or []:
+        if isinstance(service, dict):
+            _add(service.get("product"))
+
+    # CPE vendor + product, from the CPEs NVD was already queried with.
+    for cpe in (nvd.get("checked_cpes") if isinstance(nvd, dict) else None) or []:
+        if not isinstance(cpe, str) or not cpe.startswith("cpe:2.3:"):
+            continue
+        parts = cpe.split(":")
+        # cpe:2.3:part:vendor:product:version:...
+        if len(parts) > 4:
+            _add(parts[3])
+            _add(parts[4])
+
+    hostnames = shodan.get("hostnames")
+    if isinstance(hostnames, list):
+        for host in hostnames:
+            _add(host)
+    return out
+
+
+def _cpe_evidence_found(nvd: Any) -> bool:
+    """True when the exact-CPE path produced usable CVE evidence.
+
+    Replacing a `found` result with keyword leads would downgrade real
+    exact-match evidence, so this must be false for `found` regardless.
+    """
+    return bool(
+        isinstance(nvd, dict) and nvd.get("status") == "found" and nvd.get("cves")
+    )
+
+
+def _keyword_fallback_allowed(nvd: Any) -> bool:
+    """True when keyword leads would fill a real gap rather than hide a fault.
+
+    `unavailable` is excluded, and this is a correctness rule rather than a
+    nicety:
+
+      - It means NVD could not be reached at all. The `unavailable` status and
+        its `errors[]` entry are the honest signal; overwriting them with
+        keyword leads would dress an infrastructure outage up as a result and
+        lose the reason the card is thin.
+      - The keyword fallback queries **the same NVD host**. If the CPE path could
+        not reach it, the keyword path cannot either, so it could only ever add
+        a second, redundant failure.
+
+    A missing block still passes: nothing ran yet, which is the empty-card case
+    the fallback exists for.
+    """
+    if not isinstance(nvd, dict):
+        return True
+    return nvd.get("status") != "unavailable"
+
+
+def _history_trigger(results: dict[str, Any]) -> str | None:
+    """Return why the history fallback should run, or None if it should not.
+
+    Two triggers, matching the TODO:
+      - NVD reported `insufficient_evidence` (it ran but had no CPE identifiers
+        to match on), or
+      - there are zero CVE rows to show.
+
+    Anything else means the vulnerability tab has real content and the history
+    block must NOT run — substituting breach history for a populated CVE list
+    would hide the data the user actually asked for.
+
+    There is also a precondition: at least one PRIMARY source must have
+    succeeded. When Shodan, crt.sh and WHOIS all failed we learned nothing about
+    the target, so "no CVE data" means "we could not check", not "there is
+    none". Running history on top of that would dress a total outage up as a
+    result — and the scan's own `status` would still be `failed`, which is the
+    honest answer.
+    """
+    if not any(
+        isinstance(results.get(source), dict) for source in ("shodan", "crtsh", "whois")
+    ):
+        return None
+
+    nvd = results.get("nvd")
+    cve_rows: list[Any] = []
+    if isinstance(nvd, dict) and isinstance(nvd.get("cve_rows"), list):
+        cve_rows = nvd["cve_rows"]
+
+    if isinstance(nvd, dict) and nvd.get("status") == "insufficient_evidence":
+        return "NVD reported insufficient evidence (no CPE identifiers to match on)"
+    # Keyword leads are NOT host evidence: NVD matched a term inside a CVE
+    # description, which says nothing about this target. So the vulnerability
+    # card is still, in the sense that matters here, empty of usable evidence —
+    # and history is exactly what fills it.
+    if isinstance(nvd, dict) and nvd.get("status") == "keyword_derived":
+        return (
+            "NVD returned keyword-derived leads only (no CPE match for this "
+            "target), so threat intelligence history is shown alongside them"
+        )
+    if not cve_rows:
+        # Distinguish "we checked and found nothing" from "we never got to
+        # check", because those lead to very different conclusions.
+        shodan = results.get("shodan")
+        if isinstance(shodan, dict) and shodan.get("vulns"):
+            return "Shodan reported CVE IDs but none could be verified against NVD"
+        return "No CVE data was available for this target"
+    return None
 
 
 async def _shodan_lookup(
@@ -203,6 +397,43 @@ async def gather_results(
         # failure degrades every Shodan ID to `unverified`, never hidden.
         shodan = results.get("shodan")
         nvd = results.get("nvd")
+
+        # Keyword fallback: ONLY when the CPE path produced no usable result.
+        # Replacing a `found` result with keyword leads would downgrade real
+        # exact-match evidence, so it is strictly a gap-filler. The outcome
+        # carries `status: "keyword_derived"`, which build_cve_rows and
+        # risk.score both refuse to treat as host-specific evidence.
+        if (
+            isinstance(shodan, dict)
+            and not _cpe_evidence_found(nvd)
+            and _keyword_fallback_allowed(nvd)
+        ):
+            # derive_keywords takes a flat list of STRINGS and never descends
+            # into dicts, so the product has to be pulled out here. Passing the
+            # service dicts directly yields [] for every real Shodan payload,
+            # which silently disables the whole fallback.
+            terms = nvd_service.derive_keywords(_keyword_inputs(shodan, nvd))
+            if terms:
+                previous_note = nvd.get("note") if isinstance(nvd, dict) else None
+                try:
+                    results["nvd"] = await nvd_service.search_keywords(terms, client)
+                except Exception as e:  # noqa: BLE001 — leads must never fail a scan
+                    results["nvd"] = {
+                        "source": "NVD",
+                        "status": "unavailable",
+                        "method": "keyword_search",
+                        "keywords": terms,
+                        "checked_cpes": [],
+                        "cves": [],
+                        "truncated": False,
+                        "errors": [
+                            f"NVD keyword search crashed: {type(e).__name__}"[:300]
+                        ],
+                        "note": previous_note
+                        or "NVD keyword search failed unexpectedly.",
+                    }
+                nvd = results["nvd"]
+
         if isinstance(shodan, dict) and isinstance(nvd, dict):
             try:
                 nvd["cve_rows"] = await nvd_service.build_cve_rows(
@@ -231,6 +462,46 @@ async def gather_results(
                         "message": f"CVE tiering failed: {type(e).__name__}"[:500],
                     }
                 )
+
+        # Passive host enrichment (IP/ASN/geo/ports). Pure derivation over the
+        # Shodan payload: no network, no second paid key, and therefore free to
+        # compute on a cache hit — which is why it sits here rather than in the
+        # job fan-out above, where building it would cost a Shodan request.
+        if isinstance(results.get("shodan"), dict):
+            results["host"] = host_enrichment_service.enrich(results["shodan"])
+
+        # Breach/defacement history, ONLY when the vulnerability tab would
+        # otherwise be empty. A populated CVE list must never be replaced by
+        # incident history (see _history_trigger).
+        if not force:
+            cached_history = await cache_mod.cache_get_async(
+                f"history:{target.lower()}"
+            )
+        else:
+            cached_history = None
+        if cached_history is not None:
+            results["history"] = cached_history
+        elif force or jobs:
+            # Only run the chain when this call actually did work. On a pure
+            # cache hit every primary source came from the cache, and spawning
+            # four upstream requests here would break the rule the whole
+            # orchestrator is built on: a cache hit costs zero network. The
+            # history block then appears on the next cache-miss scan, or on an
+            # explicit `force=true`.
+            reason = _history_trigger(results)
+            if reason:
+                try:
+                    history = await _threat_history_fallback(target, client, reason)
+                    results["history"] = history
+                except Exception as e:  # noqa: BLE001 — history must never fail a scan
+                    errors.append(
+                        {
+                            "source": "history",
+                            "message": f"Threat history failed: {type(e).__name__}"[
+                                :500
+                            ],
+                        }
+                    )
         return results, errors
 
 

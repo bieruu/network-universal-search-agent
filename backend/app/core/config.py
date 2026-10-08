@@ -40,6 +40,38 @@ class Settings(BaseSettings):
     nvd_max_cpes: int = 5
     nvd_cves_per_cpe: int = 20
     nvd_page_size: int = 100
+    # Keyword-search fallback, used ONLY when the CPE path yields nothing.
+    # Small because every term costs a rate-limited NVD request (6s apart, 0.7s
+    # with a key) and a keyword hit is a lead, not host evidence.
+    nvd_max_keywords: int = 3
+    nvd_cves_per_keyword: int = 10
+    # --- v2 analysis sources -------------------------------------------------
+    # Every field below is optional and read defensively via getattr() by its
+    # service, so a deployment that sets none of them still boots and each
+    # source reports `not_configured` instead of silently failing. A blank
+    # secret is a supported state, not a misconfiguration: these sources cost
+    # money or need an operator's own credentials, so the key is a deliberate
+    # budget decision rather than a boot blocker.
+    scan_timeout_dns: int = 10
+    # Leak-Lookup: the key is free but is REQUIRED, and the free tier is capped
+    # at 10 queries/day. Its ToS restricts queries to targets the operator is
+    # authorised to search, so wiring it to arbitrary signed-in users is an
+    # operator decision, not a default.
+    leaklookup_api_key: str = ""
+    scan_timeout_leaklookup: int = 12
+    # URLScan.io: read-only search needs NO key (30 req/min per IP anonymous).
+    # A key is only worth setting to unlock `verdicts` and higher quotas. Free
+    # tier history depth is capped upstream at 30 days and 100 results/page —
+    # do not let the UI promise "full history".
+    urlscan_api_key: str = ""
+    scan_timeout_urlscan: int = 12
+    # Threat-intel sources. See each service's docstring for what is verified
+    # about its key requirement and limits; a blank key is a supported state.
+    # OTX answers several endpoints with no key at all, at a lower rate limit.
+    virustotal_api_key: str = ""
+    scan_timeout_virustotal: int = 12
+    otx_api_key: str = ""
+    scan_timeout_otx: int = 12
     rate_limit_per_hour: int = Field(
         default=PRODUCTION_RATE_LIMIT_CEILING,
         ge=1,
@@ -61,7 +93,35 @@ class Settings(BaseSettings):
     # cost ceiling as much as a memory one, and comfortably above any legitimate
     # instance size for this product.
     rate_limit_max_keys: int = Field(default=10000, ge=1)
+    # Per-account hourly quota for capabilities that cost no Shodan credit
+    # (offline phone validation, contact extraction, EXIF). Kept separate from
+    # `rate_limit_per_hour` on purpose: that constant is a billing decision about
+    # the shared paid key, so spending it on free work would both burn real
+    # money budget and let a cheap endpoint exhaust a user's scan allowance.
+    # Looser than the scan quota because these paths do no paid fan-out, but
+    # still bounded — contact extraction is an address-harvesting primitive.
+    free_rate_limit_per_hour: int = Field(default=20, ge=1)
+    # Subjects exempt from BOTH rate-limit buckets, for load/QA testing.
+    #
+    # Comma-separated exact `require_user()` subjects. The intended value is
+    # `user:service`, which `require_user` returns ONLY for a bearer token that
+    # matches `SERVICE_TOKEN` under hmac.compare_digest — a secret that never
+    # reaches a browser. A session-cookie subject is always `user:<db-id>` and is
+    # therefore never exempt by default, so a stolen cookie or an XSS cannot
+    # become an unlimited draw on the paid Shodan key. See rate_limit._is_exempt.
+    #
+    # Default empty: nobody is exempt until an operator opts in by name.
+    rate_limit_exempt_subjects: str = ""
     cache_ttl_hours: int = 24
+    # Target-fetching budgets (see app/core/ssrf.py). These bound the one path
+    # where the backend connects to an attacker-chosen host, so they are
+    # deliberately small: a redirect chain that runs long is a redirect loop, and
+    # a body larger than the cap is not something a header/cookie/sitemap
+    # summary needs. max_redirects also bounds how many DNS resolutions a single
+    # request can trigger.
+    fetch_timeout_seconds: int = 10
+    fetch_max_redirects: int = 10
+    fetch_max_bytes: int = 1_048_576
 
     @property
     def cors_list(self) -> list[str]:

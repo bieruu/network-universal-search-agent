@@ -5,7 +5,16 @@ export interface SourceError {
   message: string;
 }
 
-export type NvdStatus = "found" | "no_match" | "insufficient_evidence" | "unavailable";
+// `keyword_derived` is the NVD keywordSearch FALLBACK, which runs only when the
+// exact-CPE path produced nothing. Its rows are leads — a CVE whose description
+// mentions a detected product term — so they are never `verified` and never
+// counted toward the risk score (the backend enforces both).
+export type NvdStatus =
+  | "found"
+  | "no_match"
+  | "insufficient_evidence"
+  | "unavailable"
+  | "keyword_derived";
 
 export interface NvdCve {
   id: string;
@@ -30,6 +39,12 @@ export interface NvdCveRow {
   vuln_status?: string | null;
   description?: string | null;
   url?: string;
+  // True when the row came from the NVD keywordSearch fallback rather than an
+  // exact-CPE match. Such a row is a LEAD — the CVE's description mentions a
+  // detected product term, which says nothing about this host. The backend
+  // never scores these and never marks them `verified`.
+  keyword_derived?: boolean;
+  keyword?: string;
 }
 
 export interface ScanResult {
@@ -73,6 +88,38 @@ export interface ScanResult {
       name_servers?: string[];
       emails?: string | null;
     };
+    // Passive host enrichment derived from the Shodan payload (no extra paid
+    // key). Absent when Shodan itself failed.
+    host?: {
+      source?: string;
+      ip?: string | null;
+      asn?: string | null;
+      asn_org?: string | null;
+      isp?: string | null;
+      org?: string | null;
+      city?: string | null;
+      region?: string | null;
+      country?: string | null;
+      country_code?: string | null;
+      postal_code?: string | null;
+      latitude?: number | null;
+      longitude?: number | null;
+      timezone?: string | null;
+      network?: string | null;
+      domain?: string | null;
+      os?: string | null;
+      hostnames?: string[];
+      open_ports?: Array<{ port: number; transport?: string; product?: string | null; version?: string | null; banner?: string | null }>;
+      port_count?: number;
+      ports_truncated?: boolean;
+      note?: string;
+    };
+    // Breach/defacement history. Present ONLY when official CVE data came back
+    // empty, which is why the card renders nothing when it is absent. Typed as
+    // unknown because the shape is validated at the point of use
+    // (lib/threat-history-shape.ts) — it is third-party data and must not be
+    // trusted to match a compile-time shape at the call site.
+    history?: unknown;
   };
   errors: SourceError[];
 }

@@ -9,3 +9,17 @@ alembic
 python-whois
 structlog
 python-dotenv
+# DNS record resolution (A/AAAA/MX/NS/TXT/CNAME/SOA) for v2 analysis modules.
+dnspython
+# EXIF parsing in-process. Preferred over the `exiftool` system binary: no extra
+# binary in the image, and no shell-out to parse untrusted upload bytes.
+pillow
+# Offline phone format/country validation. Carrier and line-type lookup stays
+# out (it needs a paid source) - see TODO.md.
+phonenumbers
+# X.509 parsing for the TLS certificate module. The stdlib handshake can hand
+# back the peer's DER but cannot decode it, and decoding it by hand would be
+# worse. We deliberately verify against nothing on the client side (an OSINT
+# scan should *report* a broken certificate, not fail on it) and parse the DER
+# here.
+cryptography

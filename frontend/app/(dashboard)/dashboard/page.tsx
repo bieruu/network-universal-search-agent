@@ -13,6 +13,7 @@ import PortsChart from "./_components/PortsChart";
 import RiskTrendChart from "./_components/RiskTrendChart";
 import PortsTable from "./_components/PortsTable";
 import SubdomainsTable from "./_components/SubdomainsTable";
+import ThreatHistoryCard from "./_components/ThreatHistoryCard";
 import WhoisCard from "./_components/WhoisCard";
 import VulnerabilitiesCard from "./_components/VulnerabilitiesCard";
 import HistoryList from "./_components/HistoryList";
@@ -135,6 +136,11 @@ export default function DashboardPage() {
 
       {/* 4b — CVE evidence, full width */}
       <VulnerabilitiesCard scan={scan} loading={loading} />
+
+      {/* 4c — Threat intelligence history. Renders only when the vulnerability tab
+          came back empty, which is exactly when this card has something honest
+          to add; a populated CVE list means history never ran. */}
+      <ThreatHistoryCard history={scan?.results.history} loading={loading} />
 
       {/* 5 — Subdomains + WHOIS side by side */}
       <div className="grid gap-4 lg:grid-cols-2">
