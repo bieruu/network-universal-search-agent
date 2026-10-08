@@ -2,7 +2,7 @@
 
 ## 1. Prerequisites
 
-- Node.js 20.6+, npm, Python 3.11+, and Docker with Compose
+- Node.js 22.18+, npm, Python 3.11+, and Docker with Compose. The floor is 22.18 rather than 20 because `npm test` runs `.ts` files directly through `node --test`, which needs Node's type stripping — unflagged from 22.18; on Node 20 every test file fails with `ERR_UNKNOWN_FILE_EXTENSION`.
 - A Shodan API key for host lookups: https://account.shodan.io/
 - On Shodan HTTP 403 or 404, the backend also checks Shodan's public keyless InternetDB for the resolved IP.
 - Certificate Transparency lookup tries crt.sh, then the public Cert Spotter API, then optional Subfinder on the backend `PATH` (the backend Docker image bundles Subfinder v2.16.0)
@@ -189,7 +189,7 @@ black --check .
 
 > **CI required checks:** `.github/workflows/ci.yml` is tracked and runs on every `push` and `pull_request`. It defines two jobs — `backend` and `frontend` — and both must be green before merge (set them as required status checks in branch protection). What each job actually gates on:
 >
-> - `backend` — installs the hashed `backend/requirements.txt` against a `postgres:16` service, then runs Alembic `upgrade head` **and** `check` (so a model change without a migration fails CI), `pytest -q`, `ruff check .`, and `black --check .`.
+> - `backend` — installs the hashed `backend/requirements-dev.txt` (a superset of `requirements.txt`: the test and lint tooling is not in the runtime file) against a `postgres:16` service, then runs Alembic `upgrade head` **and** `check` (so a model change without a migration fails CI), `pytest -q`, `ruff check .`, and `black --check .`.
 > - `frontend` — `npm ci`, then `npm run lint`, `npm run tsc`, `npm test`, a dependency audit that fails on moderate-and-above findings, and `npm run build`.
 > - Workflow-wide, and mandatory before merge: a Python dependency vulnerability scan (`pip-audit` against the pinned requirement files) and a secret scan over the diff, so a committed credential or a known-CVE Python dependency fails CI instead of reaching a deploy. If a future edit to `ci.yml` drops either one, treat it as a regression and restore it.
 >

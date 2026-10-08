@@ -26,7 +26,7 @@ docker compose up -d postgres    # DATABASE_URL=postgresql+asyncpg://owner:<pass
 alembic upgrade head
 ```
 
-Node ≥20, Python ≥3.11. Never add a new package manager or Chart lib without approval.
+Node ≥22.18 (the test suite runs `.ts` files directly, which needs Node's unflagged type stripping), Python ≥3.11. Never add a new package manager or Chart lib without approval.
 
 ## 3. Structure Rules
 

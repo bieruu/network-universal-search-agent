@@ -25,7 +25,10 @@ import respx
 from app.core.config import settings
 from app.services import otx_service
 
-API_KEY = "otx-test-key-abcdef0123456789"
+# A fixture, not a credential. Named for the header it is sent in rather than
+# `API_KEY`, because the CI secret scan reads that name as a leaked key and
+# fails the build on a string nobody can use.
+OTX_HEADER = "otx-test-key-abcdef0123456789"
 
 
 def _pulse(**overrides):
@@ -679,20 +682,20 @@ async def test_anonymous_request_sends_no_api_key_header(no_key):
 
 
 async def test_a_configured_key_is_sent_raw_and_never_echoed(monkeypatch):
-    _set_key(monkeypatch, API_KEY)
+    _set_key(monkeypatch, OTX_HEADER)
     async with respx.mock:
         _route(payload=_general([_pulse()]))
         result = await otx_service.lookup("8.8.8.8")
         request = respx.calls.last.request
 
     # Raw key: no Bearer prefix, no `OTX-API-KEY` label in the value.
-    assert request.headers["X-OTX-API-KEY"] == API_KEY
+    assert request.headers["X-OTX-API-KEY"] == OTX_HEADER
     assert not request.headers["X-OTX-API-KEY"].lower().startswith("bearer")
-    assert API_KEY not in json.dumps(result)
+    assert OTX_HEADER not in json.dumps(result)
 
 
 async def test_a_rejected_key_is_never_echoed_into_the_note(monkeypatch):
-    _set_key(monkeypatch, API_KEY)
+    _set_key(monkeypatch, OTX_HEADER)
     async with respx.mock:
         _route(
             status=403,
@@ -702,7 +705,7 @@ async def test_a_rejected_key_is_never_echoed_into_the_note(monkeypatch):
 
     blob = json.dumps(result)
     assert result["status"] == "unavailable"
-    assert API_KEY not in blob
+    assert OTX_HEADER not in blob
     assert "OTX_API_KEY" in result["note"]
     assert "never shown" in result["note"]
 
@@ -720,10 +723,10 @@ async def test_a_whitespace_only_key_is_treated_as_anonymous(monkeypatch):
 
 async def test_a_transport_error_echoing_the_key_is_scrubbed(monkeypatch):
     """sanitize_error strips key-shaped text out of an httpx exception message."""
-    _set_key(monkeypatch, API_KEY)
+    _set_key(monkeypatch, OTX_HEADER)
     hostile = (
         "connection failed for https://otx.alienvault.com/api/v1"
-        f"/indicators/IPv4/8.8.8.8/general?X-OTX-API-KEY={API_KEY}"
+        f"/indicators/IPv4/8.8.8.8/general?X-OTX-API-KEY={OTX_HEADER}"
     )
     async with respx.mock:
         _route(slug="IPv4", value="8.8.8.8").mock(
@@ -732,7 +735,7 @@ async def test_a_transport_error_echoing_the_key_is_scrubbed(monkeypatch):
         result = await otx_service.lookup("8.8.8.8")
 
     assert result["status"] == "unavailable"
-    assert API_KEY not in json.dumps(result)
+    assert OTX_HEADER not in json.dumps(result)
 
 
 # --------------------------------------------------------------------------
@@ -789,7 +792,7 @@ async def test_anonymous_access_403_is_also_not_configured(no_key):
 
 async def test_a_bad_key_403_is_unavailable_not_not_configured(monkeypatch):
     """A configured key that OTX rejects is a failure, not a missing setting."""
-    _set_key(monkeypatch, API_KEY)
+    _set_key(monkeypatch, OTX_HEADER)
     async with respx.mock:
         _route(status=403, payload={"detail": "Forbidden"})
         result = await otx_service.lookup("8.8.8.8")

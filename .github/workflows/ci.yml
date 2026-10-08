@@ -38,10 +38,16 @@ jobs:
         with:
           python-version: "3.11"
           cache: pip
-          cache-dependency-path: backend/requirements.txt
+          cache-dependency-path: |
+            backend/requirements.txt
+            backend/requirements-dev.txt
       - name: Install backend dependencies
         working-directory: backend
-        run: python -m pip install -r requirements.txt
+        # The dev file is a superset of the runtime file (uv compiles it with
+        # `-r requirements.in`), and CI runs pytest, ruff and black below —
+        # none of which are in requirements.txt. Installing only the runtime
+        # file made every one of those steps fail on a missing command.
+        run: python -m pip install -r requirements-dev.txt
       - name: Apply and verify database migrations
         working-directory: backend
         run: |
@@ -81,9 +87,13 @@ jobs:
       - uses: actions/checkout@v6
       - uses: actions/setup-node@v6
         with:
-          # This is the project's own Node, not the action runtime. Keep it aligned
-          # with the "Node >= 20" prerequisite in README.md / WORKFLOW.md §1.
-          node-version: 20
+          # This is the project's own Node, not the action runtime. The test
+          # suite runs TypeScript files directly (`node --test lib/*.test.ts`),
+          # which needs Node's native type stripping: available from 22.6 and
+          # unflagged from 22.18. On Node 20 every test file dies with
+          # ERR_UNKNOWN_FILE_EXTENSION. Keep this aligned with the README /
+          # WORKFLOW.md §1 prerequisite.
+          node-version: 22
           cache: npm
           cache-dependency-path: frontend/package-lock.json
       - name: Install frontend dependencies

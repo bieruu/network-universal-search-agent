@@ -141,7 +141,11 @@ def _query_for(target: str) -> str | None:
     if not candidate or not _HOST_RE.fullmatch(candidate):
         return None
     field = "ip" if set(candidate) <= _IP_CHARS else "domain"
-    return f"{field}:{_RESERVED_RE.sub(r'\\\1', candidate)}"
+    # Hoisted out of the f-string on purpose: a backslash inside an f-string
+    # expression is a SyntaxError before Python 3.12 (PEP 701), and both the
+    # container image and CI run 3.11 — this module would not import at all.
+    escaped = _RESERVED_RE.sub(r"\\\1", candidate)
+    return f"{field}:{escaped}"
 
 
 def _flag(value: Any) -> bool | None:

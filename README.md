@@ -16,7 +16,7 @@ Secure passive OSINT dashboard (Next.js 15 + FastAPI). One search box → Shodan
 
 ## Quickstart
 
-Prereqs: Node 20.6+ · Python 3.11+ · Docker · Git — per-OS install commands in [WORKFLOW.md §1](./WORKFLOW.md#1-prerequisites).
+Prereqs: Node 22.18+ · Python 3.11+ · Docker · Git — per-OS install commands in [WORKFLOW.md §1](./WORKFLOW.md#1-prerequisites).
 Free Shodan key: https://account.shodan.io/
 
 ```powershell
