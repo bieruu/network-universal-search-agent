@@ -1,0 +1,57 @@
+# Render blueprint for the FastAPI backend. The frontend is NOT here — it runs
+# on Vercel (frontend/vercel.json). This file exists so the service can be
+# created from the repo instead of by hand, and so the settings that are easy to
+# get wrong — rootDir, health check, and the single worker — are reviewable.
+#
+# Every secret is `sync: false`: Render prompts for it when the blueprint is
+# applied, and nothing here is a credential. Do not inline one.
+#
+# See WORKFLOW.md §8 for the ordered deploy runbook and the frontend env vars.
+services:
+  - type: web
+    name: osint-api
+    runtime: docker
+    plan: free
+    # Pick the same region as the managed Postgres (Supabase). Every scan path
+    # touches the database, so a cross-region hop is paid on each request.
+    region: singapore
+    rootDir: backend
+    dockerfilePath: ./Dockerfile
+    healthCheckPath: /health
+    # The Dockerfile CMD runs `alembic upgrade head` before uvicorn, so the
+    # schema is applied on every deploy. The rate limiter is per-process, so a
+    # second instance would multiply every quota — one instance only.
+    envVars:
+      - key: APP_ENV
+        value: production
+      # Bounded by the worst case in app/core/cache.py: the Postgres cache path
+      # opens its own connection per call instead of using the engine pool, so
+      # this has to leave room for the pool, Alembic's connection, and the
+      # frontend's own connections on a free-plan database.
+      - key: CACHE_BACKEND
+        value: postgres
+      # The production guard requires this as a real process environment
+      # variable, and caps it at PRODUCTION_RATE_LIMIT_CEILING (5).
+      - key: RATE_LIMIT_PER_HOUR
+        value: "5"
+      # Instance-wide ceiling on admitted scans per rolling 24h, across all
+      # accounts. 0 disables it; set it when self-service sign-up is open, since
+      # N accounts each inside their own quota still add up on one paid key.
+      - key: RATE_LIMIT_DAILY_TOTAL
+        value: "50"
+      # `?ssl=require`, NOT `?sslmode=require`. SQLAlchemy splits the query
+      # string into asyncpg connect kwargs, and asyncpg accepts `ssl` but
+      # rejects `sslmode` (TypeError). app/core/config.py accepts either form,
+      # so the wrong one passes the guard and then fails on first connect.
+      - key: DATABASE_URL
+        sync: false
+      - key: BETTER_AUTH_SECRET
+        sync: false
+      - key: SHODAN_API_KEY
+        sync: false
+      # Exact Vercel origin, no trailing slash and no wildcard — the production
+      # guard refuses to boot on `*`.
+      - key: CORS_ORIGINS
+        sync: false
+      - key: APP_URL
+        sync: false

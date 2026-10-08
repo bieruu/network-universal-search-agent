@@ -73,10 +73,17 @@ backend/app/
 ## Checks (run before every PR)
 
 ```bash
-# frontend/                          # backend/
-npm run lint                         # pytest -q
-npm run tsc                          # ruff check .
-npm test                             # black --check .
+# frontend/                          
+npm run lint                         
+npm run tsc                          
+npm test                             
+```
+
+```bash
+# backend/
+pytest -q
+ruff check .
+black --check .
 ```
 
 Run the checks above locally before every PR. (`.github/` is intentionally git-ignored — the CI workflow exists locally but is not shipped.)

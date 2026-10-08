@@ -101,11 +101,57 @@ NVD_MAX_CPES=5
 NVD_CVES_PER_CPE=20
 NVD_PAGE_SIZE=100
 RATE_LIMIT_PER_HOUR=5
+# v2 analysis capabilities that cost no Shodan credit get their own quota, so a
+# cheap endpoint can never exhaust a user's scan allowance. See backend/.env.example.
+FREE_RATE_LIMIT_PER_HOUR=20
+# Testing only — see §3.1.
+RATE_LIMIT_EXEMPT_SUBJECTS=
+# Optional v2 sources. All blank = supported; each reports `not_configured`.
+LEAKLOOKUP_API_KEY=          # key required, free tier 10 queries/day, ToS-restricted
+URLSCAN_API_KEY=             # optional; search works keyless at 30 req/min
+VIRUSTOTAL_API_KEY=         # free key; needed for domain/IP/URL reputation
+OTX_API_KEY=                # OPTIONAL — OTX works keyless at a lower rate limit
 ```
 
 Generate a secret with `openssl rand -base64 32` or a trusted password generator. Do not commit real secrets or filled `.env` files.
 
-## 4. Daily development
+### Optional v2 sources and what "off" looks like
+
+None of these are boot blockers. A missing key means the source reports `status: "not_configured"` and the dashboard labels it as switched off — deliberately distinct from "found nothing", so an empty card is never ambiguous.
+
+| Source | Key required? | What it costs | What it does NOT do |
+|---|---|---|---|
+| URLScan.io search | No (30 req/min/IP anonymous) | Free | Does not submit scans (that needs a key), and free-tier history is capped upstream at **30 days / 100 results per page** |
+| Leak-Lookup | **Yes — key is free but required** | Free tier: 10 queries/day | Never emits emails or password hashes; ToS restricts queries to targets you are authorised to search |
+| VirusTotal | Yes — free key | Free tier: low per-minute and per-day quota | Does not upload files on the free plan, and does not do deep/relationship analysis without a paid plan |
+| AlienVault OTX | **No — works keyless** | Free; lower anonymous rate limit | A null `reputation` means *no data*, not zero — see ARCHITECTURE.md §4.3 |
+
+See §8.5 for the sign-up bucket limitation that remains open.
+
+### 3.1 Rate-limit exemption (testing only)
+
+`RATE_LIMIT_EXEMPT_SUBJECTS` names subjects that skip **both** rate-limit buckets, so load/QA work is not stopped by our own 429 before it ever reaches the provider limits. Default empty: nobody is exempt.
+
+```dotenv
+# Requires SERVICE_TOKEN to be set — that is what proves the subject.
+RATE_LIMIT_EXEMPT_SUBJECTS=user:service
+SERVICE_TOKEN=<a long random secret, different from BETTER_AUTH_SECRET>
+```
+
+Call it with the bearer token, never from a browser:
+
+```bash
+curl -H "Authorization: Bearer $SERVICE_TOKEN" http://localhost:8000/api/v1/scan \
+  -H 'content-type: application/json' -d '{"target":"example.com"}'
+```
+
+**Why this is safe.** `require_user()` returns exactly two shapes: `user:<db-id>` for a session cookie, and `user:service` only when the bearer token matches `SERVICE_TOKEN` under `hmac.compare_digest`. So exempting `user:service` exempts an identity that needs a secret which never reaches a browser. A stolen cookie or an XSS yields `user:<db-id>` and stays capped — the per-user quota exists precisely so one compromised account cannot become a cost vector on the paid Shodan key.
+
+**What an exempt call does.** It is not merely uncapped: it creates no bucket, and it does **not** bill `RATE_LIMIT_DAILY_TOTAL`, so a load test cannot quietly drain the cost backstop and hand the next real user a 429. Every exempt call is logged at WARNING with the subject name, so a setting left on in production is visible in the logs.
+
+**What it does NOT do.** It does not raise any *provider* limit. OTX (100 req/hour per IP) and Leak-Lookup (10 req/day per key) remain shared across every user of the deployment, because they are bounded by the backend's single egress IP and its single key. During heavy testing, expect those two to report `unavailable` with a rate-limit note — that is the provider answering, not this setting failing. For OTX, the fix is a free key from `otx.alienvault.com`, which raises or removes the anonymous ceiling.
+
+### 4. Daily development
 
 On Windows, `.\dev.ps1` starts the backend and frontend and opens `/sign-up`. The script does not create or bypass authentication sessions. The Better Auth schema migration in §2 must already have been run.
 
@@ -168,6 +214,8 @@ Backend tests mock upstream OSINT services. For auth, tests verify active/expire
 
 Target topology: frontend on Vercel, FastAPI in a container (Fly/Render), Postgres managed (Neon/Supabase).
 
+`render.yaml` (repo root) is the Render blueprint for the backend only. It pins `rootDir: backend` (the Dockerfile lives there), `dockerfilePath: ./Dockerfile`, `healthCheckPath: /health`, one instance, and the region that should match the database. Every secret is `sync: false`, so applying the blueprint prompts for it and no credential is ever committed. The settings it encodes are the ones that are easy to get wrong by hand; anything not in it (the frontend, the database) is set in its own dashboard.
+
 `frontend/vercel.json` is intentionally minimal: it pins `framework: "nextjs"` and adds `$schema` for editor validation, nothing else. Vercel already detects the build from `package.json` and `next.config.mjs`, so do not add build, output, or routing keys here without a concrete reason. Two deliberate omissions:
 
 - **No `regions`.** Nothing in the repo fixes where Postgres or the backend container runs, so pinning a function region would be a guess. Keep Vercel's default and revisit once the database region is decided — ideally the functions run adjacent to the database.
@@ -192,6 +240,23 @@ Self-service sign-up is **closed by default when `NODE_ENV=production`** and the
 - Keep TLS on the pooled endpoint. Production rejects a non-localhost Postgres URL that is missing `sslmode=require`.
 - The backend talks to the same database through SQLAlchemy/asyncpg and should use the same pooled endpoint in production, bounded by its own pool size.
 - `BETTER_AUTH_SECRET` must be the same value on both sides, and it must match what the migration in §8.2 step 3 ran against.
+
+#### `sslmode=require` and `ssl=require` are not interchangeable
+
+The two sides need different spellings, and picking the wrong one for the backend passes the production guard and then crashes on the first connection.
+
+- **Backend** — `postgresql+asyncpg://…?ssl=require`. SQLAlchemy splits the query string into `asyncpg.connect()` keyword arguments, and asyncpg takes `ssl` as a keyword but rejects `sslmode` outright: `TypeError: connect() got an unexpected keyword argument 'sslmode'` (verified against sqlalchemy 2.1.2 + asyncpg 0.31, the pinned pair). `app/core/config.py` accepts either spelling in its guard, so `sslmode=require` passes validation and fails at connect time.
+- **Frontend** — `?sslmode=require`. `pg` parses `sslmode` out of the connection string itself, so the libpq spelling is the correct one there.
+- **Postgres cache path** — `app/core/cache.py` strips the `+asyncpg` suffix and hands the whole DSN to `asyncpg.connect`, where asyncpg parses `sslmode` out of the DSN itself. Both spellings work there.
+
+#### Supabase specifics
+
+- **Two endpoints, one database.** The backend reads the Better Auth `session` table directly (`app/core/security.py`), so both apps must point at the *same* project; a separate database for the frontend would 401 every scan.
+- **Frontend → pooled.** Use the Supavisor connection string on port **5432** (session mode), user `postgres.<project-ref>`, host `aws-0-<region>.pooler.supabase.com`, with `?sslmode=require`.
+- **Backend → direct.** `db.<project-ref>.supabase.co:5432` with `?ssl=require`. One long-lived container does not need a pooler, and it avoids spending the pooler's connection budget.
+- URL-encode the database password if it contains `@ : / # ?`.
+- **Free plan pauses.** A project with low activity over 7 days is paused automatically and restored from the dashboard (1-year window). A paused database fails both migrations and every request, so a demo deployment needs either occasional traffic or a paid plan.
+- **Free plan connections.** Budget them: the SQLAlchemy engine pool, Alembic's migration connection, the Postgres cache path (which opens a connection per call rather than using the pool), and the frontend's pool. Keep `CACHE_BACKEND=sqlite` if the backend is later given a persistent volume, or lower `pool_size` before raising the plan.
 
 ### 8.2 Deploy runbook (ordered — do not skip or reorder)
 
