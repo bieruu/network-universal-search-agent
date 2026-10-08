@@ -15,7 +15,9 @@ The previous push went out with all three CI jobs red. Each failure was a real b
 
 **Gates, run this session:** `pytest -q` → 998 passed locally (3.14) **and 998 passed on Python 3.11 in a container**, matching CI's interpreter; `ruff check .` clean; `black --check .` → 83 files unchanged; `alembic upgrade head` + `alembic check` through the console script against Postgres 16 → no drift; frontend on `node:22.23.3` → `eslint` clean, `tsc --noEmit` clean, 152/152 pass. CI run #3 then confirmed `backend` and `frontend` green end to end (migrations, tests, style, `pip-audit`, `npm audit`, build). **The secret scan was still red on that run** — the changelog bullet below had quoted the fixture literal, which the scanner reads as a credential in a `.md` file exactly as it does in code.
 
-**Not verified here:** the CI jobs themselves, `pip-audit`, `npm audit`. One artifact worth knowing: `ruff check .` inside a Windows-mounted container reports EXE002 on every file, because the bind mount exposes them as executable. That is the container, not the repository.
+**Not verified here:** nothing outstanding. Run #4 (`19065d2`) is the first in this repository's history with all three jobs green — `backend` (migrations, 998 tests, style, `pip-audit`), `frontend` (lint, tsc, 152 tests, `npm audit`, build) and the secret scan.
+
+One artifact worth knowing: `ruff check .` inside a Windows-mounted container reports EXE002 on every file, because the bind mount exposes them as executable. That is the container, not the repository.
 
 ## 2026-10-09 — Deploy configuration: Render blueprint, Vercel config, and the asyncpg TLS trap
 
