@@ -15,6 +15,7 @@ import os
 import sqlite3
 import time
 from typing import Any
+from urllib.parse import parse_qsl, unquote, urlsplit
 
 _PG_DDL = (
     "CREATE TABLE IF NOT EXISTS osint_cache"
@@ -85,16 +86,54 @@ def cache_delete(path: str, key: str) -> None:
         pass
 
 
-def _pg_dsn(database_url: str) -> str:
-    """Strip the SQLAlchemy driver suffix so asyncpg gets a plain DSN."""
-    return database_url.replace("+asyncpg", "").replace("+psycopg", "")
+def _pg_connect_kwargs(database_url: str) -> dict[str, Any]:
+    """Split a SQLAlchemy Postgres URL into keyword arguments for asyncpg.
+
+    Passing the URL straight to `asyncpg.connect(dsn=...)` does NOT work once
+    it carries a TLS parameter: asyncpg parses *query parameters* in a DSN as
+    **server settings** to apply at startup, not as connection options, so
+    `?ssl=require` is handed to Postgres as a runtime parameter and rejected
+    with `CantChangeRuntimeParamError: parameter "ssl" cannot be changed now`
+    (reproduced against asyncpg 0.31 and a managed Postgres). The TLS
+    parameter therefore has to leave the query string and arrive as an
+    explicit `ssl=` keyword, which is the only spelling asyncpg accepts
+    there — the same split WORKFLOW.md 8.1 records for the engine.
+
+    Failure is silent in the worst possible way: this module swallows every
+    exception by design (a dead cache must never fail a scan), so a cache
+    that cannot connect leaves no trace except that nothing is ever cached
+    and every scan pays for Shodan again. Percent-encoding is undone here
+    because `urlsplit` hands back the raw components, and asyncpg expects the
+    real password rather than its encoded form.
+    """
+    parts = urlsplit(
+        database_url.replace("+asyncpg", "")
+        .replace("+psycopg", "")
+        .replace("postgresqls://", "postgresql://")
+    )
+    opts: dict[str, Any] = {
+        "host": parts.hostname or "localhost",
+        "port": parts.port or 5432,
+        "database": parts.path.lstrip("/"),
+    }
+    if parts.username:
+        opts["user"] = unquote(parts.username)
+    if parts.password:
+        opts["password"] = unquote(parts.password)
+    for key, value in parse_qsl(parts.query):
+        # asyncpg's connect() takes `ssl`, not `sslmode`; both spellings can
+        # legitimately arrive here depending on which side of the deployment
+        # wrote the URL, and both mean the same thing.
+        if key in ("ssl", "sslmode"):
+            opts["ssl"] = value
+    return opts
 
 
 async def _pg_get(key: str, database_url: str) -> Any | None:
     import asyncpg
 
     con = await asyncio.wait_for(
-        asyncpg.connect(_pg_dsn(database_url)), timeout=_PG_TIMEOUT
+        asyncpg.connect(**_pg_connect_kwargs(database_url)), timeout=_PG_TIMEOUT
     )
     try:
         await con.execute(_PG_DDL)
@@ -118,7 +157,7 @@ async def _pg_set(key: str, value: Any, ttl_seconds: int, database_url: str) -> 
     import asyncpg
 
     con = await asyncio.wait_for(
-        asyncpg.connect(_pg_dsn(database_url)), timeout=_PG_TIMEOUT
+        asyncpg.connect(**_pg_connect_kwargs(database_url)), timeout=_PG_TIMEOUT
     )
     try:
         await con.execute(_PG_DDL)

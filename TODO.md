@@ -5,11 +5,10 @@
 
 ## Deploy readiness — tinggal eksekusi (2026-10-06)
 
-> Target: **Vercel (frontend) + container (backend)**. Status: 🟡 code + config siap, belum deploy.
+> Target: **Vercel (frontend) + container (backend)**. Status: 🟡 Supabase sudah jadi + terverifikasi live (lihat [CHANGELOG.md](./CHANGELOG.md) entri 2026-10-09); belum ada yang dideploy ke publik — Vercel & Render belum disentuh.
 > Item P1–P3 (boot blockers, live CI, Vercel disclosure) sudah selesai → [CHANGELOG.md](./CHANGELOG.md) entri 2026-10-07. Security review pra-deploy publik (P1 + P2) ditutup di push yang sama → entri [CHANGELOG.md](./CHANGELOG.md) paling atas.
 
 - [ ] Siapkan secrets provider: `SHODAN_API_KEY`, `BETTER_AUTH_SECRET` (≥32 char, nilai sama di FE dan BE), `SERVICE_TOKEN` bila ada consumer machine-to-machine. Tidak pernah masuk repo atau variabel `NEXT_PUBLIC_*`.
-- [ ] Pilih DB managed (Neon/Supabase) dan endpoint **pooled**-nya, lalu set TLS — tapi **ejaan berbeda per sisi**: backend (asyncpg) wajib `?ssl=require`, frontend (`pg`) boleh `?sslmode=require`. `sslmode=require` di backend lolos guard `config.py` lalu crash saat connect (`TypeError: unexpected keyword argument 'sslmode'`) — lihat WORKFLOW.md §8.1.
 - [ ] Jalankan runbook deploy WORKFLOW.md §8.2 sesuai urutannya: `alembic upgrade head` → `npm run auth:migrate` → set `BETTER_AUTH_URL` / `NEXT_PUBLIC_APP_URL` / `CORS_ORIGINS` / `APP_URL` / `SIGNUP_ENABLED` → deploy backend dulu, baru frontend. `SIGNUP_ENABLED` wajib di-set: sign-up self-service tertutup default di production, jadi langkah verifikasi signup (§8.2 langkah 6) gagal tanpa itu — lihat WORKFLOW.md §8.3.
 - [ ] Set branch protection di GitHub agar 3 job `ci.yml` (backend, frontend, secrets) jadi required check — tanpa ini CI hanya informatif.
 - [ ] Verifikasi end-to-end di domain production: signup → scan domain publik → sign-out. Build sukses bukan bukti auth jalan di production.

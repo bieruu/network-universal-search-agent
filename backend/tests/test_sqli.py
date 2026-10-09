@@ -275,7 +275,12 @@ def recording_asyncpg(monkeypatch):
 
     conn = _RecordingAsyncpgConn()
 
-    async def fake_connect(dsn: str) -> _RecordingAsyncpgConn:
+    async def fake_connect(*args: object, **kwargs: object) -> _RecordingAsyncpgConn:
+        # Accepts any shape on purpose: this fixture's job is to observe the
+        # SQL that reaches asyncpg, not to pin how the connection is opened.
+        # The Postgres cache path passes keyword arguments (TLS leaves the DSN
+        # query string, see app/core/cache.py), and a stricter signature here
+        # would fail every case while proving nothing about parameter binding.
         return conn
 
     module = types.ModuleType("asyncpg")

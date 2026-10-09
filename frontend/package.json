@@ -11,7 +11,7 @@
     "start": "next start",
     "lint": "eslint . --max-warnings=0",
     "tsc": "tsc --noEmit",
-    "auth:migrate": "node --env-file=.env.local node_modules/auth/dist/index.mjs migrate --config ./lib/auth.ts",
+    "auth:migrate": "node --env-file=.env.local node_modules/auth/dist/index.mjs migrate --config ./lib/auth.ts --yes",
     "test": "node --test lib/validators.test.ts lib/components.test.ts lib/landing.test.ts lib/scan-shape.test.ts lib/login.test.ts lib/signup.test.ts lib/signup-gate.test.ts lib/signup-gate-integration.test.ts lib/auth-rate-limit.test.ts lib/dashboard.test.ts lib/palette.test.ts lib/devlogin.test.ts lib/security-headers.test.ts lib/analysis-api.test.ts lib/threat-history-shape.test.ts"
   },
   "dependencies": {
