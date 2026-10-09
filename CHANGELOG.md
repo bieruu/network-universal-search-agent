@@ -3,7 +3,35 @@
 > Completed work only, newest section at the top. Open items → [TODO.md](./TODO.md) · setup → [WORKFLOW.md](./WORKFLOW.md) · requirements → [PRD.md](./PRD.md).
 > Anything finished in a push moves here from TODO.md in that same commit, newest section at the top — see AGENTS.md §9.
 
+## 2026-10-09 — The frontend TLS advice was wrong: `sslmode=require` cannot reach Supabase
+
+Found by running the deploy runbook for real instead of reading it, which is the only way this class of bug is findable. Nothing is deployed; the runbook is still being executed by hand.
+
+- **`npm run auth:migrate` against Supabase failed with `SELF_SIGNED_CERT_IN_CHAIN`, and the spelling recommended for the frontend was the cause.** In the installed `pg-connection-string`, `sslmode` values `prefer`, `require`, and `verify-ca` are all handled as **aliases for `verify-full`** — the code emits its own deprecation warning and then falls through to the verifying branch — so the certificate chain is authenticated and the managed provider's chain is not trusted by Node's default CA bundle. `node_modules/pg-connection-string/index.js`, checked in the installed copy. WORKFLOW.md §8.1 said `?sslmode=require` for the frontend; it now says `?sslmode=no-verify`, which is the branch that sets `rejectUnauthorized = false`. §8.1's TLS bullet was rewritten at the same time: the production guard in `config.py` covers the **backend's** URL only, so its parameter names say nothing about the frontend's, and the old wording invited exactly this copy-paste.
+- **What `no-verify` costs, stated plainly:** the hop is encrypted but the server certificate is not authenticated, so there is no protection against an active man-in-the-middle. Doing it properly means passing Supabase's CA bundle as `sslrootcert` to a path that also exists inside the deployed Vercel function, which is open work in TODO.md rather than something this push claims to have solved. Until that lands, "TLS is verified" would be a false claim about this deployment and must not be written anywhere.
+- **A database password was pasted into a chat transcript while running these steps.** The value has to be treated as compromised and rotated in the Supabase dashboard; the local connection strings carry the new one. No repository file, workflow, or blueprint ever received it — the secret scan over the tracked tree found only placeholders and doc references — and the two run commands below set the URL from the shell rather than writing it to disk. Worth recording because the runbook gives no warning about this, and pasting a connection string into a terminal paste or an assistant chat is the obvious way to leak it.
+- **The backend migration produced no tables and its output was not captured, so it is undiagnosed.** The steps below were run against the Supabase **pooler** URL rather than the direct one the runbook asks for, and the alembic output was not preserved. Not attributed to a cause, because there is no evidence for one yet; re-run against `db.<project-ref>.supabase.co` with `?ssl=require` and paste the full output. The frontend migration never got far enough to create anything, so "no tables at all" is consistent with both.
+- **Region alignment is only partly available.** The Supabase project is in `ap-northeast-1` (Tokyo); Render offers Oregon, Ohio, Virginia, Frankfurt and Singapore, and no Tokyo region. Recorded in §8.1 with the guidance that recreating a not-yet-deployed project in `ap-southeast-1` is cheap and same-region is better, while once data exists a cross-region hop is the cheaper mistake to keep.
+
+### Steps to re-run, in order
+
+```powershell
+# backend/ — direct connection, not the pooler
+$env:DATABASE_URL = "postgresql+asyncpg://postgres:PASSWORD@db.<REF>.supabase.co:5432/postgres?ssl=require"
+.\.venv\Scripts\python.exe -m alembic upgrade head          # keep the full output
+
+# frontend/ — pooled connection, no-verify on purpose
+$env:DATABASE_URL = "postgresql://postgres.<REF>:PASSWORD@aws-0-ap-northeast-1.pooler.supabase.com:5432/postgres?sslmode=no-verify"
+npm run auth:migrate
+
+$env:DATABASE_URL = $null                                  # so local dev stops pointing at production
+```
+
+Expected: seven tables (`targets`, `scans`, `findings`, `user`, `session`, `account`, `verification`) in the Supabase SQL editor; `osint_cache` is created on first cache use. Gate numbers are unchanged from the previous entry — this push touches Markdown only and no test reads these files.
+
 ## 2026-10-09 — Deploy records: the asyncpg TLS spelling trap, and why a cold backend is a 504
+
+> **superseded 2026-10-09** (same day, section above): the frontend TLS spelling recorded in WORKFLOW.md §8.1 by the commit `c3cb9c3` this entry refers to — `?sslmode=require` — does not work against a managed provider and was corrected after being tried for real. The backend half of the driver split below (`ssl=require`, not `sslmode=require`) is unaffected and was independently reproduced here.
 
 The deploy configuration itself — `render.yaml`, `frontend/vercel.json`, and the `ssl` vs `sslmode` correction in WORKFLOW.md §8.1 — landed earlier today in `c3cb9c3`. This push adds the two records that were still missing, both found while executing the runbook rather than by reading the code.
 
