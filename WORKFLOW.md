@@ -237,7 +237,7 @@ Self-service sign-up is **closed by default when `NODE_ENV=production`** and the
 `frontend/lib/auth.ts:42` connects with `new Pool({ connectionString: databaseUrl })` from `pg` — a direct TCP connection, not a pooler-aware client. Vercel functions are short-lived and scale horizontally, so each concurrent invocation can open its own connection, exhaust the database's connection slots, and make sign-in and session reads hang until they time out.
 
 - The frontend's production `DATABASE_URL` must be a **pooled** endpoint: Supabase pooler, Neon pooled connection string, or a PgBouncer/Supavisor instance in front of Postgres. A direct connection is not acceptable here.
-- Keep TLS on the pooled endpoint. Production rejects a non-localhost Postgres URL that is missing `sslmode=require`.
+- Keep TLS on the pooled endpoint. Production rejects a non-localhost Postgres URL carrying neither `sslmode=require` nor `ssl=require`. Which spelling is correct depends on the driver — see below, because the two are not interchangeable.
 - The backend talks to the same database through SQLAlchemy/asyncpg and should use the same pooled endpoint in production, bounded by its own pool size.
 - `BETTER_AUTH_SECRET` must be the same value on both sides, and it must match what the migration in §8.2 step 3 ran against.
 
@@ -276,6 +276,8 @@ Other deployment notes:
 - If crt.sh is unavailable, the backend tries Cert Spotter before Subfinder. A successful fallback is shown as the provider for the certificate-transparency results and cached. Cert Spotter's anonymous free tier limits full-domain queries to 10 per hour; a source error is reported only if every passive fallback fails.
 - Configure OAuth callback URLs for the deployed origin. Do not advertise or mark a provider verified until a live callback succeeds.
 - Rotate secrets through the relevant provider/host dashboards; never place secrets in client-prefixed variables or source control.
+
+**A cold backend is a 504, not a slow scan.** The proxy routes (`app/api/scan`, `app/api/analysis`, `app/api/history`, `app/api/trend`) hold one request open for as long as the backend takes, and they declare no `maxDuration`, so they inherit Vercel's Hobby ceiling of 60s. A scan itself fits — the orchestrator gathers its sources concurrently, so wall-clock tracks the slowest per-source timeout (`SCAN_TIMEOUT_CRTSH`, 30s by default) rather than their sum — but a backend that is asleep when the request lands spends its wake-up time inside that same 60s budget. On a free host that sleeps on idle, the first scan after a quiet period can therefore time out at the edge while the backend is still booting. Practical mitigations, cheapest first: hit the backend URL directly once to warm it, then scan; treat a first-scan 504 as "retry in a minute" rather than as a broken deploy. Declaring `maxDuration` and surfacing a real error would make the failure legible instead of a bare edge timeout — that is open work, tracked in TODO.md.
 
 ### 8.4 Scan quota (required in production)
 
