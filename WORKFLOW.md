@@ -278,6 +278,15 @@ Neither side accepts the other's spelling, and neither failure is obvious: the b
 
 ### 8.6 Backend host: Fly.io (`backend/fly.toml`)
 
+**Prefer `deploy-fly.ps1` over the manual commands below.** It is the same runbook wrapped in one script, and its reason to exist is that every way this deploy fails badly happens *after* a several-minute Docker build: a `DATABASE_URL` pointing at localhost, the wrong TLS spelling, a `BETTER_AUTH_SECRET` that does not match the frontend, or an app that does not exist yet when secrets are set. It resolves each value from the environment, then `backend/.env`, then a hidden prompt; validates all four; creates the app; sets secrets; deploys; and then polls `/health` and `/ready` on the public URL.
+
+```powershell
+.\deploy-fly.ps1 -DryRun     # validate everything, deploy nothing
+.\deploy-fly.ps1             # deploy and verify
+```
+
+It is deliberately **stricter than `app/core/config.py`** on one point: the config guard accepts `sslmode=require` because it cannot know which driver a given URL is for, but a *backend* URL must be `?ssl=require`, since asyncpg rejects `sslmode` as a keyword. The script rejects `sslmode=` outright rather than letting the container discover it.
+
 `render.yaml` at the repo root stays valid and remains the alternative for anyone with a payment method Render accepts. The **active** target is Fly, because Render's signup demands credit-card verification and the operator's card is declined — and of the no-card-free alternatives, none of them can host this backend (Vercel and Cloudflare Workers have no raw TCP sockets, which `tls_service` needs).
 
 **Deploy from inside `backend/`, not from the repo root.** Fly's `[build] dockerfile` does not change the Docker build context — the context is the directory the deploy runs from — and the Dockerfile copies `requirements.txt`, `alembic.ini` and `alembic/`, which exist only under `backend/`. A deploy from the root fails with `COPY failed: file not found in build context`.
