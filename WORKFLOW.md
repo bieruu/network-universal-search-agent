@@ -212,9 +212,9 @@ Backend tests mock upstream OSINT services. For auth, tests verify active/expire
 
 ## 8. Deployment
 
-Target topology: frontend on Vercel, FastAPI in a container (Fly — see §8.6; Render blueprint retained as the alternative), Postgres managed (Neon/Supabase).
+Target topology: frontend on Vercel, FastAPI in a container on Koyeb (see §8.6), Postgres managed (Neon/Supabase).
 
-`render.yaml` (repo root) is the Render blueprint for the backend only. It pins `rootDir: backend` (the Dockerfile lives there), `dockerfilePath: ./Dockerfile`, `healthCheckPath: /health`, one instance, and the region that should match the database. Every secret is `sync: false`, so applying the blueprint prompts for it and no credential is ever committed. The settings it encodes are the ones that are easy to get wrong by hand; anything not in it (the frontend, the database) is set in its own dashboard.
+`deploy-koyeb.ps1` (repo root) wraps the whole backend deploy for Koyeb, and §8.6 explains the settings it pins. Anything outside that script — the frontend, the database — is configured in its own dashboard.
 
 `frontend/vercel.json` is intentionally minimal: it pins `framework: "nextjs"` and adds `$schema` for editor validation, nothing else. Vercel already detects the build from `package.json` and `next.config.mjs`, so do not add build, output, or routing keys here without a concrete reason. Two deliberate omissions:
 
@@ -260,7 +260,7 @@ Neither side accepts the other's spelling, and neither failure is obvious: the b
 - **Two endpoints, one database.** The backend reads the Better Auth `session` table directly (`app/core/security.py`), so both apps must point at the *same* project; a separate database for the frontend would 401 every scan.
 - **Frontend → pooled.** Use the Supavisor connection string on port **5432** (session mode), user `postgres.<project-ref>`, host `aws-0-<region>.pooler.supabase.com`, with `?sslmode=no-verify` — see the note above for why `require` fails here.
 - **Backend → direct.** `db.<project-ref>.supabase.co:5432` with `?ssl=require`. One long-lived container does not need a pooler, and it avoids spending the pooler's connection budget. Running Alembic against the pooler also works, but the direct URL is what the runbook asks for, so use it and keep one variable per deployment.
-- **Region alignment is partial by platform.** Render offers Oregon, Ohio, Virginia, Frankfurt and Singapore — there is no Tokyo region — so a Supabase project in `ap-northeast-1` can only ever be paired with a Render service in another continent or Singapore. Same-region is worth recreating a not-yet-deployed project for; once data exists, a cross-region hop on every query is the cheaper mistake to keep.
+- **Region alignment is partial by platform, and impossible on the free tier.** The Supabase project is in `ap-northeast-1` (Tokyo). Koyeb's `free` Instance is offered in Frankfurt and Washington DC only — Tokyo needs a paid Instance type. Render never offered Tokyo at all (Oregon, Ohio, Virginia, Frankfurt, Singapore). So on the free tier this deployment pays a cross-region hop on every query and there is nothing to configure about it; moving to `TYO` on a paid Instance is the fix, not a region setting.
 - URL-encode the database password if it contains `@ : / # ?`.
 - **Free plan pauses.** A project with low activity over 7 days is paused automatically and restored from the dashboard (1-year window). A paused database fails both migrations and every request, so a demo deployment needs either occasional traffic or a paid plan.
 - **Free plan connections.** Budget them: the SQLAlchemy engine pool, Alembic's migration connection, the Postgres cache path (which opens a connection per call rather than using the pool), and the frontend's pool. Keep `CACHE_BACKEND=sqlite` if the backend is later given a persistent volume, or lower `pool_size` before raising the plan.
@@ -276,45 +276,86 @@ Neither side accepts the other's spelling, and neither failure is obvious: the b
 5. **Deploy the backend container first** and confirm it responds, then deploy the frontend to Vercel. Any release that changes a schema repeats steps 2 and 3 before it takes traffic.
 6. **Verify end to end on the production domain:** sign up, run a scan against a public domain, sign out. A successful build is not proof that auth works in production.
 
-### 8.6 Backend host: Fly.io (`backend/fly.toml`)
+### 8.6 Backend host: Koyeb
 
-**Prefer `deploy-fly.ps1` over the manual commands below.** It is the same runbook wrapped in one script, and its reason to exist is that every way this deploy fails badly happens *after* a several-minute Docker build: a `DATABASE_URL` pointing at localhost, the wrong TLS spelling, a `BETTER_AUTH_SECRET` that does not match the frontend, or an app that does not exist yet when secrets are set. It resolves each value from the environment, then `backend/.env`, then a hidden prompt; validates all four; creates the app; sets secrets; deploys; and then polls `/health` and `/ready` on the public URL.
+**Prefer `deploy-koyeb.ps1` over the manual commands below.** It is the runbook wrapped in one script, and its reason to exist is that every way this deploy fails badly happens *after* a several-minute Docker build: a `DATABASE_URL` pointing at localhost, the wrong TLS spelling, a `BETTER_AUTH_SECRET` that does not match the frontend, or an app that has to exist before it can take secrets. It resolves each value from the environment, then `backend/.env`, then a hidden prompt; validates all four; sets secrets before the service; applies the service configuration; and then polls `/health` and `/ready` on the public URL.
 
 ```powershell
-.\deploy-fly.ps1 -DryRun     # validate everything, deploy nothing
-.\deploy-fly.ps1             # deploy and verify
+.\deploy-koyeb.ps1 -DryRun     # validate everything, deploy nothing
+.\deploy-koyeb.ps1             # deploy and verify
+.\deploy-koyeb.ps1 -Region was # the free Instance exists in fra or was only
 ```
 
 It is deliberately **stricter than `app/core/config.py`** on one point: the config guard accepts `sslmode=require` because it cannot know which driver a given URL is for, but a *backend* URL must be `?ssl=require`, since asyncpg rejects `sslmode` as a keyword. The script rejects `sslmode=` outright rather than letting the container discover it.
 
-`render.yaml` at the repo root stays valid and remains the alternative for anyone with a payment method Render accepts. The **active** target is Fly, because Render's signup demands credit-card verification and the operator's card is declined — and of the no-card-free alternatives, none of them can host this backend (Vercel and Cloudflare Workers have no raw TCP sockets, which `tls_service` needs).
+#### Why Koyeb
 
-**Deploy from inside `backend/`, not from the repo root.** Fly's `[build] dockerfile` does not change the Docker build context — the context is the directory the deploy runs from — and the Dockerfile copies `requirements.txt`, `alembic.ini` and `alembic/`, which exist only under `backend/`. A deploy from the root fails with `COPY failed: file not found in build context`.
+Render and Fly were both tried first and neither produced a running service: Render's signup demands credit-card verification and the operator's card is declined, and Fly has no free compute tier, so a deployed app bills continuously. Of the platforms that cannot host this backend at all, Vercel and Cloudflare Workers are ruled out structurally — `tls_service` needs raw TCP sockets, which neither has. Koyeb is the remaining option that offers genuine no-cost compute.
 
-```powershell
-# 1. create the app once; flyctl needs no card for this, which is the point
-cd backend
-fly launch --no-deploy --copy-config=false --name osint-api --region nrt
-fly apps list                 # confirm osint-api exists
+Note that Koyeb also requires a credit card at signup (a $29 pre-authorization hold), so the card decision applies here too.
 
-# 2. secrets -- never in fly.toml, never in git
-fly secrets set DATABASE_URL="postgresql+asyncpg://postgres:PASSWORD@db.<REF>.supabase.co:5432/postgres?ssl=require"
-fly secrets set BETTER_AUTH_SECRET="<same 43-char value as frontend/.env.local>"
-fly secrets set SHODAN_API_KEY="<key, or omit to keep the Shodan source dark>"
-fly secrets set CORS_ORIGINS="https://<vercel-domain>"
-fly secrets set APP_URL="https://<vercel-domain>"
+#### Why the CLI and not a `koyeb.yaml`
 
-# 3. deploy (the Dockerfile CMD runs `alembic upgrade head` before uvicorn)
-fly deploy
-fly status
-fly logs --tail              # expect: alembic upgrade head OK, then "ready" on /ready
-```
+Koyeb does not publish the schema of a `koyeb.yaml` app definition on its documentation site, and its own example repository (`koyeb/example-docker-compose`) does not use one. The supported, verifiable configuration surfaces are the control panel and the `koyeb` CLI, so this repo drives the CLI and pins the settings that are easy to get wrong. Do not hand-write a `koyeb.yaml` from memory — check the published CLI reference first.
+
+#### The work directory is the build context
+
+The script pins `--git-workdir backend`. That is not cosmetic: Koyeb builds from the work directory, and the Dockerfile copies `requirements.txt`, `alembic.ini` and `alembic/`, which exist only under `backend/`. A work directory of the repository root fails with `COPY failed: file not found in build context`.
+
+#### What the script pins, and why each one matters
+
+| Setting | Value | Reason |
+|---|---|---|
+| `--git-builder docker` + `--git-docker-dockerfile Dockerfile` | — | The image is a multi-stage build that compiles Subfinder with Go; no buildpack does this. |
+| `--instance-type free` | 512 MB / 0.1 vCPU / 2 GB SSD | The only no-cost offering. Never billed. |
+| `--regions fra` (or `was`) | — | The free Instance exists in Frankfurt and Washington DC **only**. There is no Tokyo option at this tier, so region alignment with a Supabase project in `ap-northeast-1` is impossible here — see §8.1. |
+| `--min-scale 1 --max-scale 1` | one instance | The rate limiter is per-process, so a second instance would multiply every quota (`RATE_LIMIT_PER_HOUR`). Never raise this with autoscaling. |
+| `--ports 8000:http` | — | Matches the Dockerfile's `EXPOSE 8000` and its `${PORT:-8000}` command. |
+| `--checks 8000:http:/health` | — | `/health`, not `/ready`: `/ready` opens a database connection on every probe. |
+| `--checks-grace-period 8000=60` | 60 s | The container command runs `alembic upgrade head` before uvicorn serves, and the first build also compiles Subfinder. |
+| `APP_ENV`, `CACHE_BACKEND`, `RATE_LIMIT_PER_HOUR`, `RATE_LIMIT_DAILY_TOTAL` | see table | Non-secret config, applied as plain `--env` values. `CACHE_BACKEND=postgres` because the free Instance has no persistent volume. `RATE_LIMIT_PER_HOUR` must be a real process environment variable — `config.py` checks `os.getenv` so that "unset" is distinguishable from a deliberate value, and refuses to boot without it (§8.4). |
+| `DATABASE_URL`, `BETTER_AUTH_SECRET`, `SHODAN_API_KEY`, `CORS_ORIGINS`, `APP_URL` | Koyeb secrets | Set as org-level secrets and referenced with `--env KEY={{secret.NAME}}`, so no credential is ever in git or in this file. |
+
+Secrets are set **before** the service is created or updated, so the first deployment already has them.
 
 - **`?ssl=require`, not `sslmode=require`,** for the backend URL — the same driver rule as §8.1, and `config.py`'s guard accepts either spelling, so the wrong one only fails at connect time.
 - **`BETTER_AUTH_SECRET` must equal the frontend's.** Two different values mean every scan 401s.
-- **Cost:** `shared-cpu-1x` / 512 MB is the smallest always-on size Fly offers. It has no free allowance, so a deployed app bills continuously. `auto_stop_machines = "off"` is deliberate — a stopped Machine is still billed for its root filesystem, so stopping saves almost nothing while making every quiet period pay a cold start inside the 60s Vercel budget (see the cold-backend note in §8.2). Free to *try*: Fly's trial needs no credit card, so the deploy can be proven before any payment method exists.
-- **One Machine only.** The rate limiter is per-process, so a second Machine would multiply every quota (`RATE_LIMIT_PER_HOUR`). Scale with `fly machine run` deliberately, never by autoscale.
-- **Health check is `/health`, not `/ready`** — `/ready` opens a database connection on every probe. `grace_period` is 30s because the CMD migrates before it serves.
+- **Cost:** the `free` Instance is never billed. The trade is throughput, not money: 0.1 vCPU is slow, and a scan gathers its sources concurrently, so wall-clock still tracks the slowest per-source timeout rather than CPU. If scans time out at the source rather than at the edge, move to a paid Instance (`nano` ≈ $2.68/month, `micro` ≈ $0.2 vCPU ≈ $5.36/month) — `TYO` is available at those tiers and removes the cross-region hop.
+
+#### The free Instance sleeps, and the ping that stops it
+
+The free Instance scales down to zero after **1 hour** without traffic from the Internet, and that idle period cannot be disabled on this tier. That is what `.github/workflows/keep-backend-awake.yml` is for: a 5-minute `GET /health` resets the clock, leaving a 12× margin even if a run is delayed or dropped.
+
+- `/health` is used deliberately. It is an in-memory liveness check; `/ready` would also hold the service awake but opens a Postgres connection on every probe, spending the free Supabase connection budget on a keepalive.
+- Arm it by setting the repository variable `BACKEND_HEALTH_URL` to `https://<koyeb-app-url>/health` (Settings → Secrets and variables → Actions → Variables). The script prints the exact value at the end of a successful run. This repository is public, so the Actions minutes are not billed.
+- **Known limitation, stated rather than assumed:** GitHub's scheduler runs late under load — 15 minutes is routine and it can be worse. If the backend still sleeps, move the ping to an external scheduler (cron-job.org, UptimeRobot) rather than tightening this cron further.
+
+#### Manual equivalent
+
+```powershell
+koyeb login
+koyeb secrets create DATABASE_URL -v "postgresql+asyncpg://postgres:PASSWORD@db.<REF>.supabase.co:5432/postgres?ssl=require"
+koyeb secrets create BETTER_AUTH_SECRET -v "<same value as frontend/.env.local>"
+koyeb secrets create CORS_ORIGINS -v "https://<vercel-domain>"
+koyeb secrets create APP_URL -v "https://<vercel-domain>"
+# SHODAN_API_KEY is optional -- omit it and the Shodan source reports not_configured
+
+koyeb apps init osint-api `
+  --git https://github.com/bieruu/network-universal-search-agent --git-branch main `
+  --git-workdir backend --git-builder docker --git-docker-dockerfile Dockerfile `
+  --regions fra --instance-type free --min-scale 1 --max-scale 1 --type web `
+  --ports 8000:http --checks 8000:http:/health --checks-grace-period 8000=60 `
+  --env APP_ENV=production --env CACHE_BACKEND=postgres `
+  --env RATE_LIMIT_PER_HOUR=5 --env RATE_LIMIT_DAILY_TOTAL=50 `
+  --env 'DATABASE_URL={{secret.DATABASE_URL}}' `
+  --env 'BETTER_AUTH_SECRET={{secret.BETTER_AUTH_SECRET}}' `
+  --env 'CORS_ORIGINS={{secret.CORS_ORIGINS}}' `
+  --env 'APP_URL={{secret.APP_URL}}'
+
+koyeb deployments logs osint-api   # expect: alembic upgrade head OK, then uvicorn on :8000
+```
+
+Read the public URL back with `koyeb apps describe osint-api -o json` (its `domain` field) — the default `koyeb.app` hostname contains an organization slug and a hash, so it cannot be constructed by hand.
 
 Other deployment notes:
 

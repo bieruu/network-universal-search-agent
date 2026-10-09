@@ -33,5 +33,5 @@ USER app
 
 EXPOSE 8000
 
-# $PORT is provided by Fly/Render; default 8000 for `docker run` without -e.
+# $PORT is provided by Koyeb; default 8000 for `docker run` without -e.
 CMD ["sh", "-c", "python -m alembic upgrade head && python -m uvicorn app.main:app --host 0.0.0.0 --port ${PORT:-8000}"]

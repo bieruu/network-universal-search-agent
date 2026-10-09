@@ -288,7 +288,7 @@ CREATE TABLE IF NOT EXISTS cache(key TEXT PRIMARY KEY, payload TEXT, expires_at 
 ## 8. Deployment
 
 - Local: `docker compose up postgres` + `uvicorn` + `npm run dev` (see WORKFLOW.md).
-- Prod minimal: Frontend on Vercel, FastAPI on Fly/Render (Docker), Postgres managed (Neon/Supabase). CORS + `APP_URL` updated. SQLite replaced by Postgres cache table or Redis in prod (env flag `CACHE_BACKEND=sqlite|postgres` — set `postgres` on hosts without a persistent volume; the table is auto-created, see §7).
+- Prod minimal: Frontend on Vercel, FastAPI on Koyeb (Docker, `free` Instance, one replica), Postgres managed (Neon/Supabase). CORS + `APP_URL` updated. SQLite replaced by Postgres cache table or Redis in prod (env flag `CACHE_BACKEND=sqlite|postgres` — set `postgres` on hosts without a persistent volume; the table is auto-created, see §7). The free Instance sleeps after 1 hour idle and cannot be configured otherwise, so `.github/workflows/keep-backend-awake.yml` pings `/health` every 5 minutes to hold it awake — see WORKFLOW.md §8.6.
 - **Known limitation — migrations run in the container CMD:** `backend/Dockerfile` ends with `python -m alembic upgrade head && python -m uvicorn ...`. Correct for a single replica, but concurrent replicas race on the same DDL during a scale-out, and the release step in WORKFLOW.md §8.2 (step 2) runs the same migration independently. Keep one replica until migrations move out of the CMD into a dedicated release step.
 
 ## 9. Trade-offs & v2

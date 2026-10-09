@@ -1,0 +1,87 @@
+name: Keep the backend awake
+
+# Koyeb's free Instance scales down to zero after 1 hour with no traffic from
+# the Internet, and that idle period cannot be disabled on that Instance type.
+# That matters here because a sleeping backend spends its cold start inside the
+# same 60s the Vercel proxy allows for a whole scan (WORKFLOW.md 8.2), so the
+# first scan after a quiet period can time out at the edge before the backend
+# has finished booting.
+#
+# A scheduled ping is the cheapest fix: GET /health is an in-memory liveness
+# check with no database call, so it is free to repeat and it resets the idle
+# clock. /ready would also work but it opens a Postgres connection on every
+# probe, and the free Supabase plan has a connection budget to spend on real
+# work.
+#
+# This repository is public, so GitHub Actions minutes are not billed and a
+# 5-minute cadence costs nothing.
+#
+# Known limitation, not a hypothetical: GitHub's scheduler is documented to run
+# late under load - 15 minutes is routine and it can be much worse. If the
+# backend sleeps despite this, move the ping to an external scheduler
+# (cron-job.org, UptimeRobot) rather than tightening this cron further.
+
+on:
+  schedule:
+    # Every 5 minutes. The free Instance sleeps after 1 hour, so this leaves a
+    # 12x margin even if a single run is delayed or dropped entirely.
+    - cron: "*/5 * * * *"
+  workflow_dispatch: null
+
+permissions:
+  contents: read
+
+concurrency:
+  # A slow ping must not stack up behind itself; one at a time is enough to hold
+  # the clock, and overlapping runs waste Actions minutes.
+  group: keep-backend-awake
+  cancel-in-progress: true
+
+jobs:
+  ping:
+    name: Ping backend health endpoint
+    runs-on: ubuntu-latest
+    timeout-minutes: 2
+    steps:
+      - name: Read the health URL
+        env:
+          BACKEND_HEALTH_URL: ${{ vars.BACKEND_HEALTH_URL }}
+        run: |
+          set -euo pipefail
+          if [ -z "${BACKEND_HEALTH_URL:-}" ]; then
+            echo "::warning::BACKEND_HEALTH_URL is not set. Set it in Settings -> Secrets and variables -> Actions -> Variables to https://<koyeb-app-url>/health to arm this workflow. Skipping."
+            exit 0
+          fi
+          case "${BACKEND_HEALTH_URL}" in
+            http://*)
+              echo "::warning::BACKEND_HEALTH_URL is http, not https."
+              ;;
+            https://*)
+              ;;
+            *)
+              echo "::error::BACKEND_HEALTH_URL must be an https:// URL to the backend /health endpoint."
+              exit 1
+              ;;
+          esac
+          echo "${BACKEND_HEALTH_URL}" > /tmp/backend_health_url
+
+      - name: Ping it
+        run: |
+          set -euo pipefail
+          url=$(cat /tmp/backend_health_url)
+          # 20s is generous for an in-memory liveness check, but generous on
+          # purpose: a timeout here would fail the run on a cold start rather
+          # than let the next run pick it up quietly.
+          status=$(curl --silent --show-error --output /tmp/body.txt --write-out '%{http_code}' \
+            --max-time 20 \
+            --header 'User-Agent: keep-backend-awake (GitHub Actions)' \
+            "$url") || status="000"
+
+          echo "GET ${url} -> ${status}"
+          echo "Body: $(head -c 200 /tmp/body.txt || true)"
+
+          if [ "${status}" != "200" ]; then
+            echo "::error::Backend health check returned HTTP ${status}. If this repeats the Koyeb service may have failed its deploy or lost its DATABASE_URL."
+            exit 1
+          fi
+          echo "Backend is awake."

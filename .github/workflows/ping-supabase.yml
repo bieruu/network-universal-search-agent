@@ -1,0 +1,114 @@
+name: Keep Supabase awake
+
+# Supabase pauses a free-tier project after 7 days of database inactivity, and a
+# paused project takes minutes (sometimes hours) to wake. The backend sleeps on
+# its own schedule too, so it cannot be relied on to generate that activity — a
+# scheduled job is the only thing that keeps running.
+#
+# What counts as activity is a real request against the project's REST API, not
+# a DNS check against the hostname (that never reaches Postgres). So this hits
+# PostgREST with the anon key.
+
+on:
+  schedule:
+    # Every 3 days. GitHub Actions cron is UTC and can be delayed by up to ~15
+    # minutes during busy hours, which is irrelevant against a 7-day window.
+    # Day-of-month + day-of-week are both restricted by GitHub's cron parser,
+    # so this is "day 1, 4, 7, ... and day 31", not "every 3rd day" — fine for
+    # the purpose, the point is only that it is far more often than 7 days.
+    - cron: "17 6 */3 * *"
+  workflow_dispatch: null
+
+permissions:
+  contents: read
+
+concurrency:
+  group: ping-supabase
+  cancel-in-progress: false
+
+jobs:
+  ping:
+    name: Ping Supabase REST API
+    runs-on: ubuntu-latest
+    timeout-minutes: 5
+    steps:
+      - name: Validate secrets are present
+        env:
+          SUPABASE_URL: ${{ secrets.SUPABASE_URL }}
+          SUPABASE_ANON_KEY: ${{ secrets.SUPABASE_ANON_KEY }}
+        run: |
+          set -euo pipefail
+          if [ -z "${SUPABASE_URL:-}" ] || [ -z "${SUPABASE_ANON_KEY:-}" ]; then
+            echo "::error::SUPABASE_URL and SUPABASE_ANON_KEY must be set as repository secrets (Settings -> Secrets and variables -> Actions)."
+            exit 1
+          fi
+          # Fail loudly on a pasted URL with a trailing slash or a full path:
+          # both produce a confusing 404 from PostgREST further down.
+          case "${SUPABASE_URL}" in
+            */) echo "::error::SUPABASE_URL must not have a trailing slash."; exit 1 ;;
+            */rest/*|*/auth/*) echo "::error::SUPABASE_URL must be the project URL only (https://<ref>.supabase.co)."; exit 1 ;;
+          esac
+
+      - name: Query one row
+        env:
+          SUPABASE_URL: ${{ secrets.SUPABASE_URL }}
+          SUPABASE_ANON_KEY: ${{ secrets.SUPABASE_ANON_KEY }}
+          # Optional: a table that exists and is readable by `anon`. If unset,
+          # the job still hits PostgREST's root, which returns the OpenAPI
+          # document and is enough to count as activity.
+          SUPABASE_PING_TABLE: ${{ vars.SUPABASE_PING_TABLE }}
+        run: |
+          set -euo pipefail
+          path="rest/v1/"
+          if [ -n "${SUPABASE_PING_TABLE:-}" ]; then
+            path="rest/v1/${SUPABASE_PING_TABLE}?select=*&limit=1"
+          fi
+          url="${SUPABASE_URL}/${path}"
+
+          status=$(curl --silent --show-error --output /tmp/body.json --write-out '%{http_code}' \
+            --max-time 20 --retry 2 --retry-delay 5 \
+            --header "apikey: ${SUPABASE_ANON_KEY}" \
+            --header "Authorization: Bearer ${SUPABASE_ANON_KEY}" \
+            "$url") || status="000"
+
+          echo "GET ${url} -> ${status}"
+
+          # 200/206 are success. A 401/403/404 still reached the project and
+          # reset the inactivity clock, but it means the key or table is wrong
+          # and the operator should know before the project pauses anyway.
+          case "${status}" in
+            2*)
+              echo "Supabase responded. Project stays awake."
+              ;;
+            401|403)
+              echo "::warning::Supabase rejected the anon key (${status}). The request still counted as activity, but fix SUPABASE_ANON_KEY or RLS."
+              ;;
+            404)
+              echo "::warning::Supabase returned 404. Check SUPABASE_PING_TABLE (it must exist and be exposed in the API settings)."
+              ;;
+            *)
+              echo "::error::Supabase ping failed with HTTP ${status}."
+              head -c 500 /tmp/body.json || true
+              exit 1
+              ;;
+          esac
+
+      - name: Verify the backend can still reach the database
+        # The ping keeps the *project* awake; this keeps the *backend* honest.
+        # A 401 here is expected and healthy — it proves /ready reached Postgres
+        # through the backend host. Skip by leaving BACKEND_READY_URL empty.
+        env:
+          BACKEND_READY_URL: ${{ vars.BACKEND_READY_URL }}
+        run: |
+          set -euo pipefail
+          if [ -z "${BACKEND_READY_URL:-}" ]; then
+            echo "BACKEND_READY_URL not set; skipping backend readiness check."
+            exit 0
+          fi
+          status=$(curl --silent --show-error --output /dev/null --write-out '%{http_code}' \
+            --max-time 30 "${BACKEND_READY_URL}") || status="000"
+          echo "GET ${BACKEND_READY_URL} -> ${status}"
+          if [ "${status}" != "200" ]; then
+            echo "::error::Backend /ready is not healthy (${status})."
+            exit 1
+          fi
