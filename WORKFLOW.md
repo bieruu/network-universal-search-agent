@@ -212,7 +212,7 @@ Backend tests mock upstream OSINT services. For auth, tests verify active/expire
 
 ## 8. Deployment
 
-Target topology: frontend on Vercel, FastAPI in a container (Fly/Render), Postgres managed (Neon/Supabase).
+Target topology: frontend on Vercel, FastAPI in a container (Fly — see §8.6; Render blueprint retained as the alternative), Postgres managed (Neon/Supabase).
 
 `render.yaml` (repo root) is the Render blueprint for the backend only. It pins `rootDir: backend` (the Dockerfile lives there), `dockerfilePath: ./Dockerfile`, `healthCheckPath: /health`, one instance, and the region that should match the database. Every secret is `sync: false`, so applying the blueprint prompts for it and no credential is ever committed. The settings it encodes are the ones that are easy to get wrong by hand; anything not in it (the frontend, the database) is set in its own dashboard.
 
@@ -275,6 +275,37 @@ Neither side accepts the other's spelling, and neither failure is obvious: the b
    - Backend (container env): `CORS_ORIGINS=https://<prod-domain>` (exact origin, no trailing slash, no wildcard), `APP_URL=https://<prod-domain>`, plus the same secret and the same database. `RATE_LIMIT_PER_HOUR` is **required** and the backend refuses to boot without it — see §8.4. Set it as a real container/host environment variable, not only a `.env` file inside the image.
 5. **Deploy the backend container first** and confirm it responds, then deploy the frontend to Vercel. Any release that changes a schema repeats steps 2 and 3 before it takes traffic.
 6. **Verify end to end on the production domain:** sign up, run a scan against a public domain, sign out. A successful build is not proof that auth works in production.
+
+### 8.6 Backend host: Fly.io (`backend/fly.toml`)
+
+`render.yaml` at the repo root stays valid and remains the alternative for anyone with a payment method Render accepts. The **active** target is Fly, because Render's signup demands credit-card verification and the operator's card is declined — and of the no-card-free alternatives, none of them can host this backend (Vercel and Cloudflare Workers have no raw TCP sockets, which `tls_service` needs).
+
+**Deploy from inside `backend/`, not from the repo root.** Fly's `[build] dockerfile` does not change the Docker build context — the context is the directory the deploy runs from — and the Dockerfile copies `requirements.txt`, `alembic.ini` and `alembic/`, which exist only under `backend/`. A deploy from the root fails with `COPY failed: file not found in build context`.
+
+```powershell
+# 1. create the app once; flyctl needs no card for this, which is the point
+cd backend
+fly launch --no-deploy --copy-config=false --name osint-api --region nrt
+fly apps list                 # confirm osint-api exists
+
+# 2. secrets -- never in fly.toml, never in git
+fly secrets set DATABASE_URL="postgresql+asyncpg://postgres:PASSWORD@db.<REF>.supabase.co:5432/postgres?ssl=require"
+fly secrets set BETTER_AUTH_SECRET="<same 43-char value as frontend/.env.local>"
+fly secrets set SHODAN_API_KEY="<key, or omit to keep the Shodan source dark>"
+fly secrets set CORS_ORIGINS="https://<vercel-domain>"
+fly secrets set APP_URL="https://<vercel-domain>"
+
+# 3. deploy (the Dockerfile CMD runs `alembic upgrade head` before uvicorn)
+fly deploy
+fly status
+fly logs --tail              # expect: alembic upgrade head OK, then "ready" on /ready
+```
+
+- **`?ssl=require`, not `sslmode=require`,** for the backend URL — the same driver rule as §8.1, and `config.py`'s guard accepts either spelling, so the wrong one only fails at connect time.
+- **`BETTER_AUTH_SECRET` must equal the frontend's.** Two different values mean every scan 401s.
+- **Cost:** `shared-cpu-1x` / 512 MB is the smallest always-on size Fly offers. It has no free allowance, so a deployed app bills continuously. `auto_stop_machines = "off"` is deliberate — a stopped Machine is still billed for its root filesystem, so stopping saves almost nothing while making every quiet period pay a cold start inside the 60s Vercel budget (see the cold-backend note in §8.2). Free to *try*: Fly's trial needs no credit card, so the deploy can be proven before any payment method exists.
+- **One Machine only.** The rate limiter is per-process, so a second Machine would multiply every quota (`RATE_LIMIT_PER_HOUR`). Scale with `fly machine run` deliberately, never by autoscale.
+- **Health check is `/health`, not `/ready`** — `/ready` opens a database connection on every probe. `grace_period` is 30s because the CMD migrates before it serves.
 
 Other deployment notes:
 
