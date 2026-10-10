@@ -3,6 +3,33 @@
 > Completed work only, newest section at the top. Open items → [TODO.md](./TODO.md) · setup → [WORKFLOW.md](./WORKFLOW.md) · requirements → [PRD.md](./PRD.md).
 > Anything finished in a push moves here from TODO.md in that same commit, newest section at the top — see AGENTS.md §9.
 
+## 2026-10-10 — Deployment prep before the first public deploy; playground terminal, tech-stack marquee, and password reset shipped
+
+Three operator decisions are recorded here because they are what the deploy runbook executes from now on: the Vercel domain is a `*.vercel.app` subdomain, self-service sign-up is **open** (`SIGNUP_ENABLED=true`, no allowlist), and password reset is switched on via `RESEND_API_KEY`. **Nothing is deployed** — no Vercel project and no Koyeb service exist — so none of this has been exercised against a public URL.
+
+**Deploy configuration**
+
+- **`deploy-koyeb.ps1` forwards every source key, not just Shodan.** `SHODAN_API_KEY`, `NVD_API_KEY`, `OTX_API_KEY`, `URLSCAN_API_KEY`, `VIRUSTOTAL_API_KEY` and `LEAKLOOKUP_API_KEY` are read from `backend/.env` and created as Koyeb org-level secrets alongside the four required ones, so a deployed scan reports the same source coverage as a local one. Without this, the threat-history sources were the first thing production silently lost — a scan that works locally and comes back `not_configured` in production. Each optional key is skipped with a note when unset, and a placeholder (`your-key`, `changeme`, anything ending in `-key`) is treated as unset rather than pushed: a source that looks configured but throws on every call reads as an outage, while one that reports `not_configured` reads as the decision it actually is.
+- **`frontend/.env.local` `DATABASE_URL` corrected to `?sslmode=no-verify`.** The file still carried `?sslmode=require`, which node-postgres handles as an alias for `verify-full` and which therefore fails against Supabase with `SELF_SIGNED_CERT_IN_CHAIN` — the exact trap WORKFLOW.md §8.1 documents. `pg` is handed the raw connection string in `lib/auth.ts:101` with no `ssl` override, so the spelling in the DSN is the only thing that can set it. The consequence is unchanged and still open: that hop is encrypted but does not authenticate the server certificate, so "TLS is verified" remains a false claim about this deployment.
+- **`SERVICE_TOKEN` and `RATE_LIMIT_EXEMPT_SUBJECTS` are deliberately not forwarded to Koyeb.** They grant unlimited quota and exist for load/QA testing, and an unset `SERVICE_TOKEN` fails closed (`require_user` compares under `hmac.compare_digest`, which cannot match an empty value), so leaving them behind keeps the public deployment without an exemption. Reasoning and the manual CLI equivalent are in WORKFLOW.md §8.6.
+- **`AUTH_FROM_EMAIL` is still the placeholder `Universal Search <noreply@your-domain.com>`.** It must be a sender verified in Resend or reset emails will be rejected by the receiving provider. `RESEND_API_KEY` itself is set (36 characters) and is not in the diff.
+
+**Landing work shipped in this push**
+
+- Interactive hero terminal: `PlaygroundTerminal.tsx` with a three-phase lifecycle (`attract` → `demo` → `live`), a click-activated session (hover was tried and rejected with written reasons — a cursor crossing the window wipes the transcript), shell history on arrow-up/arrow-down, `scan` refused until `list` has run, and an animated wipe shared by both the transition and a typed `clear`. Six browser-only defects were fixed here, including a duplicated prompt bar that read as two inputs, a hand-drawn block caret that raced the native one, a hero that resized mid-session, and a `nextId.current` read inside an async updater that made React duplicate and drop transcript rows.
+- Tech-stack section rewritten from a macOS-style dock into a toolchain marquee (`toolchain-marquee.tsx` + `.module.css` + rewritten `StackStrip.tsx`), with eyebrow text replaced by a real `<h2>` and caption. Every label is mapped to a dependency this repo actually uses — `package.json`/`devDependencies` for the six frontend names, `backend/requirements.txt` for the five backend names, and PostgreSQL proven through its drivers (`asyncpg`, `pg`) — and a label with no mapping fails the contract.
+- Password reset flow ships: `lib/reset-email.ts`, `reset-confirmation.ts`, `auth-errors.ts`, `user-errors.ts`, `terms.ts`, `scan-status.ts`, and the `forgot-password`/`reset-password` routes. The sender logs one warning per process when no key is present, so an operator who has not configured mail still boots.
+- DESIGN.md §Layout, §Colors, §Elevation, §Shapes and §Motion are updated for the marquee, including dated supersession of the dock's three elevation rules (supersession, not deletion — §9) and an explicit motion budget for the marquee: landing-only, transform-only, ~22s, gated by a hook rather than a class, a mandatory pause control, zero frames while paused.
+
+**Two bugs that only verification could find — every gate was green on both**
+
+1. **The page did not compile, and no gate noticed.** `toolchain-marquee.module.css` declared vendor colours with `:root { }` / `.dark { }` blocks. Next.js CSS Modules rejects those as impure selectors, so `next dev` failed the compile and every route returned 500 — while `eslint`, `tsc` and `node --test` all passed, because none of them read a CSS module. Vendor colours moved to `globals.css`, the one file that already owns the page tokens.
+2. **A second copy of the CDN-slug bug.** `PlaygroundTerminal.tsx` marked `Next.js` with the slug `nextjs`, which 404s on Simple Icons; the fix that had already landed in the dock version of `StackStrip` never reached this copy. Verified live: 404 before, zero failed resources after.
+
+Gates run in this session, on the pushed tree: `pytest -q` → **1003 passed** (1 Starlette/httpx deprecation warning, 200s); `ruff check .` → **All checks passed**; `black --check .` → **83 files would be left unchanged**; `npm run lint` → exit 0 with no output; `npm run tsc --noEmit` → exit 0, no errors; `npm test` → **220 pass, 0 fail**. Secret scan over the staged diff: only `.env.local.example` touched, and only its empty placeholders.
+
+Not verified, and claimed nowhere: nothing in this push has run against a live Koyeb service or a Vercel deployment, and `npm run build` was not re-run for it.
+
 ## 2026-10-10 — Backend host moved to Koyeb: Fly could not be deployed without billing
 
 `backend/fly.toml` and `deploy-fly.ps1` are deleted, `render.yaml` is deleted, and the backend target is now Koyeb. Nothing is deployed: no Koyeb app exists and no Vercel project exists, so there is still no public URL and nothing here has been proven against a running service.
