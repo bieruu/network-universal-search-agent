@@ -1,3 +1,5 @@
+import { toUserFacingError } from "./user-errors.ts";
+
 export type ScanStatus = "pending" | "running" | "completed" | "partial" | "failed";
 
 export interface SourceError {
@@ -133,10 +135,16 @@ export interface HistoryItem {
 }
 
 async function handle<T>(res: Response): Promise<T> {
-  if (res.status === 401) throw new Error("Unauthorized — please sign in again.");
-  if (res.status === 429) throw new Error("Rate limited — try again later.");
-  if (!res.ok) throw new Error(`Request failed (${res.status})`);
-  return (await res.json()) as T;
+  if (res.ok) return (await res.json()) as T;
+  // The error body carries the upstream `detail`; we keep it for the console
+  // and render only the mapped sentence. See lib/user-errors.ts.
+  let body: unknown = null;
+  try {
+    body = await res.json();
+  } catch {
+    body = null;
+  }
+  throw toUserFacingError(res.status, body);
 }
 
 export async function startScan(target: string, force = false): Promise<{ scan_id: string; status: ScanStatus }> {

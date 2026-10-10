@@ -12,7 +12,7 @@
     "lint": "eslint . --max-warnings=0",
     "tsc": "tsc --noEmit",
     "auth:migrate": "node --env-file=.env.local node_modules/auth/dist/index.mjs migrate --config ./lib/auth.ts --yes",
-    "test": "node --test lib/validators.test.ts lib/components.test.ts lib/landing.test.ts lib/scan-shape.test.ts lib/login.test.ts lib/signup.test.ts lib/signup-gate.test.ts lib/signup-gate-integration.test.ts lib/auth-rate-limit.test.ts lib/dashboard.test.ts lib/palette.test.ts lib/devlogin.test.ts lib/security-headers.test.ts lib/analysis-api.test.ts lib/threat-history-shape.test.ts"
+    "test": "node --test lib/validators.test.ts lib/components.test.ts lib/landing.test.ts lib/playground-commands.test.ts lib/scan-shape.test.ts lib/login.test.ts lib/signup.test.ts lib/signup-gate.test.ts lib/signup-gate-integration.test.ts lib/auth-rate-limit.test.ts lib/dashboard.test.ts lib/palette.test.ts lib/devlogin.test.ts lib/security-headers.test.ts lib/analysis-api.test.ts lib/threat-history-shape.test.ts lib/auth-errors.test.ts lib/reset-email.test.ts lib/password-reset-flow.test.ts lib/terminal-lines.test.ts"
   },
   "dependencies": {
     "@phosphor-icons/react": "^2.1.10",
@@ -25,13 +25,15 @@
     "@radix-ui/react-tooltip": "^1.2.16",
     "better-auth": "^1.7.7",
     "chart.js": "^4.4.1",
-    "lucide-react": "^1.48.0",
+    "framer-motion": "^14.0.0",
+    "lucide-react": "^1.54.0",
     "motion": "^13.4.4",
     "next": "15.5.27",
     "pg": "^8.23.1",
     "react": "^18.3.1",
     "react-chartjs-2": "^5.2.0",
     "react-dom": "^18.3.1",
+    "resend": "^6.32.1",
     "zod": "^3.23.8"
   },
   "devDependencies": {

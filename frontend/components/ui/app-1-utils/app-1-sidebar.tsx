@@ -56,18 +56,24 @@ export function App1Sidebar({ active = "/dashboard", className }: { active?: str
         })}
       </nav>
       <div>
-        <p className="px-3 font-mono text-[11px] uppercase tracking-widest text-accent">Sources</p>
+        <p className="px-3 font-mono text-[11px] uppercase tracking-widest text-accent">Where the data comes from</p>
+        <p className="px-3 pt-1 text-xs text-slate-500 dark:text-neutral-500">
+          Every finding is read from a public source. Nothing is ever sent to the target.
+        </p>
         <ul className="mt-2 flex flex-col gap-1">
           {SOURCE_MONOGRAMS.map((s) => (
             <li
               key={s.label}
-              className="flex items-center gap-2 rounded-lg px-3 py-2 text-sm text-slate-600 dark:text-neutral-500"
-              title={s.label}
+              className="flex items-start gap-2 rounded-lg px-3 py-2 text-sm text-slate-600 dark:text-neutral-500"
+              title={`${s.label} — ${s.provenance}`}
             >
-              <span className="flex h-6 w-6 items-center justify-center rounded-md bg-accent/10 font-mono text-[10px] font-bold text-accent">
+              <span className="mt-0.5 flex h-6 w-6 shrink-0 items-center justify-center rounded-md bg-accent/10 font-mono text-[10px] font-bold text-accent">
                 {s.short}
               </span>
-              {s.label}
+              <span className="min-w-0">
+                <span className="block">{s.label}</span>
+                <span className="block text-xs opacity-70">{s.provenance}</span>
+              </span>
             </li>
           ))}
         </ul>

@@ -1,39 +1,27 @@
 import Reveal from "./Reveal";
 
-// Logo-only wall. Simple Icons CDN for real brands; inline monogram for
-// sources without an icon. Fictional marks are monograms, not wordmarks.
-const LOGOS = [
-  { name: "Next.js", src: "https://cdn.simpleicons.org/nextdotjs/00E59B" },
-  { name: "FastAPI", src: "https://cdn.simpleicons.org/fastapi/00E59B" },
-  { name: "PostgreSQL", src: "https://cdn.simpleicons.org/postgresql/00E59B" },
+// Provenance, not a stack wall. The previous version listed the frameworks the
+// product is built on, which tells a visitor nothing they are buying. What a
+// buyer does want to know is whose public records the answer comes from.
+const SOURCES = [
+  { mark: "shodan", detail: "internet-wide service and host data" },
+  { mark: "crt.sh", detail: "the public certificate log" },
+  { mark: "whois", detail: "public domain registration records" },
+  { mark: "NVD", detail: "the NIST vulnerability database" },
 ] as const;
-
-const MONOGRAMS = ["shodan", "crt.sh", "whois"] as const;
 
 export default function LogoStrip() {
   return (
-    <section aria-label="Sources and stack" className="border-y border-neutral-200 dark:border-neutral-800/80">
+    <section
+      aria-label="Public records these results are drawn from"
+      className="border-y border-neutral-200 dark:border-neutral-800/80"
+    >
       <div className="mx-auto flex max-w-7xl flex-wrap items-center justify-center gap-x-10 gap-y-4 px-4 py-6 sm:px-6">
-        {LOGOS.map((l, i) => (
-          <Reveal key={l.name}>
-            <img
-              src={l.src}
-              alt={l.name}
-              width={28}
-              height={28}
-              loading="lazy"
-              className="motion-safe:animate-bob"
-              style={{ animationDelay: `${i * 0.5}s` }}
-            />
-          </Reveal>
-        ))}
-        {MONOGRAMS.map((m, i) => (
-          <Reveal key={m}>
-            <span
-              className="font-mono text-sm font-semibold text-accent motion-safe:animate-bob"
-              style={{ animationDelay: `${(LOGOS.length + i) * 0.5}s` }}
-            >
-              {m}
+        {SOURCES.map((s, i) => (
+          <Reveal key={s.mark}>
+            <span className="flex items-baseline gap-2 motion-safe:animate-bob" style={{ animationDelay: `${i * 0.5}s` }}>
+              <span className="font-mono text-sm font-semibold text-accent">{s.mark}</span>
+              <span className="text-xs text-slate-500 dark:text-neutral-500">{s.detail}</span>
             </span>
           </Reveal>
         ))}

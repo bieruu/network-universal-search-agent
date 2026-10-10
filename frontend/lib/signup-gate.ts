@@ -130,10 +130,13 @@ export function canCreateAccount(
 export const SIGNUP_CLOSED_TITLE = "Sign-up is closed";
 
 export function signupClosedBody(policy: SignupPolicy): string {
+  // "Deployment" is infrastructure vocabulary; nobody signing in has a concept
+  // for it. Both variants must still say what to do next, and must not reveal
+  // whether an allowlist is configured beyond what the page already shows.
   if (policy.restricted) {
-    return "New account creation is disabled. Ask an administrator to provision your access, then sign in.";
+    return "Creating a new account here needs approval. Ask an administrator to set up your access, then sign in.";
   }
-  return "New account creation is disabled on this deployment. Ask an administrator for access, then sign in.";
+  return "Creating a new account here needs approval. Ask an administrator to set up your access, then sign in.";
 }
 
 export const SIGNUP_RESTRICTED_BODY =

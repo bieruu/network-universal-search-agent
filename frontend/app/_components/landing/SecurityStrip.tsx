@@ -4,23 +4,23 @@ import Reveal from "./Reveal";
 const ITEMS = [
   {
     icon: ShieldCheck,
-    title: "Session-gated",
-    body: "Middleware guards the dashboard; the API rejects missing sessions with 401.",
+    title: "Your searches are yours",
+    body: "Sign-in is required before anything is shown, so a shared link gives away nothing.",
   },
   {
     icon: Key,
     title: "Secrets stay server-side",
-    body: "Shodan key and DB URLs live in backend env only. The bundle carries none.",
+    body: "The credentials used to reach each source stay on the server and are never sent to your browser.",
   },
   {
     icon: Prohibit,
-    title: "Private ranges blocked",
-    body: "Localhost, RFC1918, and link-local targets are rejected front and back.",
+    title: "Nothing private is looked up",
+    body: "Addresses that only exist inside a network, such as a machine named localhost or a private 10.x address, are refused before a search starts.",
   },
   {
     icon: Eye,
-    title: "Audit by default",
-    body: "Scans persist as immutable snapshots with user, target, and request ID.",
+    title: "A record you can point to",
+    body: "Every search is kept against your account with the target and the time, and past results never change once shown.",
   },
 ];
 

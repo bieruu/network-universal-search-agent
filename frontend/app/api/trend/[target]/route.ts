@@ -1,4 +1,5 @@
 import { NextRequest, NextResponse } from "next/server";
+import { messageForStatus } from "@/lib/user-errors";
 
 const BACKEND = process.env.BACKEND_URL ?? "http://localhost:8000";
 
@@ -18,6 +19,9 @@ export async function GET(req: NextRequest, { params }: { params: Promise<{ targ
       headers: { "content-type": "application/json" },
     });
   } catch {
-    return NextResponse.json({ points: [] }, { status: 502 });
+    // A fabricated `{points: []}` reads as "this target has never been scanned",
+    // which is a false clean bill of health. Propagate the failure and let the
+    // chart say it could not load — see RiskTrendChartInner.
+    return NextResponse.json({ error: messageForStatus(502) }, { status: 502 });
   }
 }

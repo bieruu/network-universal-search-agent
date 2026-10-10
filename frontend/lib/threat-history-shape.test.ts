@@ -101,7 +101,7 @@ test("not_configured is distinct from unavailable and is not an error", () => {
   assert.notEqual(off.outcome, dead.outcome);
   // Operator configuration state: muted, and the source's own note is surfaced.
   assert.equal(statusBadge(off.outcome).variant, "outline");
-  assert.match(off.message, /switched off in this deployment/);
+  assert.match(off.message, /switched off here/);
   assert.equal(off.note, "LEAKLOOKUP_API_KEY is not set.");
   // Actual failure: red, and it says the contribution is unknown rather than zero.
   assert.equal(statusBadge(dead.outcome).variant, "destructive");

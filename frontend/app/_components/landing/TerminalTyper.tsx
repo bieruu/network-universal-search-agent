@@ -1,7 +1,9 @@
 "use client";
 
-import { useEffect, useState } from "react";
+import { useEffect, useMemo, useState } from "react";
 import { AnimatePresence, motion, useReducedMotion } from "motion/react";
+import type { TerminalSample } from "./terminal-lines";
+import { DEMO_SCANS } from "./playground-samples";
 
 // Terminal typing effect: the command is typed char-by-char, then output
 // lines appear sequentially like a real execution. Between two samples it
@@ -9,35 +11,11 @@ import { AnimatePresence, motion, useReducedMotion } from "motion/react";
 // before the next scan, so the rotation reads like one continuous shell
 // session instead of an abrupt jump. Static full output when reduced motion
 // is on; full text is also SSR'd (see Hero fallback).
-const SCANS = [
-  {
-    command: "scan example.com",
-    output: [
-      "shodan  passive source · 2 ports seen",
-      "crt.sh  3 cert names · issuer letsencrypt",
-      "whois   registrar reserved · emails redacted",
-      "risk    heuristic match · status partial",
-    ],
-  },
-  {
-    command: "scan api.acme.co",
-    output: [
-      "shodan  passive source · 6 ports seen",
-      "crt.sh  12 names found · issuer sectigo",
-      "whois   registrar namecheap · ns 3 found",
-      "risk    heuristic match · status elevated",
-    ],
-  },
-  {
-    command: "scan portal.nova.io",
-    output: [
-      "shodan  passive source · 8 ports seen",
-      "crt.sh  9 names found · issuer digicert",
-      "whois   registrar cloudflare · emails masked",
-      "risk    heuristic match · status monitored",
-    ],
-  },
-] as const;
+//
+// The samples themselves live in `playground-samples.ts` because the same three
+// are what a signed-out visitor gets from the playground's `scan` command — two
+// copies of the same data is a drift trap.
+const SCANS = DEMO_SCANS;
 
 const CHAR_MS = 28;
 const LINE_PAUSE_MS = 320;
@@ -48,8 +26,42 @@ const CLEAR_BLANK_MS = 520; // wipe + blank beat before the next sample
 const CLEAR_EXIT_MS = 0.22; // per-line clear (wipe) animation duration, seconds
 const CLEAR_STAGGER_S = 0.045; // top-to-bottom cascade between cleared lines
 
-export default function TerminalTyper() {
+// `sample` is the signed-in case: the one real scan for this analyst. It has
+// the exact same shape as an entry in SCANS, so nothing below branches on
+// which mode it is — only on whether there is anything to rotate to. A real
+// result is never cleared and replayed: it types once and stays.
+// `suppressCaret` exists for the one place this component is no longer the only
+// thing on screen. On the landing page the hero terminal became interactive:
+// `PlaygroundTerminal` renders this attract loop ABOVE a real prompt the visitor
+// types into. Two blinking blocks then read as two inputs — one of them not
+// accepting anything. So the interactive host suppresses this one and lets the
+// real prompt own the caret. Default is unchanged, so every other caller keeps
+// exactly the motion this file documents. What is NOT suppressed is the caret's
+// width: this file's caret is a thin 2px bar, matched to the native caret the
+// real prompt draws, so the two halves of the window never disagree about what a
+// cursor looks like. The wide block it used to be is the same duplication bug in
+// miniature, so it was narrowed rather than kept.
+export default function TerminalTyper({
+  sample,
+  suppressCaret = false,
+  onSnapshot,
+}: {
+  sample?: TerminalSample | null;
+  suppressCaret?: boolean;
+  /**
+   * Reports exactly what is on screen right now.
+   *
+   * The interactive host needs this because the attract loop's output is this
+   * component's own internal state, not the host's transcript entries — so on
+   * the first click the host had nothing to animate away and the window simply
+   * went blank. Reporting the visible lines lets the host seed them as ordinary
+   * entries and wipe the text the visitor was actually looking at.
+   */
+  onSnapshot?: (lines: string[]) => void;
+}) {
   const reduce = useReducedMotion();
+  const scans = useMemo<readonly TerminalSample[]>(() => (sample ? [sample] : SCANS), [sample]);
+  const rotating = !sample;
   const [mounted, setMounted] = useState(false);
   const [scanIndex, setScanIndex] = useState(0);
   const [chars, setChars] = useState(0);
@@ -64,7 +76,7 @@ export default function TerminalTyper() {
 
   useEffect(() => {
     if (!mounted) return;
-    const scan = SCANS[scanIndex];
+    const scan = scans[scanIndex] ?? scans[0];
     if (reduce) {
       setChars(scan.command.length);
       setLines(scan.output.length);
@@ -82,7 +94,9 @@ export default function TerminalTyper() {
       const t = setTimeout(() => setLines((l) => l + 1), LINE_PAUSE_MS);
       return () => clearTimeout(t);
     }
-    // 3) Output done → hold, then start typing `clear`.
+    // 3) Output done → hold, then start typing `clear`. A real result is
+    // never wiped: it stays on screen as the record of what was found.
+    if (!rotating) return;
     if (clearChars === null) {
       const t = setTimeout(() => setClearChars(0), LOOP_DELAY_MS);
       return () => clearTimeout(t);
@@ -99,15 +113,30 @@ export default function TerminalTyper() {
     }
     // 6) Blank beat → advance to the next sample and restart from zero.
     const t = setTimeout(() => {
-      setScanIndex((index) => (index + 1 === SCANS.length ? 0 : index + 1));
+      setScanIndex((index) => (index + 1 === scans.length ? 0 : index + 1));
       setChars(0);
       setLines(0);
       setClearChars(null);
     }, CLEAR_BLANK_MS);
     return () => clearTimeout(t);
-  }, [mounted, chars, lines, clearChars, reduce, scanIndex]);
+  }, [mounted, chars, lines, clearChars, reduce, scanIndex, scans, rotating]);
 
-  const scan = SCANS[scanIndex];
+  const scan = scans[scanIndex] ?? scans[0];
+
+  // Report exactly what is on screen right now.
+  //
+  // The interactive host needs this because the attract output is this
+  // component's internal state, not the host's transcript. Without it the host
+  // had nothing to animate away on the first click and the window simply went
+  // blank — the visitor saw the text vanish rather than be cleared. The loop
+  // keeps running underneath; the host only needs the current lines.
+  useEffect(() => {
+    if (!onSnapshot) return;
+    const visible: string[] = [];
+    if (chars > 0) visible.push(`$ ${scan.command.slice(0, chars)}`);
+    for (const line of scan.output.slice(0, lines)) visible.push(line);
+    onSnapshot(visible);
+  }, [chars, lines, scan, onSnapshot]);
 
   // SSR + first paint + no-JS: full static text (SEO/accessible baseline).
   // After mount, the typing performance takes over from zero.
@@ -145,8 +174,12 @@ export default function TerminalTyper() {
           >
             <span className="text-accent">$ </span>
             <span className="text-slate-900 dark:text-neutral-100">{scan.command.slice(0, chars)}</span>
-            {!commandDone && (
-              <span aria-hidden="true" className="ml-0.5 inline-block h-4 w-2 bg-accent motion-safe:animate-pulse" />
+            {!commandDone && !suppressCaret && (
+              // Thin, like the native caret of the real prompt below it: the wide
+              // block this used to be duplicated that caret the moment a session
+              // started and both jumped around while typing, which read as two
+              // inputs. Same width, same accent, same blink on both sides.
+              <span aria-hidden="true" className="ml-0.5 inline-block h-4 w-[2px] bg-accent motion-safe:animate-pulse" />
             )}
           </motion.p>
         )}
@@ -173,7 +206,7 @@ export default function TerminalTyper() {
             </motion.p>
           ))}
       </AnimatePresence>
-      {done && (
+      {done && rotating && !suppressCaret && (
         <p className="truncate text-slate-700 dark:text-neutral-300">
           <span className="text-accent">$ </span>
           <AnimatePresence>
@@ -187,7 +220,10 @@ export default function TerminalTyper() {
               </motion.span>
             )}
           </AnimatePresence>
-          <span aria-hidden="true" className="ml-0.5 inline-block h-4 w-2 bg-accent motion-safe:animate-pulse" />
+          {/* Thin, not a block: see the caret on the command line above. The
+              attract caret and the live prompt's native caret are the same width
+              so the window never looks like it has two different cursors. */}
+          <span aria-hidden="true" className="ml-0.5 inline-block h-4 w-[2px] bg-accent motion-safe:animate-pulse" />
         </p>
       )}
     </div>

@@ -9,6 +9,12 @@
   the frontend, and an app that has to be created before it can take secrets.
   All four are checked here first, in under a second.
 
+  Optional source keys (SHODAN/NVD/OTX/URLSCAN/VIRUSTOTAL/LEAKLOOKUP) are read
+  from backend\.env as well, so a scan in production reports the same coverage
+  as one locally. A placeholder value is treated as unset rather than pushed,
+  which keeps a copied .env.example from turning a clean `not_configured`
+  badge into an API error.
+
   Values are resolved in this order, first hit wins:
     1. an environment variable of the same name
     2. backend\.env   (already gitignored, already holds the secret)
@@ -135,7 +141,6 @@ Write-Ok "git source: $GitRepo"
 Write-Step 'Configuration'
 $databaseUrl = Resolve-Setting -Name 'DATABASE_URL' -Prompt 'Supabase DIRECT connection string (host starts with db.)'
 $authSecret = Resolve-Setting -Name 'BETTER_AUTH_SECRET' -Secret
-$shodanKey = Resolve-Setting -Name 'SHODAN_API_KEY' -Optional
 $appUrl = Resolve-Setting -Name 'APP_URL' -Prompt 'Your Vercel origin, e.g. https://network-universal-search-agent.vercel.app'
 $corsOrigins = Resolve-Setting -Name 'CORS_ORIGINS' -Optional
 if (-not $corsOrigins) { $corsOrigins = $appUrl; Write-Note 'CORS_ORIGINS not set, using APP_URL' }
@@ -199,7 +204,8 @@ if ($DryRun) {
   Write-Host "    source    : $GitRepo (branch main, workdir $WorkDir, docker builder)"
   Write-Host "    instance  : free ($Region)"
   Write-Host "    port      : $Port -> $HealthPath"
-  Write-Host '    secrets   : DATABASE_URL, BETTER_AUTH_SECRET, SHODAN_API_KEY, CORS_ORIGINS, APP_URL'
+  Write-Host '    secrets   : DATABASE_URL, BETTER_AUTH_SECRET, CORS_ORIGINS, APP_URL'
+  Write-Host '    optional  : SHODAN/NVD/OTX/URLSCAN/VIRUSTOTAL/LEAKLOOKUP API keys, pushed only when set'
   exit 0
 }
 
@@ -215,15 +221,35 @@ $secrets = [ordered]@{
   'CORS_ORIGINS'       = $corsOrigins
   'APP_URL'            = $appUrl
 }
-if ($shodanKey) {
-  # A copied .env.example placeholder would make the Shodan source look
-  # configured and turn a clean "not configured" badge into an API error.
-  if ($shodanKey -match '^(your|replace|changeme|xxx|<)' -or $shodanKey -match '[-_]key$') {
-    Write-Note 'SHODAN_API_KEY looks like a placeholder - treating it as unset'
-    $shodanKey = ''
+# Optional source keys. Resolved the same way as the required values
+# (environment, then backend\.env, then skipped) so production reports the
+# same source coverage as a local scan. A copied .env.example placeholder is
+# rejected here for the same reason it is worth skipping Shodan for: a source
+# that looks configured but throws on every call reads as an outage, while one
+# that reports `not_configured` reads as a decision. Keys that belong to an
+# operator decision rather than a source (SERVICE_TOKEN, RATE_LIMIT_EXEMPT_SUBJECTS)
+# are deliberately NOT forwarded - see WORKFLOW.md 8.6.
+$optionalKeys = @(
+  'SHODAN_API_KEY',    # host enrichment - the one paid shared key
+  'NVD_API_KEY',       # CVE lookups; optional, raises the anonymous ceiling
+  'OTX_API_KEY',       # threat history pulses; anonymous works at 100 req/hour/IP
+  'URLSCAN_API_KEY',   # passive screenshots and search history
+  'VIRUSTOTAL_API_KEY',  # BYOK; the operator accepts VirusTotal's terms
+  'LEAKLOOKUP_API_KEY'   # 10 req/day free tier, breach counts only
+)
+foreach ($name in $optionalKeys) {
+  $value = Resolve-Setting -Name $name -Optional
+  if ($value -match '^(your|replace|changeme|xxx|<)' -or $value -match '[-_]key$') {
+    Write-Note "$name looks like a placeholder - treating it as unset"
+    $value = ''
+  }
+  if ($value) {
+    $secrets[$name] = $value
+    Write-Ok "$name forwarded"
+  } else {
+    Write-Note "$name skipped: that source reports not_configured"
   }
 }
-if ($shodanKey) { $secrets['SHODAN_API_KEY'] = $shodanKey } else { Write-Note 'SHODAN_API_KEY skipped: scans stay partial' }
 
 $existing = (& koyeb secrets list -o json 2>$null | Out-String)
 foreach ($name in $secrets.Keys) {

@@ -18,9 +18,19 @@ test("login uses lucide icons only, no CDN or remote images", () => {
   assert.ok(src.includes("lucide-react"), "lucide icons required");
 });
 
-test("login has no debug logs or dead routes", () => {
+test("login has no debug logs, and the forgot-password link is live", () => {
   assert.ok(!src.includes("console.log"), "no console.log");
-  assert.ok(!src.includes("Forgot password"), "no dead forgot-password route");
+  // This used to assert the absence of "Forgot password": there was no reset
+  // flow, so the link would have been dead. The route now exists
+  // (app/(auth)/forgot-password/page.tsx), so the guard is inverted — a link
+  // must be present AND the page it points at must exist on disk.
+  assert.ok(src.includes("Forgot password?"), "forgot-password link required");
+  assert.ok(
+    readFileSync(join(here, "..", "app", "(auth)", "forgot-password", "page.tsx"), "utf8").includes(
+      "ForgotPasswordForm",
+    ),
+    "the linked route must exist",
+  );
 });
 
 test("login accent uses the global token, no hardcoded hex", () => {

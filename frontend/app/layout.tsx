@@ -3,8 +3,9 @@ import { JetBrains_Mono, Space_Grotesk } from "next/font/google";
 import "./globals.css";
 
 export const metadata: Metadata = {
-  title: "Network Universal Search Agent",
-  description: "Secure OSINT dashboard",
+  title: "Universal Search — see what a domain exposes",
+  description:
+    "Search a domain or IP and read its open ports, subdomain names, registration details, and a risk score in one place.",
 };
 
 const grotesk = Space_Grotesk({ subsets: ["latin"], display: "swap" });

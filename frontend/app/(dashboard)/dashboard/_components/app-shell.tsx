@@ -2,7 +2,7 @@
 
 import type { ReactNode } from "react";
 import { useRouter } from "next/navigation";
-import { Bell, LogOut, Menu, Search } from "lucide-react";
+import { LogOut, Menu, Search } from "lucide-react";
 import { Avatar, AvatarFallback } from "@/components/ui/avatar";
 import { Button } from "@/components/ui/button";
 import { Sheet, SheetContent, SheetHeader, SheetTitle, SheetTrigger } from "@/components/ui/sheet";
@@ -12,6 +12,11 @@ import { authClient } from "@/lib/auth-client";
 
 // Pure shell: sidebar + sticky header + content slot. All scan sections
 // (stats, charts, tables, history) live in page.tsx so one file owns the order.
+//
+// The header used to carry a notifications bell: an icon button labelled
+// "Notifications" that had no handler, no menu and nothing to notify about. A
+// control a screen reader announces but cannot operate is worse than no control,
+// so it is gone rather than faked.
 export default function AppShell({
   target,
   children,
@@ -51,9 +56,6 @@ export default function AppShell({
           </h1>
           <Button variant="ghost" size="icon" className="shrink-0" aria-label="Search target" onClick={() => document.getElementById("target-search")?.focus()}>
             <Search size={20} strokeWidth={2} />
-          </Button>
-          <Button variant="ghost" size="icon" className="shrink-0" aria-label="Notifications">
-            <Bell size={20} strokeWidth={2} />
           </Button>
           <ThemeToggle />
           <Button variant="ghost" size="icon" className="shrink-0" aria-label="Log out" title="Log out" onClick={handleLogout}>

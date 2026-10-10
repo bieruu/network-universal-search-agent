@@ -6,6 +6,7 @@ import {
   resolveIpAddressConfig,
   resolveSignupPolicy,
 } from "./signup-gate.ts";
+import { createResetPasswordSender } from "./reset-email.ts";
 
 const databaseUrl = process.env.DATABASE_URL;
 const secret = process.env.BETTER_AUTH_SECRET;
@@ -63,6 +64,32 @@ const signupPolicy = resolveSignupPolicy();
 // unset otherwise. See the "Client-IP resolution" section of `signup-gate.ts`
 // for the full reading of the installed code and for why the three alternative
 // options are deliberately not configured.
+// Password reset delivery. The Resend client is constructed only when a key is
+// present, so an operator who has not configured mail still boots the app and
+// still gets the loud warning from `createResetPasswordSender` instead of a
+// module-load crash. `RESET_EMAIL_TIMEOUT_MS` bounds the send: Better Auth
+// awaits this callback, so a hung provider would hold the request open and
+// stall the rate limiter's bucket for every other caller.
+const resetEmailTimeoutMs = Number.parseInt(process.env.RESET_EMAIL_TIMEOUT_MS ?? "", 10);
+const resetSendTimeoutMs =
+  Number.isFinite(resetEmailTimeoutMs) && resetEmailTimeoutMs > 0 ? resetEmailTimeoutMs : 10_000;
+
+const sendResetPassword = createResetPasswordSender(process.env, {
+  send: async ({ to, from, subject, html, text }) => {
+    const { Resend } = await import("resend");
+    const client = new Resend(process.env.RESEND_API_KEY);
+    // Resend's request options take an AbortSignal, not a millisecond count, so
+    // the bound is applied with `AbortSignal.timeout`.
+    const result = await client.emails.send(
+      { to, from, subject, html, text },
+      { signal: AbortSignal.timeout(resetSendTimeoutMs) },
+    );
+    // Resend resolves with `{ error }` rather than rejecting on an API-level
+    // failure; treat both shapes as "not delivered".
+    if (result.error) throw new Error("resend rejected the send");
+  },
+});
+
 const ipAddressConfig = resolveIpAddressConfig();
 const rejectedProxyWarning = describeRejectedTrustedProxies(ipAddressConfig);
 if (rejectedProxyWarning) {
@@ -75,7 +102,14 @@ export const auth = betterAuth({
   secret,
   baseURL,
   trustedOrigins: [baseURL],
-  emailAndPassword: { enabled: true, disableSignUp: !signupPolicy.enabled },
+  emailAndPassword: {
+    enabled: true,
+    disableSignUp: !signupPolicy.enabled,
+    // Required for the reset flow at all: without it Better Auth answers
+    // `RESET_PASSWORD_DISABLED`. The sender never throws and never varies its
+    // result by account existence — see `lib/reset-email.ts`.
+    sendResetPassword,
+  },
   socialProviders,
   // `ipAddressHeaders`, `disableIpTracking` and `rateLimit.customRules` are
   // intentionally absent. Preferring a different IP header cannot break a

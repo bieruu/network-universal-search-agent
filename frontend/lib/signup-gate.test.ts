@@ -188,7 +188,11 @@ test("the open form explains an active allowlist and localises a gate rejection"
   assert.ok(form.includes("restricted = false"), "the restricted prop must default to false");
   assert.ok(form.includes("SIGNUP_RESTRICTED_BODY"), "the allowlist notice must be rendered");
   assert.ok(form.includes("describeSignUpError"), "gate rejections must be mapped to clear copy");
-  assert.ok(form.includes("Ask an administrator for access."), "user-friendly rejection copy required");
+  // The mapper's rejection copy now lives in `lib/auth-errors.ts` (it is shared
+  // and unit-tested there); assert it is imported AND routed through, rather
+  // than pinning the wording here.
+  assert.ok(form.includes('from "@/lib/auth-errors"'), "the shared error mapper must be imported");
+  assert.ok(form.includes("describeSignUpError(result.error)"), "rejections must be mapped, not rendered raw");
   // The client must never read the allowlist itself: the form is a client
   // component, so resolving the policy there risks bundling operators' email
   // addresses into the browser payload. It only receives a boolean.

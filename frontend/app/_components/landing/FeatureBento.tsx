@@ -6,32 +6,32 @@ import Reveal from "./Reveal";
 const CELLS = [
   {
     icon: HardDrives,
-    title: "Open ports & banners",
-    body: "Shodan host data mapped to port, product, version. Banners truncated, rendered as plain text.",
+    title: "See what is open, and what is running",
+    body: "Every open port with the product and version answering on it. Nothing is probed to find out — the answers come from data the internet already publishes.",
     visual: "grid" as const,
   },
   {
     icon: Certificate,
-    title: "Subdomains from crt.sh",
-    body: "Certificate transparency deduped and capped. Flaky source degrades to partial, never a crash.",
+    title: "Names nobody put on a page",
+    body: "Machine names under your domain, taken from the public certificate log. If that log is slow, the rest of the result still arrives and says what is missing.",
     visual: "none" as const,
   },
   {
     icon: Database,
-    title: "WHOIS & domain age",
-    body: "Registrar, creation and expiry, name servers. GDPR-redacted emails shown as redacted.",
+    title: "Who holds the domain, and since when",
+    body: "The public WHOIS registration record: the company holding the domain, when it was created, when it expires, and which nameservers answer for it.",
     visual: "none" as const,
   },
   {
     icon: TrendUp,
-    title: "Risk trend per target",
-    body: "Transparent heuristic v1 scored on every scan. Last 10 scans charted, snapshots immutable.",
+    title: "Know where to look first",
+    body: "Each search gets a 0 to 100 risk score, and your last ten searches for the same target are charted so you can see a host getting worse, not just one bad afternoon.",
     visual: "metrics" as const,
   },
   {
     icon: LockKey,
-    title: "Auth & audit trail",
-    body: "Session-gated scans, per-user rate limits, every scan logged with request ID.",
+    title: "Only you can see your searches",
+    body: "Sign-in required, nobody outside your account can read your history, and every search you run is written down so you can prove what was looked up and when.",
     visual: "tint" as const,
   },
 ];
@@ -42,8 +42,10 @@ function Visual({ kind }: { kind: (typeof CELLS)[number]["visual"] }) {
   if (kind === "tint")
     return (
       <div aria-hidden="true" className="mt-4 rounded-xl border border-accent/25 bg-accent/5 p-3 font-mono text-xs text-slate-700 dark:text-neutral-300">
-        <p>POST /api/v1/scan → 401 without session</p>
-        <p className="mt-1 text-slate-600 dark:text-neutral-500">GET /history → 200 · paginated</p>
+        <p>Your search history</p>
+        <p className="mt-1 text-slate-600 dark:text-neutral-500">
+          Every search you run, newest first
+        </p>
       </div>
     );
   return null;
@@ -54,10 +56,10 @@ export default function FeatureBento() {
     <section id="sources" className="mx-auto max-w-7xl px-4 py-16 sm:px-6 md:py-24">
       <Reveal>
         <h2 className="max-w-[20ch] text-3xl font-bold tracking-tighter text-slate-900 dark:text-neutral-50 md:text-4xl">
-          Three sources, one triage view
+          Everything about one domain, in one place
         </h2>
         <p className="mt-3 max-w-[65ch] text-slate-600 dark:text-neutral-400">
-          Each source runs with its own timeout. One fails, the scan still lands as partial.
+          If one of those places is slow or unreachable, you still get the rest — and the result tells you plainly what it could not check, so a gap is never mistaken for good news.
         </p>
       </Reveal>
       <div className="mt-10 grid gap-4 sm:grid-cols-2 lg:grid-cols-3">

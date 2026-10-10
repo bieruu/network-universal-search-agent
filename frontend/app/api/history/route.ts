@@ -1,4 +1,5 @@
 import { NextRequest, NextResponse } from "next/server";
+import { messageForStatus } from "@/lib/user-errors";
 
 const BACKEND = process.env.BACKEND_URL ?? "http://localhost:8000";
 
@@ -15,6 +16,11 @@ export async function GET(req: NextRequest) {
       headers: { "content-type": "application/json" },
     });
   } catch {
-    return NextResponse.json({ items: [], total: 0 }, { status: 502 });
+    // Never fabricate `{items: [], total: 0}` here. An empty list means "this
+    // account has no scans"; returning that shape for a failed request makes a
+    // dead backend indistinguishable from a new account, and the dashboard
+    // renders it as the friendly "No scans yet" empty state. Propagate a real
+    // failure instead — `lib/api.ts` maps the status to a sentence the UI shows.
+    return NextResponse.json({ error: messageForStatus(502) }, { status: 502 });
   }
 }

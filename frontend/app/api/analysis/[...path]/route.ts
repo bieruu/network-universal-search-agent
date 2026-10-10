@@ -35,7 +35,7 @@ async function proxy(req: NextRequest, path: string[], body?: string) {
       headers: { "content-type": res.headers.get("content-type") ?? "application/json" },
     });
   } catch {
-    return NextResponse.json({ detail: "Backend unreachable" }, { status: 502 });
+    return NextResponse.json({ detail: "The search service did not respond." }, { status: 502 });
   }
 }
 

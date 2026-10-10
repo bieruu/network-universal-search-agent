@@ -191,7 +191,15 @@ test("lookupPhone normalizes the envelope it gets back", async () => {
   }
 });
 
-// --- failures are typed and carry the backend's own detail -------------------
+// --- failures are typed and say what a user can do ---------------------------
+//
+// These assertions used to require the backend's own `detail` to reach the UI
+// verbatim. The copy audit (2026-10-10) reversed that on purpose: `detail`
+// carries raw FastAPI validation arrays and provider exception prose, which is
+// untrusted (AGENTS.md §5.4) and unreadable. The message is now mapped from the
+// status; the upstream text survives on `technicalDetail` for the console.
+// The regression these tests must keep locked is that NEITHER string leaks into
+// the user-facing `detail`.
 
 test("an expired session reads as a sign-in problem, not a crash", async () => {
   const stub = withFetch(() => json({ detail: "Not authenticated" }, 401));
@@ -199,7 +207,8 @@ test("an expired session reads as a sign-in problem, not a crash", async () => {
     await assert.rejects(() => runAnalysis("dns", { target: "example.com" }), (err: unknown) => {
       assert.ok(err instanceof AnalysisError);
       assert.equal(err.status, 401);
-      assert.equal(err.detail, "Unauthorized — please sign in again.");
+      assert.match(err.detail, /session/i);
+      assert.match(err.detail, /sign in/i);
       return true;
     });
   } finally {
@@ -207,13 +216,14 @@ test("an expired session reads as a sign-in problem, not a crash", async () => {
   }
 });
 
-test("a rate limit is reported as a rate limit", async () => {
+test("a rate limit names the limit and a retry horizon, never 'try again later'", async () => {
   const stub = withFetch(() => json({ detail: "Rate limit exceeded" }, 429));
   try {
     await assert.rejects(() => runAnalysis("headers", { url: "https://example.com" }), (err: unknown) => {
       assert.ok(err instanceof AnalysisError);
       assert.equal(err.status, 429);
-      assert.equal(err.detail, "Rate limited — try again later.");
+      assert.match(err.detail, /limit/i);
+      assert.ok(!/try again later/i.test(err.detail), err.detail);
       return true;
     });
   } finally {
@@ -221,13 +231,18 @@ test("a rate limit is reported as a rate limit", async () => {
   }
 });
 
-test("the proxy's 502 surfaces its own detail rather than a restatement", async () => {
+test("the proxy's 502 is not restated as its own plumbing detail", async () => {
   const stub = withFetch(() => json({ detail: "Backend unreachable" }, 502));
   try {
     await assert.rejects(() => runAnalysis("dns", { target: "example.com" }), (err: unknown) => {
       assert.ok(err instanceof AnalysisError);
       assert.equal(err.status, 502);
-      assert.equal(err.detail, "Backend unreachable");
+      // "Backend unreachable" is infrastructure vocabulary: it names the hop,
+      // not what the reader should do.
+      assert.ok(!err.detail.toLowerCase().includes("backend"), err.detail);
+      assert.ok(!/\b50\d\b/.test(err.detail), err.detail);
+      // ...but the evidence survives for the console.
+      assert.match(String(err.technicalDetail), /Backend unreachable/);
       return true;
     });
   } finally {
@@ -235,14 +250,15 @@ test("the proxy's 502 surfaces its own detail rather than a restatement", async 
   }
 });
 
-test("a caller mistake keeps the backend's detail (blocked target, bad input)", async () => {
+test("a caller mistake maps to actionable copy, not the upstream reason", async () => {
   for (const status of [400, 413, 422]) {
     const stub = withFetch(() => json({ detail: "Target resolves to a blocked address" }, status));
     try {
       await assert.rejects(() => runAnalysis("headers", { url: "http://169.254.169.254" }), (err: unknown) => {
         assert.ok(err instanceof AnalysisError);
         assert.equal(err.status, status);
-        assert.equal(err.detail, "Target resolves to a blocked address");
+        assert.ok(!err.detail.includes("169.254"), err.detail);
+        assert.ok(!/blocked address/i.test(err.detail), err.detail);
         return true;
       });
     } finally {
@@ -251,14 +267,16 @@ test("a caller mistake keeps the backend's detail (blocked target, bad input)", 
   }
 });
 
-test("a FastAPI validation list is still shown, bounded", async () => {
+test("a FastAPI validation list never reaches the message, but is kept for logs", async () => {
   const detail = [{ loc: ["body", "target"], msg: "too short" }];
   const stub = withFetch(() => json({ detail }, 422));
   try {
     await assert.rejects(() => runAnalysis("dns", { target: "" }), (err: unknown) => {
       assert.ok(err instanceof AnalysisError);
-      assert.ok(err.detail.includes("too short"));
+      assert.ok(!err.detail.includes("too short"), err.detail);
+      assert.ok(!err.detail.includes("loc"), err.detail);
       assert.ok(err.detail.length <= 301);
+      assert.match(String(err.technicalDetail), /too short/);
       return true;
     });
   } finally {
@@ -278,9 +296,9 @@ test("an unparseable body is a clear error, not a JSON syntax error", async () =
     await assert.rejects(() => runAnalysis("sitemap", { url: "https://example.com" }), (err: unknown) => {
       assert.ok(err instanceof AnalysisError);
       assert.equal(err.status, 502);
-      assert.match(err.detail, /502/);
       // The page is untrusted third-party text and is never rendered back.
       assert.ok(!err.detail.includes("<html>"), err.detail);
+      assert.ok(!err.detail.includes("502"), err.detail);
       return true;
     });
   } finally {
@@ -293,7 +311,7 @@ test("a 200 with an empty body is an error too, not a hang or a parse crash", as
   try {
     await assert.rejects(() => runAnalysis("dns", { target: "example.com" }), (err: unknown) => {
       assert.ok(err instanceof AnalysisError);
-      assert.match(err.detail, /empty body/);
+      assert.match(err.detail, /unexpected reply/i);
       return true;
     });
   } finally {
@@ -309,7 +327,9 @@ test("a transport failure never escapes as a raw fetch TypeError", async () => {
     await assert.rejects(() => runAnalysis("dns", { target: "example.com" }), (err: unknown) => {
       assert.ok(err instanceof AnalysisError);
       assert.equal(err.status, 0);
-      assert.equal(err.detail, "Could not reach the analysis proxy");
+      // "proxy" names the hop, not the reader's problem or their next action.
+      assert.ok(!err.detail.includes("proxy"), err.detail);
+      assert.match(err.detail, /check your connection/i);
       return true;
     });
   } finally {
@@ -411,7 +431,14 @@ test("the proxy forwards the session and never a backend URL to the client", () 
     analysisRouteSrc.includes("path.map(encodeAnalysisSegment)"),
     "every path segment must be encoded individually (a phone number is a segment)",
   );
-  assert.ok(analysisRouteSrc.includes('{ detail: "Backend unreachable" }'), "transport failure must be a 502 with a detail");
+  assert.ok(
+    analysisRouteSrc.includes('{ detail: "The search service did not respond." }'),
+    "transport failure must be a 502 with an honest detail, not plumbing vocabulary",
+  );
+  assert.ok(
+    !analysisRouteSrc.includes("Backend unreachable"),
+    'the detail must not read as "Backend unreachable" — it names plumbing the user cannot act on',
+  );
   assert.ok(analysisRouteSrc.includes("status: 502"));
   // Both verbs are needed: phone and capabilities are GETs, the rest are POSTs.
   assert.match(analysisRouteSrc, /export async function GET/);

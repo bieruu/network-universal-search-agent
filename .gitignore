@@ -13,3 +13,4 @@ dist/
 .ruff_cache
 .pytest_cache/
 .tmp-pytest/
+*.log

@@ -5,17 +5,17 @@ const STEPS = [
   {
     n: "01",
     title: "Sign in",
-    body: "Session cookie gates the dashboard and every scan endpoint. No session, no data.",
+    body: "Your account is the key. Nobody who is not signed in to it can see your searches, your targets, or your results.",
   },
   {
     n: "02",
     title: "Scan a target",
-    body: "Type a domain or IPv4. Private ranges and localhost are blocked before anything runs.",
+    body: "Enter a domain or a public IP address. Addresses that only exist inside a network are refused, because there is nothing public to look up.",
   },
   {
     n: "03",
-    title: "Triage the result",
-    body: "Cards, tables, and charts fill per source. Snapshots persist in history, immutable.",
+    title: "Read the result",
+    body: "Results arrive as cards, tables and charts, and every search you have run stays in your history so you can reopen it or compare it against a later one.",
   },
 ];
 
@@ -27,7 +27,7 @@ export default function HowItWorks() {
           <Reveal>
             <p className="font-mono text-xs tracking-widest text-accent">HOW IT WORKS</p>
             <h2 className="mt-3 text-3xl font-bold tracking-tighter text-slate-900 dark:text-neutral-50 md:text-4xl">
-              From target to triage fast
+              Three steps to a full picture
             </h2>
           </Reveal>
           <ol className="mt-8 space-y-0">
@@ -49,13 +49,13 @@ export default function HowItWorks() {
         <Reveal delay={0.1} className="relative min-h-72 overflow-hidden rounded-2xl border border-neutral-200 bg-gradient-to-br from-accent/10 via-slate-100 to-slate-200 p-5 dark:border-neutral-800 dark:from-accent/10 dark:via-neutral-900 dark:to-[#101923]">
           <div className="flex h-full flex-col justify-between">
             <div className="flex items-center justify-between text-[10px] uppercase tracking-[0.2em] text-slate-500 dark:text-neutral-400">
-              <span>ops</span>
+              <span>your target</span>
               <span className="flex items-center gap-1.5">
                 <span aria-hidden="true" className="relative inline-flex h-1.5 w-1.5">
                   <span className="h-full w-full rounded-full bg-accent motion-safe:animate-blip" />
                   <span className="absolute inset-0 rounded-full bg-accent motion-safe:animate-[ping_1.8s_ease-out_infinite]" />
                 </span>
-                live
+                updating
               </span>
             </div>
             <div className="mt-6 grid gap-2">
@@ -65,8 +65,8 @@ export default function HowItWorks() {
             </div>
             <div className="mt-8 space-y-3 rounded-xl border border-neutral-200 bg-white/70 p-3 shadow-xs dark:border-neutral-800 dark:bg-neutral-900/80">
               <div className="flex items-center justify-between text-xs text-slate-600 dark:text-neutral-400">
-                <span>risk signal</span>
-                <span className="font-mono text-accent">heuristic</span>
+                <span>Risk score</span>
+                <span className="font-mono text-accent">0 to 100</span>
               </div>
               <div className="h-2 overflow-hidden rounded-full bg-slate-200 dark:bg-neutral-800">
                 <RiskMeter />

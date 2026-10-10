@@ -20,6 +20,8 @@
 /** Where the proxy lives. Relative on purpose — see the note above. */
 export const ANALYSIS_PROXY_PREFIX = "/api/analysis";
 
+import { extractTechnicalDetail, messageForStatus } from "./user-errors.ts";
+
 export type AnalysisCapability =
   | "headers"
   | "redirects"
@@ -76,29 +78,33 @@ export interface AnalysisCapabilities {
 /**
  * An analysis call that did not produce a response envelope.
  *
- * `detail` is the backend's own `detail` field when it sent one (including the
- * proxy's `{"detail": "Backend unreachable"}`), so the message a user reads is
- * the reason the server gave rather than a restatement of a status code.
+ * `detail` is the sentence a user reads, mapped from the status via
+ * `messageForStatus`. It is intentionally NOT the backend's own `detail` field:
+ * that field carries raw FastAPI validation arrays and provider exception
+ * prose, which is untrusted and unreadable (AGENTS.md §5.4). It is preserved
+ * on `technicalDetail` for the console, so a bug report still carries evidence.
  * `status` is 0 when no HTTP response was received at all.
  */
 export class AnalysisError extends Error {
   readonly status: number;
   readonly detail: string;
+  /** Raw upstream text. Never render this — log it. */
+  readonly technicalDetail: string | undefined;
 
-  constructor(detail: string, status = 0) {
+  constructor(detail: string, status = 0, technicalDetail?: string) {
     super(detail);
     this.name = "AnalysisError";
     this.detail = detail;
     this.status = status;
+    this.technicalDetail = technicalDetail;
   }
 }
 
-/** Error text is rendered in a badge, so it is bounded like any external string. */
-const DETAIL_MAX = 300;
-
-function truncate(text: string): string {
-  return text.length > DETAIL_MAX ? `${text.slice(0, DETAIL_MAX)}…` : text;
-}
+/**
+ * Error text rendered in a badge comes from `messageForStatus` (fixed-length,
+ * authored strings), so it no longer needs runtime truncation. Upstream text
+ * is still bounded, but on `UserFacingError.technicalDetail` in user-errors.ts.
+ */
 
 function isRecord(value: unknown): value is Record<string, unknown> {
   return typeof value === "object" && value !== null && !Array.isArray(value);
@@ -143,25 +149,13 @@ export function analysisProxyPath(capability: string, rest: string[] = []): stri
   return `${ANALYSIS_PROXY_PREFIX}/${[capability, ...rest].map(encodeAnalysisSegment).join("/")}`;
 }
 
-function detailFrom(status: number, payload: unknown, contentType: string | null): string {
-  // These two are the frontend's own session/rate-limit story and are phrased
-  // for a signed-in user, the same wording lib/api.ts uses.
-  if (status === 401) return "Unauthorized — please sign in again.";
-  if (status === 429) return "Rate limited — try again later.";
-
-  // FastAPI's error shape is `{"detail": string}`; validation errors make it a
-  // list of objects, which is still worth showing.
-  if (isRecord(payload) && payload["detail"] !== undefined) {
-    const detail = payload["detail"];
-    const text = typeof detail === "string" ? detail : JSON.stringify(detail);
-    if (text) return truncate(text);
-  }
-
-  // A body we cannot read is described, never echoed. The text could be an
-  // HTML error page from something in front of the proxy, and this string is
-  // rendered into the UI.
-  const kind = contentType && contentType.includes("json") ? "" : ` (non-JSON, ${contentType ?? "no content-type"})`;
-  return `Request failed (${status})${kind}`;
+function detailFrom(status: number): string {
+  // Never echo the upstream body into the UI: FastAPI validation errors arrive
+  // as a JSON array of {loc,msg,type} objects and provider exceptions arrive as
+  // prose. Both are untrusted (AGENTS.md §5.4) and neither is written for a
+  // human. The message is mapped from the status alone; the upstream text rides
+  // along on the thrown error's `technicalDetail` for the console.
+  return messageForStatus(status);
 }
 
 /**
@@ -176,7 +170,7 @@ async function request<T>(url: string, init: RequestInit): Promise<T> {
     // No HTTP response at all: the request never reached the proxy. The
     // proxy's own failure mode is different and much better — it answers 502
     // with `{"detail": "Backend unreachable"}`, which lands below.
-    throw new AnalysisError("Could not reach the analysis proxy");
+    throw new AnalysisError("We could not reach the server. Check your connection and try again.");
   }
 
   const text = await res.text();
@@ -192,11 +186,15 @@ async function request<T>(url: string, init: RequestInit): Promise<T> {
   }
 
   if (!res.ok) {
-    throw new AnalysisError(detailFrom(res.status, json ? parsed : null, res.headers.get("content-type")), res.status);
+    throw new AnalysisError(
+      detailFrom(res.status),
+      res.status,
+      json ? extractTechnicalDetail(parsed) : undefined,
+    );
   }
   if (!json) {
     throw new AnalysisError(
-      `Unexpected response from the analysis proxy (HTTP ${res.status}, ${text ? "not JSON" : "empty body"})`,
+      "We received an unexpected reply from the server. Try again in a moment.",
       res.status,
     );
   }

@@ -47,16 +47,24 @@ export function getCveEvidence(results: ScanResult["results"] | null | undefined
 
   if (!nvd || status === undefined) {
     if (ids.length > 0) {
-      return { ids, count: ids.length, status: "source_only", hint: "source IDs only · NVD not checked" };
+      return {
+        ids,
+        count: ids.length,
+        status: "source_only",
+        hint: "Identifiers only — not checked against the vulnerability database",
+      };
     }
-    return { ids, count: null, status: "none", hint: "no CVE evidence" };
+    return { ids, count: null, status: "none", hint: "Nothing to show yet" };
   }
   if (status === "unavailable") {
     return {
       ids,
       count: ids.length > 0 ? ids.length : null,
       status,
-      hint: ids.length > 0 ? "partial evidence · NVD unavailable" : "NVD unavailable — not 0",
+      hint:
+        ids.length > 0
+          ? "Partial evidence — the vulnerability database did not answer"
+          : "Not checked — the vulnerability database did not answer, so this is unknown rather than none",
     };
   }
   if (status === "insufficient_evidence") {
@@ -64,12 +72,15 @@ export function getCveEvidence(results: ScanResult["results"] | null | undefined
       ids,
       count: ids.length > 0 ? ids.length : null,
       status,
-      hint: ids.length > 0 ? "source IDs only · no CPE to verify" : "no CPE to check — not 0",
+      hint:
+        ids.length > 0
+          ? "Identifiers only — no exact product version was detected to verify them against"
+          : "Not checked — no exact product version was detected, so coverage is unknown rather than none",
     };
   }
   if (status === "no_match") {
-    return { ids, count: ids.length, status, hint: "no NVD match for observed CPEs" };
+    return { ids, count: ids.length, status, hint: "Checked — nothing in the catalogue for this product and version" };
   }
-  return { ids, count: ids.length, status: "found", hint: "exact-CPE NVD matches" };
+  return { ids, count: ids.length, status: "found", hint: "Matched on the exact product and version running here" };
 }
 

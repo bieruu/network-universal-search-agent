@@ -30,7 +30,11 @@ test("dashboard stats come from the active scan, no fake deltas", () => {
 
 test("dashboard shell is a pure shell; page owns the section order", () => {
   assert.ok(sidebar.includes("/dashboard"), "sidebar needs Dashboard nav");
-  assert.ok(sidebar.includes("Sources"), "sidebar needs Sources section");
+  assert.ok(
+    sidebar.includes("Where the data comes from"),
+    "sidebar source block must read as provenance, not as a logo wall",
+  );
+  assert.ok(sidebar.includes("provenance"), "each source must say what it contributes");
   assert.ok(sidebar.includes("min-w-0") || shell.includes("min-w-0"), "min-w-0 flex fix required");
   assert.ok(shell.includes("sticky"), "header must be sticky");
   assert.ok(shell.includes("h-16"), "header must be h-16");
@@ -110,4 +114,30 @@ test("charts resolve colors from the global tokens", () => {
     assert.ok(src.includes("chartPalette"), `${f} must use token-driven chart colors`);
     assert.ok(!src.includes("#"), `${f} must not hardcode hex colors`);
   }
+});
+
+test("a failed history or trend request never reads as an empty account", () => {
+  // The most misleading bug in the copy audit: both routes caught a transport
+  // failure and answered with an empty-but-well-formed collection and HTTP 502.
+  // The history list rendered that as "No scans yet" and the trend chart
+  // swallowed it entirely, so a dead backend looked exactly like a new user.
+  const historyRoute = readFileSync(join(here, "..", "app", "api", "history", "route.ts"), "utf8");
+  const trendRoute = readFileSync(join(here, "..", "app", "api", "trend", "[target]", "route.ts"), "utf8");
+
+  for (const [name, src] of [["history", historyRoute], ["trend", trendRoute]] as const) {
+    assert.ok(
+      !src.includes("json({ items: []") && !src.includes("json({ points: []"),
+      `${name} route must not fabricate an empty collection on failure`,
+    );
+    assert.ok(src.includes("messageForStatus(502)"), `${name} route must return a readable failure message`);
+  }
+
+  // The UI has to be able to tell the two apart, which means the trend chart
+  // must stop discarding the rejection it used to catch and ignore.
+  const trendInner = readFileSync(
+    join(here, "..", "app", "(dashboard)", "dashboard", "_components", "RiskTrendChartInner.tsx"),
+    "utf8",
+  );
+  assert.ok(trendInner.includes("setError"), "trend chart must track and render a load failure");
+  assert.ok(!trendInner.includes(".catch(() => {})"), "trend chart must not swallow its own failure");
 });

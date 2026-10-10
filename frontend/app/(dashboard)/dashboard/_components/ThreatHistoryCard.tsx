@@ -5,12 +5,14 @@ import { Skeleton } from "@/components/ui/skeleton";
 import { Table, THead, TRow, TH, TD } from "@/components/ui/table";
 import {
   SAFETY_CAVEAT,
+  columnHeading,
   headlineBadge,
   parseThreatHistory,
   statusBadge,
   type HistoryRow,
   type HistorySource,
 } from "@/lib/threat-history-shape";
+import { sourceFailureCount } from "@/lib/scan-status";
 
 /**
  * Threat-intelligence history, shown only when the orchestrator ran the fallback
@@ -45,7 +47,7 @@ export function ThreatHistoryCard({
       <Card className="flex flex-col">
         <CardHeader>
           <CardTitle>Threat &amp; incident history</CardTitle>
-          <CardDescription>Threat intelligence records</CardDescription>
+          <CardDescription>Past incidents and threat activity recorded for this target.</CardDescription>
         </CardHeader>
         <CardContent>
           <Skeleton className="h-24" />
@@ -65,21 +67,16 @@ export function ThreatHistoryCard({
       <CardHeader>
         <CardTitle>Threat &amp; incident history</CardTitle>
         <CardDescription>
-          {parsed.source}
           {summary.findingCount > 0
-            ? ` · ${summary.findingCount.toLocaleString("en-US")} record${summary.findingCount === 1 ? "" : "s"}`
-            : ""}
+            ? `${summary.findingCount.toLocaleString("en-US")} ${summary.findingCount === 1 ? "record" : "records"} across the sources below, for this target.`
+            : "Past incidents and threat activity recorded for this target."}
         </CardDescription>
       </CardHeader>
       <CardContent>
         <div className="flex flex-col gap-4">
-          {parsed.triggerReason && (
-            <p className="text-sm">
-              <span className="text-slate-500 dark:text-neutral-500">Why this ran: </span>
-              {parsed.triggerReason}
-            </p>
-          )}
-
+          {/* `triggerReason` is deliberately not rendered: it is an internal
+              reason code describing why this fallback ran, which means nothing
+              to a reader and exposes how the search is put together. */}
           <div className="flex flex-col gap-1">
             <div className="flex flex-wrap items-center gap-2">
               <Badge variant={headline.variant}>{headline.text}</Badge>
@@ -95,11 +92,10 @@ export function ThreatHistoryCard({
 
           {parsed.errors.length > 0 && (
             <div className="flex flex-col gap-1.5">
-              {parsed.errors.map((e) => (
-                <Badge key={`${e.source}-${e.message}`} variant="destructive">
-                  {e.source}: {e.message}
-                </Badge>
-              ))}
+              <p className="text-xs text-warning">{sourceFailureCount(parsed.errors.length)}</p>
+              <p className="text-xs opacity-60">
+                Treat the sources above as partial coverage — a gap here is not a clean result.
+              </p>
             </div>
           )}
         </div>
@@ -110,23 +106,29 @@ export function ThreatHistoryCard({
 
 function SourceSection({ source }: { source: HistorySource }) {
   const badge = statusBadge(source.outcome);
-  const headers = source.rows[0]?.cells.map((c) => c.label) ?? [];
+  const headers = (source.rows[0]?.cells ?? []).map((c) => columnHeading(c.label));
   return (
     <section className="flex flex-col gap-1.5" aria-label={source.label}>
       <div className="flex flex-wrap items-center gap-2">
         <h3 className="text-sm font-medium">{source.label}</h3>
         <Badge variant={badge.variant}>{badge.text}</Badge>
         {source.windowDays !== null && (
-          <span className="text-xs text-slate-500 dark:text-neutral-500">{source.windowDays}-day window</span>
+          <span className="text-xs text-slate-500 dark:text-neutral-500">
+            From the last {source.windowDays} days
+          </span>
         )}
         {source.total !== null && source.total > source.rows.length && (
           <span className="text-xs text-slate-500 dark:text-neutral-500">
-            {source.total.toLocaleString("en-US")} reported
+            {source.total.toLocaleString("en-US")} recorded in total
           </span>
         )}
       </div>
       <p className="text-sm text-slate-500 dark:text-neutral-500">{source.message}</p>
-      {source.note && <p className="text-xs opacity-60">{source.note}</p>}
+      {/*
+        `source.note` is the source's own diagnostic ("HTTP 429 from …"). It stays
+        on the parsed object for the console but is not shown: it is provider
+        plumbing, and `message` above already says what it means for the result.
+      */}
       {source.screenshotUrl && (
         <a
           href={source.screenshotUrl}
@@ -134,7 +136,7 @@ function SourceSection({ source }: { source: HistorySource }) {
           rel="noreferrer noopener"
           className="text-xs text-accent hover:underline"
         >
-          Latest public urlscan.io screenshot
+          See the most recent archived view of this page (urlscan.io)
         </a>
       )}
       {source.rows.length > 0 && (
@@ -143,7 +145,9 @@ function SourceSection({ source }: { source: HistorySource }) {
             <THead>
               <TRow>
                 {headers.map((h) => (
-                  <TH key={h}>{h}</TH>
+                  <TH key={h.label} title={h.title || undefined}>
+                    {h.label}
+                  </TH>
                 ))}
               </TRow>
             </THead>

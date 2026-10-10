@@ -6,6 +6,7 @@ import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
 import { Skeleton } from "@/components/ui/skeleton";
 import { fetchScan, pollScan, startScan, type ScanResult } from "@/lib/api";
+import { scanStatusLabel, sourceFailureCount } from "@/lib/scan-status";
 import { latestFindings, statsFromScan } from "@/components/ui/app-1-utils/app-1-data";
 import TargetSearch from "./_components/TargetSearch";
 import ScanStatus from "./_components/ScanStatus";
@@ -20,6 +21,25 @@ import HistoryList from "./_components/HistoryList";
 import AppShell from "./_components/app-shell";
 
 const STAT_ICONS = { ports: Network, services: Server, vulns: Bug, subs: Globe } as const;
+
+/**
+ * `errors[]` reaches the browser as `{source, message}` straight from the
+ * providers — "shodan: timeout". Those badges told the analyst nothing they
+ * could act on and handed them an exception string from a third party. We name
+ * the source in words and say what the gap means for their results; the detail
+ * stays in the console.
+ */
+const SOURCE_NAMES: Record<string, string> = {
+  shodan: "Internet scan data (Shodan)",
+  crtsh: "Certificate logs (crt.sh)",
+  whois: "Domain registration records",
+  nvd: "The vulnerability database (NVD)",
+};
+
+function sourceName(id: string): string {
+  const key = id.toLowerCase();
+  return SOURCE_NAMES[key] ?? "A data source";
+}
 
 export default function DashboardPage() {
   const [scan, setScan] = useState<ScanResult | null>(null);
@@ -36,7 +56,11 @@ export default function DashboardPage() {
       const done = await pollScan(scan_id, { onUpdate: setScan });
       setScan(done);
     } catch (e: unknown) {
-      setError(e instanceof Error ? e.message : "Scan failed");
+      setError(
+        e instanceof Error && e.message
+          ? e.message
+          : "We could not start that search. Check the target and try again.",
+      );
     } finally {
       setLoading(false);
     }
@@ -50,7 +74,11 @@ export default function DashboardPage() {
       setScan(s);
       setTarget(s.target);
     } catch (e: unknown) {
-      setError(e instanceof Error ? e.message : "Failed to load scan");
+      setError(
+        e instanceof Error && e.message
+          ? e.message
+          : "We could not open that saved scan. It may have been removed — try again in a moment.",
+      );
     } finally {
       setLoading(false);
     }
@@ -68,7 +96,9 @@ export default function DashboardPage() {
           <div className="flex items-center justify-between gap-2">
             <div>
               <CardTitle>New scan</CardTitle>
-              <CardDescription>Passive sources only — Shodan, crt.sh, WHOIS</CardDescription>
+              <CardDescription>
+                Reads public sources only — nothing is sent to the target and nothing on it is touched.
+              </CardDescription>
             </div>
             {target && (
               <Button variant="outline" disabled={loading} onClick={() => run(target, true)}>
@@ -88,15 +118,19 @@ export default function DashboardPage() {
             </div>
           )}
           {sourceErrors.length > 0 && (
-            <ul className="mt-2 flex flex-col gap-1.5" aria-label="source errors">
-              {sourceErrors.map((e) => (
-                <li key={e.source}>
-                  <Badge variant="destructive">
-                    {e.source}: {e.message}
-                  </Badge>
-                </li>
-              ))}
-            </ul>
+            <div className="mt-2 flex flex-col gap-1.5">
+              <p className="text-xs text-warning">{sourceFailureCount(sourceErrors.length)}</p>
+              <ul className="flex flex-wrap gap-1.5" aria-label="sources that did not answer">
+                {sourceErrors.map((e, i) => (
+                  <li key={`${e.source}-${i}`}>
+                    <Badge variant="outline">{sourceName(e.source)}</Badge>
+                  </li>
+                ))}
+              </ul>
+              <p className="text-xs opacity-60">
+                Anything missing below was not checked, not confirmed absent. Run the scan again to retry.
+              </p>
+            </div>
           )}
         </CardContent>
       </Card>
@@ -154,7 +188,11 @@ export default function DashboardPage() {
         <Card className="flex flex-col">
           <CardHeader>
             <CardTitle>Latest findings</CardTitle>
-            <CardDescription>{scan ? `${scan.target} · ${scan.status}` : "From the active scan"}</CardDescription>
+            <CardDescription>
+            {scan
+              ? `${scan.target} · ${scanStatusLabel(scan.status)}`
+              : "Once you scan a target, its headline findings appear here."}
+          </CardDescription>
           </CardHeader>
           <CardContent>
             {!scan ? (

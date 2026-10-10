@@ -80,6 +80,13 @@ SIGNUP_ENABLED=
 # Optional allowlist: user@example.com, @example.com, *@example.com, or the bare
 # example.com (whole domain). Empty = any email may register.
 SIGNUP_EMAIL_ALLOWLIST=
+# Password reset (forgot-password -> reset-password). All optional; with no
+# RESEND_API_KEY the app boots and the flow still answers identically for every
+# address, it just cannot send anything (one operator warning per process).
+# RESEND_API_KEY is a SECRET — env only, never NEXT_PUBLIC_*, never committed.
+RESEND_API_KEY=
+AUTH_FROM_EMAIL=Universal Search <noreply@your-domain.com>
+RESET_EMAIL_TIMEOUT_MS=10000
 ```
 
 `backend/.env`:
@@ -157,6 +164,8 @@ On Windows, `.\dev.ps1` starts the backend and frontend and opens `/sign-up`. Th
 
 Create an account at `http://localhost:3000/sign-up`, then sign in at `/sign-in`. After sign-in, open `/dashboard` and scan a public domain such as `example.com`. Use the dashboard Log out control to revoke the session.
 
+Password reset lives at `/forgot-password` and `/reset-password`. Without `RESEND_API_KEY` both pages still work end to end and the server logs one warning saying no email is sent — the flow cannot actually deliver a link until the key is set (see the env block in §3).
+
 Browser API requests go through the Next proxy (`/api/scan/*`) to FastAPI. Do not call Shodan or CT services from the browser.
 
 ## 5. OAuth provider setup
@@ -221,7 +230,7 @@ Target topology: frontend on Vercel, FastAPI in a container on Koyeb (see §8.6)
 - **No `regions`.** Nothing in the repo fixes where Postgres or the backend container runs, so pinning a function region would be a guess. Keep Vercel's default and revisit once the database region is decided — ideally the functions run adjacent to the database.
 - **No comments.** `vercel.json` is parsed as strict JSON by the Vercel CLI, so `//` comments make the file unparseable and break the deployment. This note lives here instead.
 
-Production environment variables are set in the **Vercel project settings** (Settings → Environment Variables) — never in this file, never in `NEXT_PUBLIC_*`, never in git: `BETTER_AUTH_URL`, `BETTER_AUTH_SECRET` (≥32 chars, identical to the backend value), `DATABASE_URL` (pooled Postgres endpoint, see §8.1), `NEXT_PUBLIC_APP_URL`, `NEXT_PUBLIC_API_URL`, `BACKEND_URL`, plus the sign-up gate `SIGNUP_ENABLED` / `SIGNUP_EMAIL_ALLOWLIST` (see §3 and §8.3). Apply the migrations in §8.2 before the deployment takes traffic.
+Production environment variables are set in the **Vercel project settings** (Settings → Environment Variables) — never in this file, never in `NEXT_PUBLIC_*`, never in git: `BETTER_AUTH_URL`, `BETTER_AUTH_SECRET` (≥32 chars, identical to the backend value), `DATABASE_URL` (pooled Postgres endpoint, see §8.1), `NEXT_PUBLIC_APP_URL`, `NEXT_PUBLIC_API_URL`, `BACKEND_URL`, plus the sign-up gate `SIGNUP_ENABLED` / `SIGNUP_EMAIL_ALLOWLIST` (see §3 and §8.3), plus `RESEND_API_KEY` / `AUTH_FROM_EMAIL` for password reset (see the env block in §3 — password reset is OFF until `RESEND_API_KEY` is set). Apply the migrations in §8.2 before the deployment takes traffic.
 
 ### 8.3 Sign-up admission control (required in production)
 
@@ -314,7 +323,8 @@ The script pins `--git-workdir backend`. That is not cosmetic: Koyeb builds from
 | `--checks 8000:http:/health` | — | `/health`, not `/ready`: `/ready` opens a database connection on every probe. |
 | `--checks-grace-period 8000=60` | 60 s | The container command runs `alembic upgrade head` before uvicorn serves, and the first build also compiles Subfinder. |
 | `APP_ENV`, `CACHE_BACKEND`, `RATE_LIMIT_PER_HOUR`, `RATE_LIMIT_DAILY_TOTAL` | see table | Non-secret config, applied as plain `--env` values. `CACHE_BACKEND=postgres` because the free Instance has no persistent volume. `RATE_LIMIT_PER_HOUR` must be a real process environment variable — `config.py` checks `os.getenv` so that "unset" is distinguishable from a deliberate value, and refuses to boot without it (§8.4). |
-| `DATABASE_URL`, `BETTER_AUTH_SECRET`, `SHODAN_API_KEY`, `CORS_ORIGINS`, `APP_URL` | Koyeb secrets | Set as org-level secrets and referenced with `--env KEY={{secret.NAME}}`, so no credential is ever in git or in this file. |
+| `DATABASE_URL`, `BETTER_AUTH_SECRET`, `CORS_ORIGINS`, `APP_URL` | Koyeb secrets | Set as org-level secrets and referenced with `--env KEY={{secret.NAME}}`, so no credential is ever in git or in this file. |
+| `SHODAN_API_KEY`, `NVD_API_KEY`, `OTX_API_KEY`, `URLSCAN_API_KEY`, `VIRUSTOTAL_API_KEY`, `LEAKLOOKUP_API_KEY` | Koyeb secrets, optional | Forwarded when the value in `backend/.env` is real, so production reports the same source coverage as a local scan. A placeholder (`your-key`, `changeme`, a value ending in `-key`) is treated as unset rather than pushed: a source that looks configured but throws on every call reads as an outage, while one that reports `not_configured` reads as a decision. `SERVICE_TOKEN` and `RATE_LIMIT_EXEMPT_SUBJECTS` are deliberately **not** forwarded — they are QA load-testing controls that grant unlimited quota, and an empty `SERVICE_TOKEN` fails closed (`require_user` compares under `hmac.compare_digest`, which cannot match), so not sending them leaves the public deployment without an exemption. |
 
 Secrets are set **before** the service is created or updated, so the first deployment already has them.
 
@@ -338,7 +348,15 @@ koyeb secrets create DATABASE_URL -v "postgresql+asyncpg://postgres:PASSWORD@db.
 koyeb secrets create BETTER_AUTH_SECRET -v "<same value as frontend/.env.local>"
 koyeb secrets create CORS_ORIGINS -v "https://<vercel-domain>"
 koyeb secrets create APP_URL -v "https://<vercel-domain>"
-# SHODAN_API_KEY is optional -- omit it and the Shodan source reports not_configured
+# Source keys are OPTIONAL -- omit one and that source reports not_configured.
+# Do not push a placeholder: a source that looks configured but throws on every
+# call reads as an outage rather than as the decision it actually is.
+koyeb secrets create SHODAN_API_KEY -v "<paid shared key>"
+koyeb secrets create NVD_API_KEY -v "<optional>"
+koyeb secrets create OTX_API_KEY -v "<optional>"
+koyeb secrets create URLSCAN_API_KEY -v "<optional>"
+koyeb secrets create VIRUSTOTAL_API_KEY -v "<optional, BYOK>"
+koyeb secrets create LEAKLOOKUP_API_KEY -v "<optional>"
 
 koyeb apps init osint-api `
   --git https://github.com/bieruu/network-universal-search-agent --git-branch main `

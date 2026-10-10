@@ -12,30 +12,53 @@ import {
 } from "chart.js";
 import { fetchTrend } from "@/lib/api";
 import { chartPalette, useThemeTick } from "@/lib/chart-theme";
+import { Badge } from "@/components/ui/badge";
 
 ChartJS.register(CategoryScale, LinearScale, PointElement, LineElement, Tooltip, Legend);
 
 export default function RiskTrendChartInner({ target }: { target: string }) {
   const [points, setPoints] = useState<Array<{ created_at: string; risk_score: number | null }>>([]);
+  // "We could not load this" and "there is nothing yet" are different facts.
+  // Swallowing the rejection here used to render the second one for the first,
+  // which read as "this target has never been scanned".
+  const [error, setError] = useState<string | null>(null);
   useThemeTick();
 
   useEffect(() => {
     let live = true;
     fetchTrend(target)
       .then((d) => {
-        if (live) setPoints(d.points);
+        if (live) {
+          setPoints(d.points);
+          setError(null);
+        }
       })
-      .catch(() => {});
+      .catch((e: unknown) => {
+        if (!live) return;
+        setPoints([]);
+        setError(
+          e instanceof Error && e.message
+            ? e.message
+            : "We could not load the trend for this target. Try again in a moment.",
+        );
+      });
     return () => {
       live = false;
     };
   }, [target]);
 
   const pal = chartPalette();
+  if (error) {
+    return (
+      <div className="flex h-[240px] items-center justify-center p-4 text-center">
+        <Badge variant="destructive">{error}</Badge>
+      </div>
+    );
+  }
   if (points.length === 0) {
     return (
-      <p className="flex h-[240px] items-center justify-center text-sm text-slate-500 dark:text-neutral-500">
-        No trend data yet.
+      <p className="flex h-[240px] items-center justify-center px-4 text-center text-sm text-slate-500 dark:text-neutral-500">
+        Only one scan so far. A trend line appears once this target has been scanned more than once.
       </p>
     );
   }

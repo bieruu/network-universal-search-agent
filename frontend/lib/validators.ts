@@ -23,13 +23,13 @@ function isBlockedTarget(v: string): boolean {
 export const targetSchema = z
   .string()
   .trim()
-  .min(1, "Target is required")
-  .max(253, "Target too long")
+  .min(1, "Enter something to search for — a domain name such as example.com, or an IP address.")
+  .max(253, "That is longer than any domain name can be. A domain is at most 253 characters — check for extra text that came along with the paste.")
   .refine((v) => DOMAIN_RE.test(v) || IP_RE.test(v), {
-    message: "Enter a valid domain (example.com) or IPv4 address",
+    message: "We could not read that as a web address. Enter a domain name such as example.com, or a public IPv4 address such as 8.8.8.8.",
   })
   .refine((v) => !isBlockedTarget(v), {
-    message: "Private/localhost targets are blocked",
+    message: "That address is on a private or local network, so it is blocked — the sources we search can only see hosts reachable from the public internet. Enter the target's public address instead.",
   });
 
 export const scanRequestSchema = z.object({

@@ -1,0 +1,154 @@
+/*
+ * Toolchain marquee — the landing's tech-stack section.
+ *
+ * WHY THIS IS THEMED FROM THE PAGE'S OWN TOKENS
+ * --------------------------------------------
+ * The template this came from ships its own light-only palette (`--bg`,
+ * `--surface`, `--text`, `--muted`). This page is dark-first with one emerald
+ * accent and a locked token set, so importing a second palette would have
+ * produced two competing design systems on one page. Every surface below is
+ * therefore built from the page's tokens (`--panel`, `--btn-border`,
+ * `--foreground`, `--radius`), which already carry both themes — the component
+ * inherits dark/light for free and there is nothing to re-declare.
+ *
+ * WHY THE MARKS KEEP VENDOR COLOUR
+ * --------------------------------
+ * Same decision as the dock this replaces: PostgreSQL is blue, Tailwind is
+ * cyan, and flattening every mark to the accent would both misidentify the
+ * tools and waste the one thing a mark is for. The vendor values are declared
+ * as --tool-* custom properties in pp/globals.css — NOT here, because CSS
+ * Modules rejects :root and .dark as impure selectors and the whole sheet
+ * failed to compile when they were tried in this file. Keeping them in
+ * globals.css also puts them beside every other page token and its .dark
+ * override, so there is still exactly one place where vendor colour appears.
+ *
+ * MOTION
+ * -----
+ * The drift is driven by JS (`useAnimationFrame`) rather than a CSS keyframe,
+ * because the distance travelled has to come from the measured group width.
+ * That makes the motion-safe gate a `useReducedMotion()` branch in the
+ * component, not a `motion-safe:` class: under reduced motion the row renders
+ * once and the viewport becomes scrollable, so the content is still reachable.
+ */
+
+
+.root {
+  display: flex;
+  flex-direction: column;
+  gap: calc(var(--radius) * 0.75);
+}
+
+.rows {
+  display: flex;
+  flex-direction: column;
+  gap: calc(var(--radius) * 0.75);
+}
+
+/*
+ * The fade at both ends is a mask, not a gradient overlay: an overlay would sit
+ * ON TOP of the marks and tint the last one before it slides away.
+ */
+.viewport {
+  overflow: hidden;
+  -webkit-mask-image: linear-gradient(
+    to right,
+    transparent,
+    #000 calc(var(--radius) * 3),
+    #000 calc(100% - var(--radius) * 3),
+    transparent
+  );
+  mask-image: linear-gradient(
+    to right,
+    transparent,
+    #000 calc(var(--radius) * 3),
+    #000 calc(100% - var(--radius) * 3),
+    transparent
+  );
+}
+
+/*
+ * Reduced motion: the row stops moving and becomes a scroll container. The
+ * marks stay on the page and stay reachable — they simply do not drift.
+ */
+.root[data-reduced-motion] .viewport {
+  overflow-x: auto;
+  -webkit-mask-image: none;
+  mask-image: none;
+}
+
+.track {
+  display: flex;
+  width: max-content;
+  will-change: transform;
+}
+
+.group {
+  display: flex;
+  flex-shrink: 0;
+  align-items: center;
+  gap: calc(var(--radius) * 0.75);
+  /* Trailing gap keeps the seam between two copies invisible while looping. */
+  padding-right: calc(var(--radius) * 0.75);
+}
+
+/*
+ * The badge is the same family as the terminal and bento cards: panel surface,
+ * hairline border, mono type. The vendor colour appears on ONE element — the
+ * icon — never as a fill, so the row still reads as one row of the page rather
+ * than fifteen different colours shouting.
+ */
+.badge {
+  display: inline-flex;
+  flex-shrink: 0;
+  align-items: center;
+  gap: calc(var(--radius) * 0.5);
+  border: 1px solid hsl(var(--btn-border));
+  border-radius: var(--radius);
+  background-color: hsl(var(--card));
+  padding: calc(var(--radius) * 0.5) calc(var(--radius) * 0.875);
+  color: hsl(var(--foreground) / 0.75);
+  font-family: var(--font-landing-mono, ui-monospace, monospace);
+  font-size: 0.75rem;
+  line-height: 1.4;
+  white-space: nowrap;
+}
+
+.icon {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  /* Falls back to the accent if a caller forgets to pass one. */
+  color: var(--tool-accent, hsl(var(--accent)));
+}
+
+.icon > svg {
+  width: 0.95rem;
+  height: 0.95rem;
+}
+
+/* Pause/play control — only rendered when a caller asks for it. */
+.control {
+  align-self: center;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  border: 1px solid hsl(var(--btn-border));
+  border-radius: 9999px;
+  background-color: hsl(var(--card));
+  color: hsl(var(--foreground) / 0.7);
+  cursor: pointer;
+  padding: calc(var(--radius) * 0.375);
+  transition:
+    color 150ms ease,
+    border-color 150ms ease;
+}
+
+.control > svg {
+  width: 0.85rem;
+  height: 0.85rem;
+}
+
+.control:hover {
+  border-color: hsl(var(--accent) / 0.4);
+  color: hsl(var(--accent));
+}

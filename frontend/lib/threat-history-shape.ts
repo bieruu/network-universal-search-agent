@@ -124,6 +124,35 @@ export const SOURCE_LABELS: Record<HistorySourceKey, string> = {
   leaklookup: "Leak-Lookup",
 };
 
+/**
+ * Plain column headings, with the precise term kept for anyone who needs it.
+ *
+ * The heading text is what every row of that source renders under, so it is
+ * defined once here rather than per-builder. Acronyms an analyst greps for
+ * (TLP, pulse, verdict) survive in the tooltip instead of the header, where
+ * they cost nothing and mean something to the right reader.
+ */
+export const COLUMN_HEADINGS: Record<string, { label: string; title: string }> = {
+  Verdict: { label: "Result", title: "urlscan's overall judgement of the page when it was scanned" },
+  "Scanned page": { label: "Scanned page", title: "The page urlscan.io visited and recorded" },
+  "Scan UUID": { label: "Scan ID", title: "urlscan's identifier for that scan. Use it to look the scan up on urlscan.io." },
+  Pulse: { label: "Threat feed", title: "An AlienVault OTX pulse: a community-curated list of indicators published on a topic." },
+  Description: { label: "What the feed says", title: "The publisher's own summary of the pulse" },
+  Created: { label: "First published", title: "When the publisher added this feed entry" },
+  TLP: { label: "Sharing restriction", title: "How widely the publisher says this record may be shared (TLP)" },
+  Author: { label: "Published by", title: "Who published the pulse" },
+  Malware: { label: "Malware families", title: "Malware names the feed associates with this indicator" },
+  Adversary: { label: "Threat actor", title: "Who OTX attributes the activity to, where it names one" },
+  Breach: { label: "Breach", title: "The named data breach an account address appeared in" },
+  "Breach date": { label: "Breach date", title: "When the breach itself happened" },
+  Records: { label: "Accounts exposed", title: "How many accounts from that breach share this address" },
+};
+
+/** Heading text + tooltip for one column id, falling back to the raw id. */
+export function columnHeading(id: string): { label: string; title: string } {
+  return COLUMN_HEADINGS[id] ?? { label: id, title: "" };
+}
+
 const SOURCE_KEYS: HistorySourceKey[] = ["otx", "urlscan", "leaklookup"];
 
 // C0 controls (NUL, ESC, …) plus DEL. Defacement banners and breach names are
@@ -224,11 +253,11 @@ export function statusBadge(outcome: SourceOutcome): StatusBadge {
     case "no_records":
       return { variant: "secondary", text: "no records" };
     case "not_configured":
-      return { variant: "outline", text: "not configured" };
+      return { variant: "outline", text: "not in use here" };
     case "unavailable":
-      return { variant: "destructive", text: "unavailable" };
+      return { variant: "destructive", text: "could not answer" };
     case "unknown_status":
-      return { variant: "destructive", text: "unknown status" };
+      return { variant: "destructive", text: "result not understood" };
   }
 }
 
@@ -360,13 +389,13 @@ export function buildSource(key: HistorySourceKey, value: unknown): HistorySourc
       message = "No records found for this source.";
       break;
     case "not_configured":
-      message = `${label} is switched off in this deployment, so it was not checked. This is a configuration state, not a source failure.`;
+      message = `${label} is switched off here, so nothing was searched there. That is how this installation is set up, not a source that failed.`;
       break;
     case "unavailable":
       message = `${label} could not be reached, so this source contributes nothing. Its contribution is unknown, not zero.`;
       break;
     case "unknown_status":
-      message = `${label} returned a status this dashboard does not recognise. Treat the result as unknown, not as a clean one.`;
+      message = `${label} sent back something we could not read, so we cannot tell whether it searched or failed. Treat the result as unknown, not as a clean one.`;
       break;
   }
 
@@ -427,9 +456,9 @@ export function summarize(sources: HistorySource[]): HistorySummary {
   if (outcome === "findings") {
     detail = `Across ${okSources} source${okSources === 1 ? "" : "s"} that answered.`;
   } else if (outcome === "incomplete") {
-    detail = `Partial coverage: ${okSources} source${okSources === 1 ? "" : "s"} answered, ${failedSources} failed, ${unconfiguredSources} not configured. An incomplete sweep is not a clean result.`;
+    detail = `Partial coverage: ${okSources} source${okSources === 1 ? "" : "s"} answered, ${failedSources} could not answer, ${unconfiguredSources} switched off here. An incomplete sweep is not a clean result.`;
   } else if (unconfiguredSources > 0) {
-    detail = `${okSources} source${okSources === 1 ? "" : "s"} answered with no records; ${unconfiguredSources} switched off in this deployment were not checked at all.`;
+    detail = `${okSources} source${okSources === 1 ? "" : "s"} answered with no records; ${unconfiguredSources} switched off here were never searched at all.`;
   } else {
     detail = `All ${okSources} sources answered and none has a record for this target.`;
   }
@@ -464,7 +493,13 @@ export function parseThreatHistory(input: unknown): ThreatHistory | null {
       const source = asPlainText(e.source);
       const message = asPlainText(e.message);
       if (!source && !message) continue;
-      errors.push({ source: source || "history", message: message || "failed with no detail" });
+      // No source name and no reason: neither is rendered raw (see
+      // ThreatHistoryCard), so the placeholders only need to be honest about
+      // being placeholders rather than echoing plumbing.
+      errors.push({
+        source: source || "Another lookup",
+        message: message || "did not answer",
+      });
     }
   }
 

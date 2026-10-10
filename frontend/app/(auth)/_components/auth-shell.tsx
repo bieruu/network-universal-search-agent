@@ -78,7 +78,9 @@ export function AuthShell({
         <div className="absolute inset-x-12 bottom-8">
           <p className="font-mono text-xs uppercase tracking-widest text-accent">Universal Search</p>
           <p className="mt-2 max-w-[40ch] text-sm text-slate-600 dark:text-neutral-400">
-            Passive OSINT console. Shodan, crt.sh and WHOIS in one scan with audit trail.
+            Search a domain or IP address for open ports, subdomains and known
+            vulnerabilities. Nothing is probed — every result comes from public
+            records.
           </p>
         </div>
       </div>
@@ -89,7 +91,7 @@ export function AuthShell({
             <span className="flex h-9 w-9 items-center justify-center rounded-xl bg-accent font-mono text-lg font-bold text-accent-foreground">N</span>
             <span className="flex flex-col leading-none">
               <span className="font-mono text-sm font-semibold tracking-tight text-slate-900 dark:text-neutral-100">Universal Search</span>
-              <span className="mt-1 font-mono text-[10px] uppercase tracking-widest text-accent">OSINT Console</span>
+              <span className="mt-1 font-mono text-[10px] uppercase tracking-widest text-accent">Security Search</span>
             </span>
           </div>
           <Reveal>
