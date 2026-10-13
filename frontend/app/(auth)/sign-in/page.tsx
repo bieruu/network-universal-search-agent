@@ -1,5 +1,5 @@
-import ModernAnimatedSignIn from "./_components/modern-animated-sign-in";
+import SignInForm from "./_components/sign-in-form";
 
 export default function SignInPage() {
-  return <ModernAnimatedSignIn />;
+  return <SignInForm />;
 }

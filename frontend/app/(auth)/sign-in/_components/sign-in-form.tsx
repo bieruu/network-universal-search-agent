@@ -3,7 +3,7 @@
 import { useEffect, useRef, useState, type FormEvent } from "react";
 import { useRouter } from "next/navigation";
 import Link from "next/link";
-import { Code2, Globe } from "lucide-react";
+import { GithubLogo, GoogleLogo } from "@phosphor-icons/react/dist/ssr";
 import { AuthShell } from "@/app/(auth)/_components/auth-shell";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
@@ -12,7 +12,7 @@ import { authClient } from "@/lib/auth-client";
 import { describeSignInError } from "@/lib/auth-errors";
 import { takeResetConfirmation, RESET_DONE_MESSAGE } from "@/lib/reset-confirmation";
 
-export default function ModernAnimatedSignIn() {
+export default function SignInForm() {
   const router = useRouter();
   const [email, setEmail] = useState("");
   const [password, setPassword] = useState("");
@@ -147,11 +147,11 @@ export default function ModernAnimatedSignIn() {
       </form>
       <div className="mt-3 grid gap-2">
         <Button type="button" variant="outline" onClick={() => handleOAuth("google")} disabled={pending} className="w-full rounded-full">
-          <Globe size={18} strokeWidth={2} className="mr-2" aria-hidden="true" />
+          <GoogleLogo size={18} weight="regular" className="mr-2" aria-hidden="true" />
           Continue with Google
         </Button>
         <Button type="button" variant="outline" onClick={() => handleOAuth("github")} disabled={pending} className="w-full rounded-full">
-          <Code2 size={18} strokeWidth={2} className="mr-2" aria-hidden="true" />
+          <GithubLogo size={18} weight="regular" className="mr-2" aria-hidden="true" />
           Continue with GitHub
         </Button>
       </div>

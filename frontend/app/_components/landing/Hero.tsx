@@ -1,5 +1,6 @@
 import Link from "next/link";
 import { Badge } from "@/components/ui/badge";
+import { phaseDelay } from "@/lib/motion-phases";
 import Reveal from "./Reveal";
 import PlaygroundTerminal from "./PlaygroundTerminal";
 import type { TerminalSample } from "./terminal-lines";
@@ -23,9 +24,9 @@ function Terminal({
       className="overflow-hidden rounded-2xl border border-neutral-200 bg-panel dark:border-neutral-800"
     >
       <div className="flex items-center gap-1.5 border-b border-neutral-200/80 px-4 py-3 dark:border-neutral-800/80">
-        <span aria-hidden="true" className="h-2.5 w-2.5 rounded-full bg-neutral-300 motion-safe:animate-blip dark:bg-neutral-700" style={{ animationDelay: "0s" }} />
-        <span aria-hidden="true" className="h-2.5 w-2.5 rounded-full bg-neutral-300 motion-safe:animate-blip dark:bg-neutral-700" style={{ animationDelay: "0.3s" }} />
-        <span aria-hidden="true" className="h-2.5 w-2.5 rounded-full bg-accent motion-safe:animate-blip" style={{ animationDelay: "0.6s" }} />
+        <span aria-hidden="true" className="h-2.5 w-2.5 rounded-full bg-neutral-300 motion-safe:animate-blip dark:bg-neutral-700" style={{ animationDelay: phaseDelay(0, "blip") }} />
+        <span aria-hidden="true" className="h-2.5 w-2.5 rounded-full bg-neutral-300 motion-safe:animate-blip dark:bg-neutral-700" style={{ animationDelay: phaseDelay(1, "blip") }} />
+        <span aria-hidden="true" className="h-2.5 w-2.5 rounded-full bg-accent motion-safe:animate-blip" style={{ animationDelay: phaseDelay(2, "blip") }} />
         <span className="ml-2 font-mono text-xs text-slate-500 dark:text-neutral-500">osint — zsh</span>
       </div>
       <div className="p-4">

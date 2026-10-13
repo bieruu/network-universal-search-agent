@@ -90,4 +90,4 @@ Run the checks above locally before every PR. (`.github/` is intentionally git-i
 
 ## Production checklist
 
-Rotate: `SHODAN_API_KEY`, `BETTER_AUTH_SECRET`, `DATABASE_URL`. Set `CACHE_BACKEND=postgres` on hosts without a persistent volume, and exact `CORS_ORIGINS`. External actions (production OAuth callbacks, dependency license review) → [TODO.md](./TODO.md). License: [MIT](./LICENSE).
+Deploy target: frontend on Vercel, backend as a **Hugging Face Docker Space** (port 7860; `backend/README.md` carries the Space's YAML front matter). Secrets and variables go in the Space's **Settings → Variables and secrets** — secrets are encrypted there and never committed; plain variables only for non-sensitive config. Rotate: `SHODAN_API_KEY`, `BETTER_AUTH_SECRET`, `DATABASE_URL`. Set `CACHE_BACKEND=postgres` on hosts without a persistent volume (the Space disk is non-persistent), and make `APP_URL` / `CORS_ORIGINS` the exact Vercel origin. External actions (production OAuth callbacks, dependency license review) → [TODO.md](./TODO.md). License: [MIT](./LICENSE).

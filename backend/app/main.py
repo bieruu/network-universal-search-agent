@@ -3,6 +3,7 @@ from __future__ import annotations
 from fastapi import FastAPI
 from fastapi.middleware.cors import CORSMiddleware
 
+from app.core.body_limit import BodySizeLimitMiddleware
 from app.core.config import settings
 from app.core.logging import RequestIDMiddleware
 
@@ -28,6 +29,13 @@ def create_app() -> FastAPI:
         allow_methods=["GET", "POST", "OPTIONS"],
         allow_headers=["content-type", "authorization", "x-request-id"],
     )
+    # Added last on purpose: Starlette inserts each new middleware at the front
+    # of the stack, so this one sits OUTSIDE CORS and outside the request-id
+    # middleware. It has to — the cap must bite before anything reads the body,
+    # because `require_user` (a dependency) is solved only after
+    # `await request.body()`. Without this, an anonymous caller gets to make the
+    # worker buffer an arbitrarily large payload on the way to its 401.
+    app.add_middleware(BodySizeLimitMiddleware)
     from app.routers import analysis, health, history, scan
 
     app.include_router(health.router)

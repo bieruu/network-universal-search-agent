@@ -73,6 +73,34 @@ jobs:
           pip-audit --require-hashes --disable-pip -r requirements.txt
           pip-audit --require-hashes --disable-pip -r requirements-dev.txt
 
+  prod-image-deps:
+    # The dependency set the production container actually installs. The backend
+    # job installs requirements-dev.txt (a superset of requirements.in), so a
+    # runtime package missing from requirements.txt passes every test and then
+    # crash-loops the container at boot: dnspython, pillow, phonenumbers and
+    # cryptography were all missing this way, caught by a local image build
+    # rather than by CI. This job is the guard that drift cannot pass.
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v6
+      - uses: actions/setup-python@v6
+        with:
+          python-version: "3.11"
+      - name: Install the runtime requirements exactly as the image does
+        working-directory: backend
+        # --require-hashes fails closed on an unpinned or hashless entry, the
+        # same flag the Dockerfile passes, so CI installs the identical set
+        # the image does, or neither does.
+        run: |
+          python -m venv .venv-prod
+          .venv-prod/bin/python -m pip install --no-cache-dir --require-hashes -r requirements.txt
+      - name: The production set must import the whole app
+        working-directory: backend
+        # app.main builds the app at import time and pulls in every router and
+        # service, which is where a missing runtime dependency raises. No env
+        # vars are needed: the dev defaults boot without a database.
+        run: .venv-prod/bin/python -c "import app.main"
+
   frontend:
     runs-on: ubuntu-latest
     env:

@@ -1,32 +1,58 @@
 "use client";
 
 import { motion, useReducedMotion } from "motion/react";
+import { phaseDelay } from "@/lib/motion-phases";
+import { demoSampleMetrics } from "./playground-samples";
 
-// Animated bento visuals: the port grid breathes via the shared ambient
-// pulse (staggered delays, motion-safe), the metric bars grow on scroll
-// into view (scaleY spring, transform-only). Static fallback when reduced
-// motion is on.
-const GRID_CELLS = [
-  { tone: "bg-accent/30", delay: "0s" },
-  { tone: "bg-slate-700", delay: "1.2s" },
-  { tone: "bg-accent/20", delay: "2.4s" },
-  { tone: "bg-slate-800", delay: "0.6s" },
-  { tone: "bg-accent/35", delay: "1.8s" },
-  { tone: "bg-slate-700", delay: "3s" },
-] as const;
+// Bento visuals. Both cells now read the SAME figures the terminal prints:
+// open-port counts in the grid, certificate-name counts in the bars, taken from
+// `playground-samples.ts` via `demoSampleMetrics()`. The earlier versions
+// carried their own hand-written arrays that only looked like those figures —
+// a second set of numbers for one sample is how a visual ends up disagreeing
+// with the output it sits under, and it is now impossible by construction.
+//
+// Every figure is still simulated (see the header of playground-samples.ts).
+// Nothing here is a claim about any real host.
 
-const BARS = [26, 34, 62, 48, 72, 58, 92] as const;
+/** One cell per port reported for that sample, capped so the grid cannot grow
+ *  without limit if a sample ever reports a large number. */
+const PORT_CELL_CAP = 12;
+
+/** Pixels per unit of bar height, so a count maps to one scale and not three. */
+const NAMES_PER_PX = 6;
+
+const ROWS = demoSampleMetrics();
 
 export function BentoGridVisual() {
   return (
-    <div className="relative mt-4 grid h-36 grid-cols-3 gap-2 overflow-hidden rounded-xl border border-accent/15 bg-slate-900/95 p-2">
-      {GRID_CELLS.map((c) => (
-        <div
-          key={`${c.tone}-${c.delay}`}
-          className={`rounded-md ${c.tone} motion-safe:animate-ambient-pulse`}
-          style={{ animationDelay: c.delay }}
-        />
-      ))}
+    <div className="relative mt-4 h-36 overflow-hidden rounded-xl border border-accent/15 bg-slate-900/95 p-2">
+      <div className="flex h-full flex-col justify-between gap-1.5">
+        {ROWS.map(({ sample, metrics }, row) => (
+          <div key={sample.target} className="flex min-w-0 items-center gap-2">
+            <span className="w-24 shrink-0 truncate font-mono text-[10px] text-slate-400">
+              {sample.target}
+            </span>
+            <span className="flex min-w-0 flex-1 flex-wrap gap-1">
+              {metrics.ports == null ? (
+                // The sample stopped reporting a count. Saying nothing is the
+                // only honest option: a row of invented cells would be a made-up
+                // number, and an empty row would read as zero open ports.
+                <span className="font-mono text-[10px] text-slate-500">
+                  no port count reported
+                </span>
+              ) : (
+                Array.from({ length: Math.min(metrics.ports, PORT_CELL_CAP) }).map((_, cell) => (
+                  <span
+                    key={cell}
+                    className="h-2.5 w-2.5 rounded-sm bg-accent/40 motion-safe:animate-ambient-pulse"
+                    style={{ animationDelay: phaseDelay(row * PORT_CELL_CAP + cell, "pulse") }}
+                  />
+                ))
+              )}
+            </span>
+          </div>
+        ))}
+      </div>
       {/* Looping scanline: one highlight band sweeps across the port grid. */}
       <div aria-hidden="true" className="pointer-events-none absolute inset-0">
         <div className="absolute inset-y-0 w-1/3 bg-gradient-to-r from-transparent via-accent/40 to-transparent motion-safe:animate-sweep" />
@@ -38,32 +64,51 @@ export function BentoGridVisual() {
 export function BentoMetricsVisual() {
   const reduce = useReducedMotion();
   return (
-    <div className="mt-4 flex h-36 items-end gap-2 rounded-xl border border-accent/15 bg-slate-900/95 p-3">
-      {BARS.map((value, index) => {
+    <div className="mt-4 flex h-36 items-end gap-3 rounded-xl border border-accent/15 bg-slate-900/95 p-3">
+      {ROWS.map(({ sample, metrics }, index) => {
+        const names = metrics.certNames;
+        // Same fallback as the grid: no figure means no bar, never a bar of an
+        // invented height, because a zero-height bar reads as "none found".
+        if (names == null) {
+          return (
+            <div key={sample.target} className="flex h-full flex-1 items-end">
+              <span className="font-mono text-[10px] leading-tight text-slate-500">
+                {sample.target}
+                <br />
+                no count reported
+              </span>
+            </div>
+          );
+        }
+        const height = Math.max(names * NAMES_PER_PX, 8);
         if (reduce)
           return (
-            <div
-              key={`${value}-${index}`}
-              className="flex-1 rounded-t-md bg-gradient-to-t from-accent/70 to-emerald-300/90"
-              style={{ height: `${value}px` }}
-            />
+            <div key={sample.target} className="flex h-full flex-1 flex-col justify-end gap-1">
+              <div
+                className="w-full rounded-t-md bg-gradient-to-t from-accent/70 to-emerald-300/90"
+                style={{ height: `${height}px` }}
+              />
+              <span className="truncate font-mono text-[10px] text-slate-400">{names}</span>
+            </div>
           );
         return (
-          <motion.div
-            key={`${value}-${index}`}
-            className="relative flex-1 origin-bottom"
-            style={{ height: `${value}px` }}
-            initial={{ scaleY: 0.2, opacity: 0.4 }}
-            whileInView={{ scaleY: 1, opacity: 1 }}
-            viewport={{ once: true, margin: "-40px" }}
-            transition={{ type: "spring", stiffness: 120, damping: 18, delay: index * 0.06 }}
-          >
-            {/* Inner equalizer: each bar keeps breathing after it grows in. */}
-            <div
-              className="absolute inset-0 origin-bottom rounded-t-md bg-gradient-to-t from-accent/70 to-emerald-300/90 motion-safe:animate-eq"
-              style={{ animationDelay: `${index * 0.18}s` }}
-            />
-          </motion.div>
+          <div key={sample.target} className="flex h-full flex-1 flex-col justify-end gap-1">
+            <motion.div
+              className="relative w-full origin-bottom"
+              style={{ height: `${height}px` }}
+              initial={{ scaleY: 0.2, opacity: 0.4 }}
+              whileInView={{ scaleY: 1, opacity: 1 }}
+              viewport={{ once: true, margin: "-40px" }}
+              transition={{ type: "spring", stiffness: 120, damping: 18, delay: index * 0.06 }}
+            >
+              {/* Inner equalizer: each bar keeps breathing after it grows in. */}
+              <div
+                className="absolute inset-0 origin-bottom rounded-t-md bg-gradient-to-t from-accent/70 to-emerald-300/90 motion-safe:animate-eq"
+                style={{ animationDelay: phaseDelay(index, "eq") }}
+              />
+            </motion.div>
+            <span className="truncate font-mono text-[10px] text-slate-400">{names}</span>
+          </div>
         );
       })}
     </div>

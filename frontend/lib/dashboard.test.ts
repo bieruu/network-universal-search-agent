@@ -85,11 +85,86 @@ test("mobile sheet sidebar stays visible below md", () => {
   );
 });
 
-test("dashboard data surfaces stay static — ambient motion is landing/auth only", () => {
-  for (const banned of ["animate-ambient", "AmbientBackdrop"]) {
-    assert.ok(!shell.includes(banned), `dashboard shell: no ${banned}`);
-    assert.ok(!page.includes(banned), `dashboard page: no ${banned}`);
+// The old contract read `dashboard data surfaces stay static — ambient motion is
+// landing/auth only`, and it was reversed on 2026-10-12 (see DESIGN.md for the
+// dated reversal note and the reason). What the reversal KEPT is the reason the
+// lock existed in the first place, so the test now asserts that instead:
+// the ambient layer is welcome, it is gated, it is decorative, and nothing that
+// carries a value ever moves. The mechanical half of these two floors lives in
+// lib/loop-contract.test.ts.
+test("ambient layer is allowed, gated, and never moves a row", () => {
+  const wash = readFileSync(join(here, "..", "app", "(dashboard)", "dashboard", "_components", "card-wash.tsx"), "utf8");
+  const layer = readFileSync(join(here, "..", "app", "(dashboard)", "dashboard", "_components", "ambient-layer.tsx"), "utf8");
+  const status = readFileSync(join(here, "..", "app", "(dashboard)", "dashboard", "_components", "ScanStatus.tsx"), "utf8");
+
+  assert.ok(shell.includes("AmbientLayer"), "the dashboard shell renders an ambient layer");
+  assert.ok(layer.includes('aria-hidden="true"'), "the ambient layer is decorative-only");
+  assert.ok(layer.includes("pointer-events-none"), "the ambient layer cannot take a click");
+  assert.ok(layer.includes("-z-10"), "the ambient layer sits behind the content, not on it");
+  assert.ok(layer.includes("motion-safe:"), "every layered loop is motion-safe gated");
+
+  // The wash is opacity-only, and it must never be a transform on content.
+  assert.ok(wash.includes("motion-safe:animate-ambient-pulse"), "the card wash is the shared keyframe, gated");
+  assert.ok(!wash.includes("animate-["), "the card wash introduces no bespoke keyframe");
+
+  // A status loop reports state, so it is tied to polling — never to the badge
+  // merely existing. A dot that keeps blinking after a scan has finished is the
+  // dashboard claiming to be busy when it is not.
+  assert.ok(status.includes("polling"), "the status badge knows whether a scan is polling");
+  assert.ok(/polling &&/.test(status), "the live blip runs only while polling");
+
+  // Floor #2, the half that cannot be gated: no data surface may move. The
+  // tables and the history list are what an analyst reads line by line, so they
+  // carry no loop at all — a row that reflows every frame cannot be read.
+  for (const f of ["PortsTable.tsx", "SubdomainsTable.tsx", "WhoisCard.tsx", "VulnerabilitiesCard.tsx", "ThreatHistoryCard.tsx", "HistoryList.tsx"]) {
+    const src = readFileSync(join(here, "..", "app", "(dashboard)", "dashboard", "_components", f), "utf8");
+    assert.ok(!src.includes("animate-"), `${f}: a readable row must never move`);
   }
+});
+
+test("the dashboard shell keeps the sidebar and the content side by side", () => {
+  // REGRESSION GUARD (2026-10-12). The ambient layer was added by wrapping the
+  // sidebar + inset in a plain `<div className="relative isolate">`. That wrapper
+  // sat between `SidebarProvider`'s flex container and the two things it arranges,
+  // so neither of them was a flex item any more: the sidebar dropped to the
+  // top-left, the content stacked underneath it in the same 240px column, and
+  // the sticky `h-dvh` sidebar then stayed pinned across the content on scroll.
+  //
+  // The bug was shipped with every gate green — lint, tsc, 261/261 tests and a
+  // production build all pass on a layout that is unusable, because none of them
+  // render anything. Measured in Chrome against the production CSS: sidebar.x = 0,
+  // main.x = 0, intrusion 240px; at 390px the content column collapsed to 91px.
+  //
+  // This test cannot measure layout, but it can pin the invariant that was
+  // broken: between `<SidebarProvider>` and `<App1Sidebar` there must be no
+  // block-level element, and the wrapper that does hold both must be a flex row.
+  const open = shell.indexOf("<SidebarProvider>");
+  const aside = shell.indexOf("<App1Sidebar");
+  assert.ok(open !== -1 && aside > open, "the sidebar must render inside SidebarProvider");
+  // Comments are stripped first: the guard's own explanation names the broken
+  // markup, and a prose `<div>` is not a wrapper. (Same technique landing.test.ts
+  // already uses when copy and code collide.) Indices are taken from the STRIPPED
+  // source, so they must be found on it too — mixing the two silently slices the
+  // wrong span.
+  // The invariant that was broken is not "no wrapper" — the ambient layer needs
+  // one. It is: THE wrapper that directly holds the sidebar and the inset must be
+  // the flex row, and the sidebar must be its direct child (no second nesting).
+  const code = shell.replace(/\/\*[\s\S]*?\*\//g, "").replace(/^\s*\/\/.*$/gm, "");
+  const codeOpen = code.indexOf("<SidebarProvider>");
+  const codeAside = code.indexOf("<App1Sidebar");
+  assert.ok(codeOpen !== -1 && codeAside > codeOpen, "sidebar must render inside SidebarProvider after stripping comments");
+  const wrapper = /<div className="([^"]*)"/.exec(code.slice(codeOpen, codeAside));
+  assert.ok(wrapper, "the shell must have one wrapper holding both the sidebar and the content");
+  assert.ok(
+    /(^|\s)flex(\s|$)/.test(wrapper[1]),
+    `the wrapper holding the sidebar and the content must be the flex row (got "${wrapper[1]}") — a plain block puts them in normal flow`,
+  );
+  const afterWrapper = code.slice(codeOpen + (wrapper.index ?? 0) + wrapper[0].length, codeAside);
+  assert.ok(!/<div/.test(afterWrapper), "the sidebar must be a direct child of the flex row, with no nested wrapper between them");
+  // The ambient layer is absolute, so it is out of flow and cannot steal a
+  // flex-item slot from the sidebar or the inset.
+  const layer = readFileSync(join(here, "..", "app", "(dashboard)", "dashboard", "_components", "ambient-layer.tsx"), "utf8");
+  assert.ok(/absolute inset-0/.test(layer), "the ambient layer must be positioned, so it stays out of flex flow");
 });
 
 test("button forwards ref for asChild triggers", () => {

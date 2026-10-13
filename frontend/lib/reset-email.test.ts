@@ -9,7 +9,7 @@ import {
   resetEmailText,
 } from "./reset-email.ts";
 
-const KEY = { RESEND_API_KEY: "re_test_key", AUTH_FROM_EMAIL: "Universal Search <noreply@x.test>" };
+const KEY = { RESEND_API_KEY: "re_test_key", AUTH_FROM_EMAIL: "NUSA project <noreply@x.test>" };
 const ARGS = { user: { email: "known@example.com" }, url: "http://localhost:3000/reset-password/tok?callbackURL=%2Freset-password" };
 
 function collector() {

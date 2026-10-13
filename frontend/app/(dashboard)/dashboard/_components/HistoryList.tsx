@@ -2,11 +2,10 @@
 import { useEffect, useState } from "react";
 import { Badge } from "@/components/ui/badge";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
-import { Progress } from "@/components/ui/progress";
 import { Skeleton } from "@/components/ui/skeleton";
 import { fetchHistory, type HistoryItem } from "@/lib/api";
 import { scanStatusLabel } from "@/lib/scan-status";
-import { TERM, plural } from "@/lib/terms";
+import { plural } from "@/lib/terms";
 
 const MINUTE = 60_000;
 const HOUR = 60 * MINUTE;
@@ -110,11 +109,13 @@ export default function HistoryList({
                       )}
                     </span>
                     <Badge variant="secondary">{scanStatusLabel(h.status)}</Badge>
-                    <span className="w-16">
-                      <Progress
-                        value={h.risk_score ?? 0}
-                        aria-label={`${TERM.risk.label}: ${h.risk_score ?? "not recorded"}`}
-                      />
+                    {/* The risk figure used to be a filled progress track. A bar
+                        that fills is the language of a dashboard widget, and in a
+                        list of past scans it invited reading the width as
+                        severity rather than the number. The number is the value;
+                        "not recorded" is never a zero. */}
+                    <span className="w-16 shrink-0 text-right font-mono text-xs tabular-nums text-slate-600 dark:text-neutral-400">
+                      {h.risk_score ?? "n/a"}
                     </span>
                   </button>
                 </li>

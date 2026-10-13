@@ -1,18 +1,18 @@
 "use client";
 
 import {
-  Activity,
   AppWindow,
-  Blocks,
-  Braces,
+  BracketsCurly,
+  Cube,
   Database,
-  FileCode2,
+  FileCode,
   GitBranch,
-  Lock,
-  Server,
+  HardDrives,
+  LockKey,
+  Pulse,
   Waves,
   Wind,
-} from "lucide-react";
+} from "@phosphor-icons/react/dist/ssr";
 import ToolchainMarquee, {
   type ToolchainItem,
 } from "@/components/ui/toolchain-marquee";
@@ -51,26 +51,26 @@ import Reveal from "./Reveal";
 
 /** Frontend row — everything here is in `frontend/package.json`. */
 const FRONTEND: ToolchainItem[] = [
-  { label: "Next.js", icon: <AppWindow />, accent: "var(--tool-nextjs)" },
-  { label: "TypeScript", icon: <FileCode2 />, accent: "var(--tool-typescript)" },
-  { label: "Tailwind CSS", icon: <Wind />, accent: "var(--tool-tailwind)" },
-  { label: "Zod", icon: <Braces />, accent: "var(--tool-zod)" },
-  { label: "Chart.js", icon: <Activity />, accent: "var(--tool-chartjs)" },
+  { label: "Next.js", icon: <AppWindow weight="regular" />, accent: "var(--tool-nextjs)" },
+  { label: "TypeScript", icon: <FileCode weight="regular" />, accent: "var(--tool-typescript)" },
+  { label: "Tailwind CSS", icon: <Wind weight="regular" />, accent: "var(--tool-tailwind)" },
+  { label: "Zod", icon: <BracketsCurly weight="regular" />, accent: "var(--tool-zod)" },
+  { label: "Chart.js", icon: <Pulse weight="regular" />, accent: "var(--tool-chartjs)" },
   // No vendor colour of its own: Better Auth has none, so the mark takes the
   // page accent instead of a colour invented for it.
-  { label: "Better Auth", icon: <Lock />, accent: "var(--accent)" },
+  { label: "Better Auth", icon: <LockKey weight="regular" />, accent: "var(--accent)" },
 ];
 
 /** Backend row — everything here is in `backend/requirements.txt`. */
 const BACKEND: ToolchainItem[] = [
-  { label: "FastAPI", icon: <Server />, accent: "var(--tool-fastapi)" },
-  { label: "SQLAlchemy", icon: <Database />, accent: "var(--tool-sqlalchemy)" },
+  { label: "FastAPI", icon: <HardDrives weight="regular" />, accent: "var(--tool-fastapi)" },
+  { label: "SQLAlchemy", icon: <Database weight="regular" />, accent: "var(--tool-sqlalchemy)" },
   // PostgreSQL is the database, not a pip package — its drivers (`asyncpg`
   // here, `pg` on the frontend) are what the dependency files actually name.
-  { label: "PostgreSQL", icon: <Database />, accent: "var(--tool-postgres)" },
-  { label: "Alembic", icon: <GitBranch />, accent: "var(--tool-alembic)" },
-  { label: "Pydantic v2", icon: <Blocks />, accent: "var(--accent)" },
-  { label: "httpx", icon: <Waves />, accent: "var(--accent)" },
+  { label: "PostgreSQL", icon: <Database weight="regular" />, accent: "var(--tool-postgres)" },
+  { label: "Alembic", icon: <GitBranch weight="regular" />, accent: "var(--tool-alembic)" },
+  { label: "Pydantic v2", icon: <Cube weight="regular" />, accent: "var(--accent)" },
+  { label: "httpx", icon: <Waves weight="regular" />, accent: "var(--accent)" },
 ];
 
 export default function StackStrip() {

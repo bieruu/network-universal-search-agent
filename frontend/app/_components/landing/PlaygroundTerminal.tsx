@@ -107,34 +107,6 @@ const WINDOW_HEIGHT = "h-[14rem]";
 const WIPE_EXIT_S = 0.22;
 const WIPE_STAGGER_S = 0.045;
 
-/**
- * The stack this terminal is wired to, as brand marks.
- *
- * Shown small, inside the window, because the terminal IS the product and a
- * visitor who reaches for it has earned a look at what answers it. The marks
- * come from the Simple Icons CDN with the accent as the only colour, which is
- * the pattern DESIGN.md already documents for the logo strip.
- *
- * Why frameworks and not the four data sources: `LogoStrip` deliberately shows
- * the *sources* instead of the frameworks, on the reasoning that a buyer wants
- * to know whose records the answer comes from. That decision stands. The
- * framework marks live here instead of in a logo wall, so the page keeps one
- * provenance strip and the terminal keeps its own identity — a shell that
- * looked up your domain should look like it was built with something.
- *
- * `shodan` and the other source marks are NOT here: they have no Simple Icons
- * slug (Shodan 404s on the CDN — a recorded deviation), and DESIGN.md's rule is
- * mono monograms for marks without an icon, not a half-set of icons next to
- * half a set of monograms.
- */
-const STACK_MARKS: Array<{ slug: string; name: string }> = [
-  { slug: "next.js", name: "Next.js" },
-  { slug: "fastapi", name: "FastAPI" },
-  { slug: "postgresql", name: "PostgreSQL" },
-  { slug: "typescript", name: "TypeScript" },
-  { slug: "tailwindcss", name: "Tailwind CSS" },
-];
-
 export interface PlaygroundTerminalProps {
   signedIn: boolean;
   sample?: TerminalSample | null;
@@ -671,31 +643,6 @@ export default function PlaygroundTerminal({
           </div>
         )}
       </div>
-
-      {/* The stack the terminal is wired to, small enough to read as part of the
-          window rather than as a logo wall. `motion-safe:` gates the bob, the
-          accent is the only colour, and the marks come from the Simple Icons
-          CDN DESIGN.md already documents. Each carries its name in the `title`
-          and in `aria-label`, because an icon with no name is decoration. */}
-        <div
-          className="flex items-center gap-3 px-3 pt-2"
-          aria-label="Built with"
-        >
-          {STACK_MARKS.map((mark, i) => (
-            <img
-              key={mark.slug}
-              src={`https://cdn.simpleicons.org/${mark.slug}/00E59B`}
-              alt={mark.name}
-              title={mark.name}
-              width={14}
-              height={14}
-              loading="lazy"
-              decoding="async"
-              className="opacity-70 transition-opacity duration-200 hover:opacity-100 motion-safe:animate-bob dark:opacity-80"
-              style={{ animationDelay: `${i * 0.5}s` }}
-            />
-          ))}
-        </div>
 
       {/* Status line, the way a shell carries one. Signed out it must say so
           plainly and permanently: the alternative is a visitor reading

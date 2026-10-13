@@ -5,6 +5,7 @@ import { terminalLinesFromScan, type TerminalSample } from "./_components/landin
 import AmbientBackdrop from "./_components/landing/AmbientBackdrop";
 import CtaFooter from "./_components/landing/CtaFooter";
 import FeatureBento from "./_components/landing/FeatureBento";
+import GridDrift from "./_components/landing/GridDrift";
 import Hero from "./_components/landing/Hero";
 import HowItWorks from "./_components/landing/HowItWorks";
 import LogoStrip from "./_components/landing/LogoStrip";
@@ -14,7 +15,7 @@ import SecurityStrip from "./_components/landing/SecurityStrip";
 import StackStrip from "./_components/landing/StackStrip";
 
 export const metadata: Metadata = {
-  title: "Universal Search — see what a domain exposes",
+  title: "NUSA project — see what a domain exposes",
   description:
     "Search a domain or IP and read its open ports, subdomain names, registration details, and a risk score in one place.",
 };
@@ -88,11 +89,13 @@ export default async function Home() {
       {/* Full-bleed ambient layer behind nav + hero: spans the whole viewport
           width (no centered max-w strip → no hard vertical edges) and fades
           out toward the bottom so nothing reads as a cut-off rectangle.
-          Decorative only: pointer-events-none, behind content via -z-10. */}
+          Decorative only: pointer-events-none, behind content via -z-10.
+          Order is the depth order — grid, wash, parallax washes. */}
       <div
         aria-hidden="true"
         className="pointer-events-none absolute inset-x-0 top-0 -z-10 h-[100dvh] overflow-hidden [mask-image:linear-gradient(to_bottom,black_58%,transparent)]"
       >
+        <GridDrift />
         <AmbientBackdrop variant="landing" />
         <ParallaxField />
       </div>

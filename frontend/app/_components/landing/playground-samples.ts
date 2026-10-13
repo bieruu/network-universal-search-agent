@@ -33,6 +33,58 @@ export interface ScanSample {
   output: string[];
 }
 
+/**
+ * The numbers a sample reports, read back out of its own output lines.
+ *
+ * WHY DERIVED AND NOT DECLARED TWICE
+ * ----------------------------------
+ * The bento visuals used to carry their own hand-written arrays — six grid
+ * cells and seven bar heights — that *looked* like the same information the
+ * terminal prints and was not. Two sets of numbers for one sample is exactly
+ * the drift trap this file was created to end (see the header): editing the
+ * terminal output silently left the visuals disagreeing with it.
+ *
+ * So the figures are parsed out of `output`, the same lines a visitor reads.
+ * The consequence is deliberate: if the copy changes so that these patterns
+ * stop matching, `sampleMetrics` returns `null` and the visual has to fall
+ * back to saying nothing. It cannot invent a number to fill the gap, which is
+ * the failure mode a second hand-written array would have had.
+ *
+ * Invented numbers either way — these are the samples' own, not facts about
+ * the reserved names they are attached to.
+ */
+export interface SampleMetrics {
+  /** Ports the sample's Shodan line reports, or `null` if the line no longer says. */
+  ports: number | null;
+  /** Certificate names the sample's crt.sh line reports, or `null`. */
+  certNames: number | null;
+}
+
+const PORTS_SEEN = /·\s*(\d+)\s+ports?\s+seen/;
+const CERT_NAMES = /(\d+)\s+(?:cert\s+names|names\s+found)/;
+
+export function sampleMetrics(sample: ScanSample): SampleMetrics {
+  let ports: number | null = null;
+  let certNames: number | null = null;
+  for (const line of sample.output) {
+    const p = PORTS_SEEN.exec(line);
+    if (p) ports = Number(p[1]);
+    const c = CERT_NAMES.exec(line);
+    if (c) certNames = Number(c[1]);
+  }
+  return { ports, certNames };
+}
+
+/**
+ * Every sample with its figures, for consumers that render the whole set.
+ * Samples whose lines stopped carrying a number come back with `null` figures
+ * rather than being dropped — a missing target is not the same as a target with
+ * zero ports, and a visual that quietly omits one invents the difference.
+ */
+export function demoSampleMetrics(): Array<{ sample: ScanSample; metrics: SampleMetrics }> {
+  return DEMO_SCANS.map((sample) => ({ sample, metrics: sampleMetrics(sample) }));
+}
+
 export const DEMO_SCANS: readonly ScanSample[] = [
   {
     command: "scan example.com",

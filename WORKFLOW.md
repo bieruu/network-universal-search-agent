@@ -85,7 +85,7 @@ SIGNUP_EMAIL_ALLOWLIST=
 # address, it just cannot send anything (one operator warning per process).
 # RESEND_API_KEY is a SECRET — env only, never NEXT_PUBLIC_*, never committed.
 RESEND_API_KEY=
-AUTH_FROM_EMAIL=Universal Search <noreply@your-domain.com>
+AUTH_FROM_EMAIL=NUSA project <noreply@your-domain.com>
 RESET_EMAIL_TIMEOUT_MS=10000
 ```
 
@@ -196,13 +196,23 @@ ruff check .
 black --check .
 ```
 
-> **CI required checks:** `.github/workflows/ci.yml` is tracked and runs on every `push` and `pull_request`. It defines two jobs — `backend` and `frontend` — and both must be green before merge (set them as required status checks in branch protection). What each job actually gates on:
+> **CI required checks:** `.github/workflows/ci.yml` is tracked and runs on every `push` and `pull_request`. It defines four jobs — `backend`, `prod-image-deps`, `frontend` and `secrets` — and all of them must be green before merge (set them as required status checks in branch protection). What each job actually gates on:
 >
 > - `backend` — installs the hashed `backend/requirements-dev.txt` (a superset of `requirements.txt`: the test and lint tooling is not in the runtime file) against a `postgres:16` service, then runs Alembic `upgrade head` **and** `check` (so a model change without a migration fails CI), `pytest -q`, `ruff check .`, and `black --check .`.
+> - `prod-image-deps` — installs `backend/requirements.txt` **with `--require-hashes` into a clean venv, the same flags the Dockerfile uses**, then imports `app.main`, which builds the app and pulls in every router and service. It exists because the two files above disagree silently: `requirements-dev.txt` is a superset of `requirements.in`, so a runtime package that is only in `requirements.in` and missing from `requirements.txt` passes the entire backend job and then crash-loops the container at boot. That is not hypothetical — dnspython, pillow, phonenumbers and cryptography were all missing from the runtime file this way and only a local image build caught it.
 > - `frontend` — `npm ci`, then `npm run lint`, `npm run tsc`, `npm test`, a dependency audit that fails on moderate-and-above findings, and `npm run build`.
-> - Workflow-wide, and mandatory before merge: a Python dependency vulnerability scan (`pip-audit` against the pinned requirement files) and a secret scan over the diff, so a committed credential or a known-CVE Python dependency fails CI instead of reaching a deploy. If a future edit to `ci.yml` drops either one, treat it as a regression and restore it.
+> - `secrets` — a secret scan over the pushed commit range, with redacted output.
+> - Workflow-wide, and mandatory before merge: a Python dependency vulnerability scan (`pip-audit` against the pinned requirement files), so a known-CVE Python dependency fails CI instead of reaching a deploy. If a future edit to `ci.yml` drops either one, treat it as a regression and restore it.
 >
 > `.github/workflows/ci.yml` is the source of truth for step names — update this list in the same PR whenever a gate changes. `npm run auth:migrate` is deliberately not a CI gate: the build does not need the Better Auth tables, and migrations run as part of the deploy runbook (§8.2).
+>
+> **Keeping `requirements.txt` in sync with `requirements.in`.** The runtime file is `uv pip compile` output and does not update itself. After editing `backend/requirements.in`, regenerate from `backend/` with the same constraint that keeps shared pins identical between the runtime file and CI:
+>
+> ```powershell
+> uv pip compile --universal --python-version 3.11 --generate-hashes -c requirements-dev.txt requirements.in -o requirements.txt
+> ```
+>
+> The `-c` constraint is the point: without it the compile resolves every shared dependency against today's index and quietly moves pins that CI and the venv were verified against. `prod-image-deps` catches a skipped regeneration, but the constraint keeps what ships the same as what was tested.
 
 Backend tests mock upstream OSINT services. For auth, tests verify active/expired/fake session behavior and owner isolation; run the §2 live PostgreSQL setup to validate signup and protected scans end to end.
 
@@ -221,9 +231,9 @@ Backend tests mock upstream OSINT services. For auth, tests verify active/expire
 
 ## 8. Deployment
 
-Target topology: frontend on Vercel, FastAPI in a container on Koyeb (see §8.6), Postgres managed (Neon/Supabase).
+Target topology: frontend on Vercel, FastAPI in a container on a Hugging Face Docker Space (see §8.6), Postgres managed (Neon/Supabase).
 
-`deploy-koyeb.ps1` (repo root) wraps the whole backend deploy for Koyeb, and §8.6 explains the settings it pins. Anything outside that script — the frontend, the database — is configured in its own dashboard.
+Backend deploys push the `backend/` subtree to the Space repository: `git remote add hf https://huggingface.co/spaces/<user>/<space>` once, then `git subtree push --prefix=backend hf main` for every deploy (§8.6). Secrets and non-secret config go in the Space's **Settings → Variables and secrets**, because the Space repo root *is* `backend/` and the monorepo root cannot be pushed to it. `deploy-koyeb.ps1` (repo root) is retained for the Koyeb path — the same runbook wrapped for that host, which is now an alternative rather than the active target. Anything outside the container — the frontend, the database — is configured in its own dashboard.
 
 `frontend/vercel.json` is intentionally minimal: it pins `framework: "nextjs"` and adds `$schema` for editor validation, nothing else. Vercel already detects the build from `package.json` and `next.config.mjs`, so do not add build, output, or routing keys here without a concrete reason. Two deliberate omissions:
 
@@ -268,8 +278,8 @@ Neither side accepts the other's spelling, and neither failure is obvious: the b
 
 - **Two endpoints, one database.** The backend reads the Better Auth `session` table directly (`app/core/security.py`), so both apps must point at the *same* project; a separate database for the frontend would 401 every scan.
 - **Frontend → pooled.** Use the Supavisor connection string on port **5432** (session mode), user `postgres.<project-ref>`, host `aws-0-<region>.pooler.supabase.com`, with `?sslmode=no-verify` — see the note above for why `require` fails here.
-- **Backend → direct.** `db.<project-ref>.supabase.co:5432` with `?ssl=require`. One long-lived container does not need a pooler, and it avoids spending the pooler's connection budget. Running Alembic against the pooler also works, but the direct URL is what the runbook asks for, so use it and keep one variable per deployment.
-- **Region alignment is partial by platform, and impossible on the free tier.** The Supabase project is in `ap-northeast-1` (Tokyo). Koyeb's `free` Instance is offered in Frankfurt and Washington DC only — Tokyo needs a paid Instance type. Render never offered Tokyo at all (Oregon, Ohio, Virginia, Frankfurt, Singapore). So on the free tier this deployment pays a cross-region hop on every query and there is nothing to configure about it; moving to `TYO` on a paid Instance is the fix, not a region setting.
+- **Backend → direct.** `db.<project-ref>.supabase.co:5432` with `?ssl=require`. One long-lived container does not need a pooler, and it avoids spending the pooler's connection budget. Running Alembic against the pooler also works, but the direct URL is what the runbook asks for, so use it and keep one variable per deployment. One caveat rides on it: the direct hostname may resolve to IPv6 only, and a container without IPv6 egress then fails to connect while still looking healthy — §8.6 has the signal and the pooler-session fallback.
+- **Region alignment is partial by platform, and impossible on the free tier.** The Supabase project is in `ap-northeast-1` (Tokyo). The backend host offers no region choice at the free tier — a Hugging Face CPU Basic Space is 2 vCPU / 16 GB RAM with ~50 GB of **non-persistent** disk, which resets on restart, and that is why `CACHE_BACKEND=postgres` (§8.6). The earlier candidates were no better: Koyeb's `free` Instance was offered in Frankfurt and Washington DC only (Tokyo needs a paid Instance type), and Render never offered Tokyo at all (Oregon, Ohio, Virginia, Frankfurt, Singapore). So this deployment pays a cross-region hop on every query and there is nothing to configure about it; moving the database next to the host is the fix, not a region setting.
 - URL-encode the database password if it contains `@ : / # ?`.
 - **Free plan pauses.** A project with low activity over 7 days is paused automatically and restored from the dashboard (1-year window). A paused database fails both migrations and every request, so a demo deployment needs either occasional traffic or a paid plan.
 - **Free plan connections.** Budget them: the SQLAlchemy engine pool, Alembic's migration connection, the Postgres cache path (which opens a connection per call rather than using the pool), and the frontend's pool. Keep `CACHE_BACKEND=sqlite` if the backend is later given a persistent volume, or lower `pool_size` before raising the plan.
@@ -285,95 +295,94 @@ Neither side accepts the other's spelling, and neither failure is obvious: the b
 5. **Deploy the backend container first** and confirm it responds, then deploy the frontend to Vercel. Any release that changes a schema repeats steps 2 and 3 before it takes traffic.
 6. **Verify end to end on the production domain:** sign up, run a scan against a public domain, sign out. A successful build is not proof that auth works in production.
 
-### 8.6 Backend host: Koyeb
+### 8.6 Backend host: Hugging Face Docker Space
 
-**Prefer `deploy-koyeb.ps1` over the manual commands below.** It is the runbook wrapped in one script, and its reason to exist is that every way this deploy fails badly happens *after* a several-minute Docker build: a `DATABASE_URL` pointing at localhost, the wrong TLS spelling, a `BETTER_AUTH_SECRET` that does not match the frontend, or an app that has to exist before it can take secrets. It resolves each value from the environment, then `backend/.env`, then a hidden prompt; validates all four; sets secrets before the service; applies the service configuration; and then polls `/health` and `/ready` on the public URL.
+#### Why the switch
+
+Render and Fly were the earlier candidates and neither produced a running service: Render's signup demands credit-card verification and the operator's card is declined, and Fly has no free compute tier, so a deployed app bills continuously. Koyeb covered that gap until its own signup demanded a card (a $29 pre-authorization hold), which is the same decision as Render's. Hugging Face Spaces is the host now, chosen for its **Docker** SDK specifically: this image is multi-stage, compiles Subfinder with Go, and is started by a command that runs Alembic before uvicorn — none of which a Gradio or Stream Space can do. Vercel and Cloudflare Workers remain ruled out structurally for the same reason as before: `tls_service` needs raw TCP sockets, which neither has. **Free-tier status for Docker Spaces is unverified:** third-party sources describe the free hardware tiers and their limits inconsistently, and the question cannot be settled from here. Confirm what the hardware picker offers at Space creation before treating this deployment as no-cost, and read the tier's published numbers as claims rather than facts.
+
+#### Port 7860, and why anything else is unreachable
+
+Hugging Face Docker Spaces route HTTP to container port **7860** and do **not** set `$PORT` (Koyeb did). That makes the port a hard requirement rather than a convention: a container listening on 8000 builds fine, boots fine, and serves nothing, because the platform sends its traffic to 7860 and nothing there answers. `backend/Dockerfile` `EXPOSE`s 7860 and its `CMD` ends in `uvicorn app.main:app --host 0.0.0.0 --port ${PORT:-7860}` — the default suits the Space, and `$PORT` still wins when it is set, so `docker run -e PORT=8000` keeps working locally. `EXPOSE` is documentation only; what lands traffic is uvicorn listening on 7860.
+
+`backend/README.md` has to carry the `sdk: docker` + `app_port: 7860` YAML front matter, because the Space repository root *is* the `backend/` subtree (below). Without that front matter nothing declares the SDK, and without `app_port` matching the container HTTP has nowhere to land.
+
+#### Deploy mechanics: push the `backend/` subtree
+
+The Space repo root must be the directory that holds the Dockerfile — `backend/` — while this repository's root holds the whole monorepo. `git subtree push --prefix=backend` is what maps one onto the other: it rewrites the commits touching `backend/` into a standalone history whose root is `backend/`, and pushes that history to the Space. Pushing the monorepo root is not an option — there is no Dockerfile at the top level, and unlike Koyeb there is no subdirectory build-context flag to point at.
 
 ```powershell
-.\deploy-koyeb.ps1 -DryRun     # validate everything, deploy nothing
-.\deploy-koyeb.ps1             # deploy and verify
-.\deploy-koyeb.ps1 -Region was # the free Instance exists in fra or was only
+git remote add hf https://huggingface.co/spaces/<user>/<space-name>
+git subtree push --prefix=backend hf main
 ```
 
-It is deliberately **stricter than `app/core/config.py`** on one point: the config guard accepts `sslmode=require` because it cannot know which driver a given URL is for, but a *backend* URL must be `?ssl=require`, since asyncpg rejects `sslmode` as a keyword. The script rejects `sslmode=` outright rather than letting the container discover it.
+Git authentication is the Space's own credentials: a token from `huggingface.co/settings/tokens` with the **write** role used as the password, or `hf auth login` from the `huggingface_hub` package. Remote URLs are not secrets and can be committed; tokens never are. Every deploy is those two commands, and each push rebuilds the image from the Dockerfile inside the subtree.
 
-#### Why Koyeb
+#### What the Space is configured with, and why each one matters
 
-Render and Fly were both tried first and neither produced a running service: Render's signup demands credit-card verification and the operator's card is declined, and Fly has no free compute tier, so a deployed app bills continuously. Of the platforms that cannot host this backend at all, Vercel and Cloudflare Workers are ruled out structurally — `tls_service` needs raw TCP sockets, which neither has. Koyeb is the remaining option that offers genuine no-cost compute.
+Everything below is injected as a real environment variable at container start, so there is no `.env` inside the image and nothing to keep in sync by hand. Secrets go under **Settings → Variables and secrets** as secrets (encrypted, and never shown again after saving); plain variables are for non-sensitive settings only. Saving any of them restarts the Space, which is also how a stale value gets replaced.
 
-Note that Koyeb also requires a credit card at signup (a $29 pre-authorization hold), so the card decision applies here too.
-
-#### Why the CLI and not a `koyeb.yaml`
-
-Koyeb does not publish the schema of a `koyeb.yaml` app definition on its documentation site, and its own example repository (`koyeb/example-docker-compose`) does not use one. The supported, verifiable configuration surfaces are the control panel and the `koyeb` CLI, so this repo drives the CLI and pins the settings that are easy to get wrong. Do not hand-write a `koyeb.yaml` from memory — check the published CLI reference first.
-
-#### The work directory is the build context
-
-The script pins `--git-workdir backend`. That is not cosmetic: Koyeb builds from the work directory, and the Dockerfile copies `requirements.txt`, `alembic.ini` and `alembic/`, which exist only under `backend/`. A work directory of the repository root fails with `COPY failed: file not found in build context`.
-
-#### What the script pins, and why each one matters
+**SECRETS**
 
 | Setting | Value | Reason |
 |---|---|---|
-| `--git-builder docker` + `--git-docker-dockerfile Dockerfile` | — | The image is a multi-stage build that compiles Subfinder with Go; no buildpack does this. |
-| `--instance-type free` | 512 MB / 0.1 vCPU / 2 GB SSD | The only no-cost offering. Never billed. |
-| `--regions fra` (or `was`) | — | The free Instance exists in Frankfurt and Washington DC **only**. There is no Tokyo option at this tier, so region alignment with a Supabase project in `ap-northeast-1` is impossible here — see §8.1. |
-| `--min-scale 1 --max-scale 1` | one instance | The rate limiter is per-process, so a second instance would multiply every quota (`RATE_LIMIT_PER_HOUR`). Never raise this with autoscaling. |
-| `--ports 8000:http` | — | Matches the Dockerfile's `EXPOSE 8000` and its `${PORT:-8000}` command. |
-| `--checks 8000:http:/health` | — | `/health`, not `/ready`: `/ready` opens a database connection on every probe. |
-| `--checks-grace-period 8000=60` | 60 s | The container command runs `alembic upgrade head` before uvicorn serves, and the first build also compiles Subfinder. |
-| `APP_ENV`, `CACHE_BACKEND`, `RATE_LIMIT_PER_HOUR`, `RATE_LIMIT_DAILY_TOTAL` | see table | Non-secret config, applied as plain `--env` values. `CACHE_BACKEND=postgres` because the free Instance has no persistent volume. `RATE_LIMIT_PER_HOUR` must be a real process environment variable — `config.py` checks `os.getenv` so that "unset" is distinguishable from a deliberate value, and refuses to boot without it (§8.4). |
-| `DATABASE_URL`, `BETTER_AUTH_SECRET`, `CORS_ORIGINS`, `APP_URL` | Koyeb secrets | Set as org-level secrets and referenced with `--env KEY={{secret.NAME}}`, so no credential is ever in git or in this file. |
-| `SHODAN_API_KEY`, `NVD_API_KEY`, `OTX_API_KEY`, `URLSCAN_API_KEY`, `VIRUSTOTAL_API_KEY`, `LEAKLOOKUP_API_KEY` | Koyeb secrets, optional | Forwarded when the value in `backend/.env` is real, so production reports the same source coverage as a local scan. A placeholder (`your-key`, `changeme`, a value ending in `-key`) is treated as unset rather than pushed: a source that looks configured but throws on every call reads as an outage, while one that reports `not_configured` reads as a decision. `SERVICE_TOKEN` and `RATE_LIMIT_EXEMPT_SUBJECTS` are deliberately **not** forwarded — they are QA load-testing controls that grant unlimited quota, and an empty `SERVICE_TOKEN` fails closed (`require_user` compares under `hmac.compare_digest`, which cannot match), so not sending them leaves the public deployment without an exemption. |
+| `DATABASE_URL` | `postgresql+asyncpg://postgres:PASSWORD@db.<REF>.supabase.co:5432/postgres?ssl=require` | The shared session/database URL — the backend reads Better Auth's `session` table directly (§8.1). asyncpg rejects `sslmode=` as a keyword, so `?ssl=require` is the only correct spelling: `config.py`'s guard accepts either, which means the wrong one validates and then dies at connect time, after a several-minute build. |
+| `BETTER_AUTH_SECRET` | the same value as the frontend's | Two different values mean every scan 401s. |
+| `APP_URL` | `https://<vercel-domain>` | The origin the backend names in what it emits; must be the exact browser origin. |
+| `CORS_ORIGINS` | `https://<vercel-domain>` | Exact origin, no trailing slash, no wildcard — `config.py` refuses to boot in production on a wildcard, and a trailing slash fails every browser preflight for a reason that is invisible server-side. |
+| `SHODAN_API_KEY`, `NVD_API_KEY`, `OTX_API_KEY`, `URLSCAN_API_KEY`, `VIRUSTOTAL_API_KEY`, `LEAKLOOKUP_API_KEY` | optional | Forward each only when the value is real, so production reports the same source coverage as a local scan. A placeholder (`your-key`, `changeme`, a value ending in `-key`) is worse than an omission: the source looks configured and then throws on every call, which reads as an outage, while an unset source reports `not_configured`, which reads as the decision it actually is. `SERVICE_TOKEN` and `RATE_LIMIT_EXEMPT_SUBJECTS` are deliberately **not** forwarded — they are QA load-testing controls that grant unlimited quota (§3.1), and an empty `SERVICE_TOKEN` fails closed, so not sending them leaves the public deployment without an exemption. |
 
-Secrets are set **before** the service is created or updated, so the first deployment already has them.
+**PLAIN VARIABLES**
 
-- **`?ssl=require`, not `sslmode=require`,** for the backend URL — the same driver rule as §8.1, and `config.py`'s guard accepts either spelling, so the wrong one only fails at connect time.
+| Setting | Value | Reason |
+|---|---|---|
+| `APP_ENV` | `production` | Turns on the fail-closed config guards (§8.3, §8.4). |
+| `CACHE_BACKEND` | `postgres` | The Space has no persistent volume, so there is nowhere for the SQLite TTL cache to survive a restart and the cache has to live in the database (ARCHITECTURE.md §7). |
+| `RATE_LIMIT_PER_HOUR` | `5` | **Required.** It must be a real injected variable rather than a file in the image: `config.py` checks `os.getenv` so that "unset" stays distinguishable from a deliberate value, and the backend refuses to boot under production without it (§8.4). |
+| `RATE_LIMIT_DAILY_TOTAL` | `50` | Instance-wide backstop over the one paid Shodan key (§8.4). |
+| `MAX_REQUEST_BODY_BYTES` | (unset → `16777216`) | Ceiling on an inbound request body. It is enforced by `BodySizeLimitMiddleware` BEFORE anything reads the payload, because FastAPI solves dependencies — `require_user` included — only after `await request.body()`. Without it an anonymous caller can make the worker buffer an arbitrarily large body on the way to its 401. The default is sized by the largest legitimate body, the EXIF base64 upload (`(MAX_INPUT_BYTES // 3) * 4 + 4` ≈ 13.98 MiB) plus envelope overhead; `backend/tests/test_body_limit.py` pins that relationship, so raising it past the default reopens the bug and lowering it gives legitimate uploads a spurious 413. The frontend proxy applies the same 16 MiB cap. |
+
+Three points the tables cannot carry:
+
+- **`?ssl=require`, not `sslmode=require`** — the same driver rule as §8.1, and `config.py`'s guard accepts either spelling, so the wrong one only fails at connect time.
 - **`BETTER_AUTH_SECRET` must equal the frontend's.** Two different values mean every scan 401s.
-- **Cost:** the `free` Instance is never billed. The trade is throughput, not money: 0.1 vCPU is slow, and a scan gathers its sources concurrently, so wall-clock still tracks the slowest per-source timeout rather than CPU. If scans time out at the source rather than at the edge, move to a paid Instance (`nano` ≈ $2.68/month, `micro` ≈ $0.2 vCPU ≈ $5.36/month) — `TYO` is available at those tiers and removes the cross-region hop.
+- **No region to align.** The Space runs where the platform runs it; there is no `fra`/`was` picker to argue with, unlike the earlier hosts (§8.1).
 
-#### The free Instance sleeps, and the ping that stops it
+#### The IPv6 caveat (a real risk, with a fallback)
 
-The free Instance scales down to zero after **1 hour** without traffic from the Internet, and that idle period cannot be disabled on this tier. That is what `.github/workflows/keep-backend-awake.yml` is for: a 5-minute `GET /health` resets the clock, leaving a 12× margin even if a run is delayed or dropped.
+The direct Supabase endpoint `db.<project-ref>.supabase.co` may resolve to an **IPv6 address only**. If the Space has no IPv6 egress, every connection attempt fails while the container itself stays healthy: `/health` answers `{"status":"ok"}` because it is an in-memory liveness check that touches nothing, so the break looks like nothing at all until a scan 401s or `/ready` reports degraded. **Unverified:** whether a given Space has IPv6 egress cannot be determined from this repository, so treat that path as broken until it is proved otherwise.
 
-- `/health` is used deliberately. It is an in-memory liveness check; `/ready` would also hold the service awake but opens a Postgres connection on every probe, spending the free Supabase connection budget on a keepalive.
-- Arm it by setting the repository variable `BACKEND_HEALTH_URL` to `https://<koyeb-app-url>/health` (Settings → Secrets and variables → Actions → Variables). The script prints the exact value at the end of a successful run. This repository is public, so the Actions minutes are not billed.
-- **Known limitation, stated rather than assumed:** GitHub's scheduler runs late under load — 15 minutes is routine and it can be worse. If the backend still sleeps, move the ping to an external scheduler (cron-job.org, UptimeRobot) rather than tightening this cron further.
+`/ready` is the signal, because it opens one real database connection. If `/health` says ok and `/ready` is degraded, the backend cannot reach Postgres and the IPv6 path is the first suspect.
+
+The fallback is the Supavisor pooler in **SESSION** mode: port **5432**, user `postgres.<project-ref>`, host `aws-0-<region>.pooler.supabase.com`, `?ssl=require`. Not transaction mode on 6543 — transaction pooling breaks SQLAlchemy's prepared statements, and that failure arrives as intermittent confusing errors rather than as a clean connection refusal. The pooler's connection budget is shared with the frontend (§8.1), which is the only reason to keep the direct URL otherwise.
+
+#### Verification, in order
+
+1. Create the Space with SDK **Docker** and the hardware tier you want, then confirm `backend/README.md` carries `sdk: docker` and `app_port: 7860` before the first push: that file becomes the Space's root README, and it is what declares the SDK and the port.
+2. Add the `hf` remote and push the subtree. Expect the **first build to take several minutes** — the image is multi-stage and compiles Subfinder with Go before the runtime stage installs anything, and the container command runs `alembic upgrade head` before uvicorn serves.
+3. `GET https://<user>-<space-name>.hf.space/health` → `{"status":"ok"}`, then `GET /ready` → `{"status":"ready"}`. `/health` alone proves only that the process is alive; `/ready` is the one that exercises `DATABASE_URL`, the TLS spelling, and the IPv6 path.
+4. Set `BACKEND_URL=https://<user>-<space-name>.hf.space` in the Vercel project environment and redeploy the frontend. The browser never calls the backend directly — requests go through the Next.js proxy routes — so CORS is a second layer rather than the mechanism, and the exact origins still matter for the day something does call it directly.
+5. Run the §8.2 step 6 check on the production domain: sign up, scan a public domain, sign out.
+
+#### The Space sleeps, and the ping that stops it
+
+Spaces sleep after an idle period — reported at roughly **48 hours**, but the exact window is neither documented nor guaranteed, so treat that number as unverified and read the Space's own logs rather than this paragraph. Either way `.github/workflows/keep-backend-awake.yml` still applies: a 5-minute `GET /health` holds the clock whatever the window turns out to be.
+
+- Arm it by setting the repository variable `BACKEND_HEALTH_URL` to `https://<user>-<space-name>.hf.space/health` (Settings → Secrets and variables → Actions → Variables).
+- Keep the existing caveat rather than assuming it away: GitHub's scheduler runs late under load — 15 minutes is routine and it can be worse. If the Space still sleeps, move the ping to an external scheduler (cron-job.org, UptimeRobot) instead of tightening this cron further.
 
 #### Manual equivalent
 
+The deploy itself is two git commands:
+
 ```powershell
-koyeb login
-koyeb secrets create DATABASE_URL -v "postgresql+asyncpg://postgres:PASSWORD@db.<REF>.supabase.co:5432/postgres?ssl=require"
-koyeb secrets create BETTER_AUTH_SECRET -v "<same value as frontend/.env.local>"
-koyeb secrets create CORS_ORIGINS -v "https://<vercel-domain>"
-koyeb secrets create APP_URL -v "https://<vercel-domain>"
-# Source keys are OPTIONAL -- omit one and that source reports not_configured.
-# Do not push a placeholder: a source that looks configured but throws on every
-# call reads as an outage rather than as the decision it actually is.
-koyeb secrets create SHODAN_API_KEY -v "<paid shared key>"
-koyeb secrets create NVD_API_KEY -v "<optional>"
-koyeb secrets create OTX_API_KEY -v "<optional>"
-koyeb secrets create URLSCAN_API_KEY -v "<optional>"
-koyeb secrets create VIRUSTOTAL_API_KEY -v "<optional, BYOK>"
-koyeb secrets create LEAKLOOKUP_API_KEY -v "<optional>"
-
-koyeb apps init osint-api `
-  --git https://github.com/bieruu/network-universal-search-agent --git-branch main `
-  --git-workdir backend --git-builder docker --git-docker-dockerfile Dockerfile `
-  --regions fra --instance-type free --min-scale 1 --max-scale 1 --type web `
-  --ports 8000:http --checks 8000:http:/health --checks-grace-period 8000=60 `
-  --env APP_ENV=production --env CACHE_BACKEND=postgres `
-  --env RATE_LIMIT_PER_HOUR=5 --env RATE_LIMIT_DAILY_TOTAL=50 `
-  --env 'DATABASE_URL={{secret.DATABASE_URL}}' `
-  --env 'BETTER_AUTH_SECRET={{secret.BETTER_AUTH_SECRET}}' `
-  --env 'CORS_ORIGINS={{secret.CORS_ORIGINS}}' `
-  --env 'APP_URL={{secret.APP_URL}}'
-
-koyeb deployments logs osint-api   # expect: alembic upgrade head OK, then uvicorn on :8000
+git remote add hf https://huggingface.co/spaces/<user>/<space-name>
+git subtree push --prefix=backend hf main
 ```
 
-Read the public URL back with `koyeb apps describe osint-api -o json` (its `domain` field) — the default `koyeb.app` hostname contains an organization slug and a hash, so it cannot be constructed by hand.
+- Secrets and plain variables are set in the Space's **Settings → Variables and secrets** UI, or programmatically through `huggingface_hub`'s Space secrets API (`HfApi.add_space_secret` / `add_space_variable`). Saving either restarts the Space.
+- The public URL is `https://<user>-<space-name>.hf.space` — the username is part of the hostname, so the Space name alone does not construct it.
+- `deploy-koyeb.ps1` is retained for the Koyeb path, which remains a working alternative host: it wraps the same runbook, resolving the four load-bearing values from the environment, then `backend/.env`, then a hidden prompt, validating them, applying them before the service, and polling `/health` and `/ready` on the resulting public URL. It is deliberately stricter than `app/core/config.py` on one point — the config guard accepts `sslmode=require` because it cannot know which driver a given URL is for, but a *backend* URL must be `?ssl=require`, since asyncpg rejects `sslmode` as a keyword. Run it with `-DryRun` to validate everything and deploy nothing. It is no longer the active target.
 
 Other deployment notes:
 

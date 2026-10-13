@@ -113,6 +113,16 @@ class Settings(BaseSettings):
     # Default empty: nobody is exempt until an operator opts in by name.
     rate_limit_exempt_subjects: str = ""
     cache_ttl_hours: int = 24
+    # Ceiling on an inbound request body. It is enforced by
+    # `BodySizeLimitMiddleware` BEFORE anything reads the payload, because
+    # FastAPI resolves dependencies (`require_user`) only after `await
+    # request.body()`: without this cap an anonymous caller can make the worker
+    # buffer an arbitrarily large JSON document on the way to being told "401".
+    # 16 MiB is sized by the largest legitimate body — the EXIF upload at
+    # `POST /api/v1/analysis/exif`, whose base64 payload is capped at
+    # `(MAX_INPUT_BYTES // 3) * 4 + 4` = ~13.98 MiB, plus JSON envelope overhead.
+    # Raising it past that buys nothing and reopens the exhaustion path.
+    max_request_body_bytes: int = Field(default=16 * 1024 * 1024, ge=0)
     # Target-fetching budgets (see app/core/ssrf.py). These bound the one path
     # where the backend connects to an attacker-chosen host, so they are
     # deliberately small: a redirect chain that runs long is a redirect loop, and

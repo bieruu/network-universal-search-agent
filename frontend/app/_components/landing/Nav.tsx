@@ -25,7 +25,7 @@ export default function Nav() {
         <Link href="/" className="flex items-center gap-2.5">
           <Monogram />
           <span className="font-mono text-sm font-semibold tracking-tight text-foreground dark:text-neutral-100">
-            universal-search
+            NUSA project
           </span>
         </Link>
         <div className="hidden items-center gap-7 text-sm text-slate-600 dark:text-neutral-400 md:flex">

@@ -14,7 +14,7 @@ const forgotPage = read("..", "app", "(auth)", "forgot-password", "page.tsx");
 const forgotForm = read("..", "app", "(auth)", "forgot-password", "forgot-password-form.tsx");
 const resetPage = read("..", "app", "(auth)", "reset-password", "page.tsx");
 const resetForm = read("..", "app", "(auth)", "reset-password", "reset-password-form.tsx");
-const signIn = read("..", "app", "(auth)", "sign-in", "_components", "modern-animated-sign-in.tsx");
+const signIn = read("..", "app", "(auth)", "sign-in", "_components", "sign-in-form.tsx");
 const signUp = read("..", "app", "(auth)", "sign-up", "sign-up-form.tsx");
 const middleware = read("..", "middleware.ts");
 
@@ -41,10 +41,24 @@ test("auth.ts logs the missing-key state rather than pretending to send", () => 
 test("the reset routes exist and are reachable while signed out", () => {
   assert.ok(forgotPage.includes("ForgotPasswordForm"));
   assert.ok(resetPage.includes("ResetPasswordForm"));
-  // middleware gates only the dashboard; a reset page behind a session gate
-  // could never be used by the person holding the emailed token.
-  assert.ok(middleware.includes('matcher: ["/dashboard/:path*"]'));
+  // The matcher used to be the dashboard's alone. It is now wider, because the
+  // CSP nonce has to be minted wherever a document renders — so the invariant
+  // is no longer "the matcher mentions the dashboard" but "the *session gate*
+  // inside the middleware is scoped to the dashboard". A reset page behind a
+  // blanket gate could never be used by the person holding the emailed token.
+  assert.ok(
+    middleware.includes('startsWith("/dashboard")'),
+    "the session lookup must stay scoped to /dashboard",
+  );
   assert.ok(!middleware.includes("forgot-password") && !middleware.includes("reset-password"));
+
+  // And the widened matcher must still reach both reset routes.
+  const matcher = middleware.match(/matcher:\s*\[([\s\S]*?)\]/);
+  assert.ok(matcher, "no matcher declared in middleware.ts");
+  const pattern = new RegExp((matcher[1].match(/"((?:[^"\\]|\\.)*)"/) ?? [])[1]);
+  for (const path of ["/forgot-password", "/reset-password"]) {
+    assert.ok(pattern.test(path), `the matcher must reach ${path} while signed out`);
+  }
 });
 
 test("the forgot-password form shows one confirmation for every outcome", () => {

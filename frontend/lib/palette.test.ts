@@ -91,6 +91,12 @@ test("landing sections pair light/dark text, borders and surfaces", () => {
   assert.ok(landing["HowItWorks.tsx"].includes("dark:bg-[#0c1117]"), "how-it-works keeps dark surface");
   assert.ok(landing["Hero.tsx"].includes("bg-panel"), "terminal uses the shared panel token");
   assert.ok(landing["FeatureBento.tsx"].includes("bg-panel"), "bento matches the terminal surface");
+  // The auth shell now carries a real transcript on the same panel token — the
+  // sign-in screen used to spend that half of the screen on an icon orbit.
+  assert.ok(authShell.includes("bg-panel"), "the auth shell's transcript sits on the shared panel token");
+  assert.ok(authShell.includes("DEMO_SCANS"), "the auth panel prints the real sample transcript");
+  assert.ok(!authShell.includes("ORBIT_ICONS"), "the icon orbit is gone, not restyled");
+  assert.ok(!authShell.includes("lucide-react"), "the auth shell takes its icons from Phosphor");
 });
 
 test("primitives render in both themes", () => {

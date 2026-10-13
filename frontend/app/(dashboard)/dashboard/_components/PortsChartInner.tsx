@@ -37,7 +37,7 @@ export default function PortsChartInner({ scan }: { scan: ScanResult }) {
   const pal = chartPalette();
   const groups = groupsFor(scan);
   return (
-    <div className="h-[240px]" aria-label="ports chart">
+    <div className="relative h-[240px]" aria-label="ports chart">
       <Bar
         data={{
           labels: groups.map((g) => g.label),
@@ -63,6 +63,15 @@ export default function PortsChartInner({ scan }: { scan: ScanResult }) {
           },
         }}
       />
+      {/* Highlight band: a soft sweep travelling across the plot area. This is
+          the one loop inside a data surface, and it stays inside the floor the
+          dashboard lock was protecting — opacity and transform on a decorative
+          overlay only. The bars themselves never change height, never grow and
+          are never re-animated: a bar whose height is alive is a bar you cannot
+          compare against the number printed beside it. */}
+      <div aria-hidden="true" className="pointer-events-none absolute inset-0 overflow-hidden">
+        <div className="absolute inset-y-0 w-1/3 bg-gradient-to-r from-transparent via-accent/10 to-transparent motion-safe:animate-sweep" />
+      </div>
     </div>
   );
 }

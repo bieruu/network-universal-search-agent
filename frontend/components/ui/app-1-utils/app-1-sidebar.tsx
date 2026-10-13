@@ -2,15 +2,15 @@
 
 import { useRouter } from "next/navigation";
 import Link from "next/link";
-import { History, LayoutDashboard, LogIn, LogOut } from "lucide-react";
+import { ClockClockwise, SignIn, SignOut, SquaresFour } from "@phosphor-icons/react/dist/ssr";
 import { NAV_ITEMS, SOURCE_MONOGRAMS } from "./app-1-data";
 import { authClient } from "@/lib/auth-client";
 import { cn } from "@/lib/utils";
 
-const NAV_ICONS = { Dashboard: LayoutDashboard, History: History, "Sign in": LogIn } as const;
+const NAV_ICONS = { Dashboard: SquaresFour, History: ClockClockwise, "Sign in": SignIn } as const;
 
 export function SidebarProvider({ children }: { children: React.ReactNode }) {
-  return <div className="flex min-h-screen bg-background text-foreground">{children}</div>;
+  return <div className="flex min-h-dvh bg-background text-foreground">{children}</div>;
 }
 
 export function SidebarInset({ children }: { children: React.ReactNode }) {
@@ -27,16 +27,16 @@ export function App1Sidebar({ active = "/dashboard", className }: { active?: str
   }
 
   return (
-    <aside className={cn("sticky top-0 hidden h-screen w-60 shrink-0 flex-col gap-6 overflow-y-auto border-r border-btn-border bg-background p-4 md:flex", className)} aria-label="sidebar">
-      <Link href="/" className="flex items-center gap-2" aria-label="Universal Search home">
+    <aside className={cn("sticky top-0 hidden h-dvh w-60 shrink-0 flex-col gap-6 overflow-y-auto border-r border-btn-border bg-background p-4 md:flex", className)} aria-label="sidebar">
+      <Link href="/" className="flex items-center gap-2" aria-label="NUSA project home">
         <span className="flex h-8 w-8 items-center justify-center rounded-lg bg-accent font-mono text-lg font-bold text-accent-foreground">
           N
         </span>
-        <span className="font-mono text-sm font-semibold tracking-tight">Universal Search</span>
+        <span className="font-mono text-sm font-semibold tracking-tight">NUSA project</span>
       </Link>
       <nav className="flex flex-col gap-1" aria-label="primary">
         {NAV_ITEMS.map((item) => {
-          const Icon = NAV_ICONS[item.label as keyof typeof NAV_ICONS] ?? LayoutDashboard;
+          const Icon = NAV_ICONS[item.label as keyof typeof NAV_ICONS] ?? SquaresFour;
           return (
             <Link
               key={item.href}
@@ -49,7 +49,7 @@ export function App1Sidebar({ active = "/dashboard", className }: { active?: str
                   : "text-slate-600 hover:bg-accent/10 hover:text-foreground dark:text-neutral-500 dark:hover:bg-accent/10 dark:hover:text-foreground",
               )}
             >
-              <Icon size={18} strokeWidth={2} aria-hidden="true" />
+              <Icon size={18} weight="regular" aria-hidden="true" />
               {item.label}
             </Link>
           );
@@ -85,7 +85,7 @@ export function App1Sidebar({ active = "/dashboard", className }: { active?: str
           className="flex w-full items-center gap-2 rounded-lg px-3 py-2 text-sm text-slate-600 transition-colors hover:bg-accent/10 hover:text-foreground dark:text-neutral-500 dark:hover:bg-accent/10 dark:hover:text-foreground"
           aria-label="Log out"
         >
-          <LogOut size={18} strokeWidth={2} aria-hidden="true" />
+          <SignOut size={18} weight="regular" aria-hidden="true" />
           Log out
         </button>
       </div>

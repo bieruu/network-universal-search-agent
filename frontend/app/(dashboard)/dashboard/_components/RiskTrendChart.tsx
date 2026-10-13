@@ -1,13 +1,15 @@
 "use client";
 import dynamic from "next/dynamic";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
+import CardWash from "./card-wash";
 
 const RiskTrendChartInner = dynamic(() => import("./RiskTrendChartInner"), { ssr: false });
 
 export default function RiskTrendChart({ target }: { target: string | null }) {
   return (
-    <Card className="flex min-h-[320px] flex-col">
-      <CardHeader>
+    <Card className="relative flex min-h-[320px] flex-col overflow-hidden">
+      <CardWash index={1} />
+      <CardHeader className="relative">
         <CardTitle>Risk trend{target ? ` — ${target}` : ""}</CardTitle>
         <CardDescription>
           {target
@@ -15,7 +17,7 @@ export default function RiskTrendChart({ target }: { target: string | null }) {
             : "Scan a target to see how its risk score changes over time."}
         </CardDescription>
       </CardHeader>
-      <CardContent className="flex-1">
+      <CardContent className="relative flex-1">
         {!target ? (
           <p className="flex h-[240px] items-center justify-center text-sm text-slate-500 dark:text-neutral-500">
             Nothing to chart yet — run a scan and come back after a few more.

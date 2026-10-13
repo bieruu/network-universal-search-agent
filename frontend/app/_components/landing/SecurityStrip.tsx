@@ -34,13 +34,12 @@ export default function SecurityStrip() {
       </Reveal>
       <ul className="mt-10 grid gap-x-8 gap-y-6 sm:grid-cols-2 lg:grid-cols-4">
         {ITEMS.map((c, i) => (
-          <li key={c.title} className="border-l-2 border-accent/60 pl-4">
+          <li key={c.title} className="group border-l-2 border-accent/60 pl-4 transition-colors duration-200 hover:border-accent">
             <Reveal delay={Math.min(i * 0.05, 0.15)}>
               <c.icon
                 size={20}
                 weight="regular"
-                className="text-accent motion-safe:animate-bob"
-                style={{ animationDelay: `${i * 0.6}s` }}
+                className="text-accent transition-transform duration-200 group-hover:-translate-y-0.5 motion-reduce:group-hover:translate-y-0"
                 aria-hidden="true"
               />
               <h3 className="mt-2 text-sm font-semibold text-slate-900 dark:text-neutral-100">{c.title}</h3>

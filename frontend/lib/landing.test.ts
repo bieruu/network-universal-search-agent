@@ -270,9 +270,39 @@ test("CTA and card hovers lift with motion-reduce fallback", () => {
   assert.ok(bento.includes("motion-reduce:hover:translate-y-0"), "card lift disabled on reduced motion");
 });
 
+test("how-it-works shows the partial-failure story, not a painted skeleton", () => {
+  const how = sources["HowItWorks.tsx"];
+  // The right-hand panel used to be three empty pills — rounded bars with a
+  // looping pulse, standing in for a list nobody had written. A div that looks
+  // like content and carries none is the one template tell that actually
+  // deceives, because it implies a screenshot of a real result.
+  assert.ok(!how.includes("rounded-full bg-accent/40"), "the fake content pills must not come back");
+  // Real sentences, one per data source, from the one place they are declared.
+  assert.ok(how.includes('from "./source-copy"'), "the panel reads the shared source copy");
+  assert.ok(how.includes("s.whenSlow"), "every row says what happens when that source fails");
+  assert.ok(how.includes("s.gives"), "every row says what that source contributes");
+  // Four sources are declared, so four rows render. One per source, no extras.
+  const rows = how.match(/<li key=\{s\.mark\}/g) ?? [];
+  assert.ok(rows.length === 1, "exactly one row template, rendered per source");
+  const sourceCopy = readFileSync(join(here, "..", "app", "_components", "landing", "source-copy.ts"), "utf8");
+  const marks = sourceCopy.match(/mark: "/g) ?? [];
+  assert.ok(marks.length === 4, "the shared copy declares one entry per data source");
+});
+
+test("bento visuals read the shared sample figures, not a second set of numbers", () => {
+  const bento = sources["BentoVisuals.tsx"];
+  assert.ok(bento.includes("demoSampleMetrics"), "the bento reads the samples' own figures");
+  assert.ok(!bento.includes("const BARS"), "no hand-written bar heights left to disagree with the terminal");
+  assert.ok(!bento.includes("const GRID_CELLS"), "no hand-written grid cells left to disagree with the terminal");
+  // The figures come out of the sample's own output lines, and a sample whose
+  // copy stops carrying a number must degrade rather than invent one.
+  assert.ok(samples.includes("export function sampleMetrics"), "the parser lives beside the samples");
+  assert.ok(samples.includes("demoSampleMetrics"), "the samples export their figures to consumers");
+});
+
 test("looping motion: staggered blips, bobs and sweeps — all motion-safe", () => {
   const css = readFileSync(join(here, "..", "app", "globals.css"), "utf8");
-  for (const key of ["bob", "sweep", "blip", "eq", "breathe"]) {
+  for (const key of ["sweep", "blip", "eq", "breathe"]) {
     assert.ok(css.includes(`--animate-${key}:`), `globals.css must define --animate-${key}`);
     assert.ok(css.includes(`@keyframes ${key}`), `globals.css must define @keyframes ${key}`);
   }
@@ -280,7 +310,12 @@ test("looping motion: staggered blips, bobs and sweeps — all motion-safe", () 
   assert.ok(/@keyframes breathe[\s\S]*?scale\(1\.12\)/.test(css), "breathe caps expansion at 1.12x");
   const hero = sources["Hero.tsx"];
   assert.ok(hero.includes("motion-safe:animate-blip"), "terminal traffic dots blip in a loop");
-  assert.ok(hero.includes('animationDelay: "0.6s"'), "traffic dots are staggered");
+  // The stagger comes from the shared period table rather than from numbers
+  // typed out per file. There used to be a literal `"0.6s"` here, `"1.5s"` in
+  // how-it-works and `"0.18"` in the bento — three independent guesses at a
+  // spread that nothing kept from collapsing into one beat.
+  assert.ok(hero.includes('from "@/lib/motion-phases"'), "the hero reads the shared period table");
+  assert.ok(hero.includes("phaseDelay("), "traffic dots take their stagger from the shared table");
   // The eyebrow asserts the benefit, and asserts the jargon is GONE: "OSINT"
   // and "PASSIVE" were both mechanism words on a visitor-facing surface.
   assert.ok(hero.includes("PUBLIC RECORDS ONLY"), "eyebrow keeps its copy");
@@ -293,13 +328,24 @@ test("looping motion: staggered blips, bobs and sweeps — all motion-safe", () 
   assert.ok(nav.includes("motion-safe:animate-breathe"), "nav monogram breathes smoothly (no ping)");
   assert.ok(!nav.includes("animate-[ping_"), "nav monogram must not use the abrupt ping");
   const logos = sources["LogoStrip.tsx"];
-  assert.ok(logos.includes("motion-safe:animate-bob"), "logo strip bobs in a loop");
-  assert.ok(logos.includes("animationDelay"), "logo bob is staggered");
+  // The bob loop is gone: a perpetual up/down drift said "decoration" about
+  // the records the product's evidence base is built from. The strip sits
+  // still and answers when asked — click a source, get what it contributes
+  // and what the result looks like when it is slow (2026-10-10).
+  assert.ok(!logos.includes("animate-bob"), "the logo strip no longer bobs in a loop");
+  assert.ok(!logos.includes("animationDelay"), "no staggered loop delay remains");
+  assert.ok(logos.includes("useState"), "each source is selectable, so the strip is interactive");
+  assert.ok(/aria-pressed/.test(logos), "the selected source is announced to AT, not just painted");
+  assert.ok(logos.includes("hover:"), "chips give hover feedback instead of a loop");
+  assert.ok(logos.includes("focus:ring-accent"), "chips are keyboard reachable");
+  assert.ok(logos.includes('from "./Reveal"'), "the source panel still reveals on scroll");
   const bento = sources["BentoVisuals.tsx"];
   assert.ok(bento.includes("motion-safe:animate-sweep"), "port grid has a looping scanline sweep");
   assert.ok(bento.includes("motion-safe:animate-eq"), "metric bars keep equalizing in a loop");
   const security = sources["SecurityStrip.tsx"];
-  assert.ok(security.includes("motion-safe:animate-bob"), "security icons bob in a loop");
+  assert.ok(!security.includes("animate-bob"), "security icons no longer bob in a loop");
+  assert.ok(security.includes("hover:border-accent"), "security rows give hover feedback instead of a loop");
+  assert.ok(security.includes("motion-reduce:group-hover:translate-y-0"), "hover lift disabled on reduced motion");
   const how = sources["HowItWorks.tsx"];
   assert.ok(how.includes("motion-safe:animate-blip"), "how-it-works live dot blips");
   assert.ok(how.includes("animate-[ping_"), "how-it-works live dot pings");
@@ -308,9 +354,36 @@ test("looping motion: staggered blips, bobs and sweeps — all motion-safe", () 
   assert.ok(meter.includes("motion-safe:animate-sweep"), "risk meter carries a looping shimmer");
   const parallax = sources["ParallaxField.tsx"];
   assert.ok(parallax.includes("motion-safe:animate-ambient-pulse"), "parallax washes pulse while resting");
+  // Two washes that breathe on the same beat read as one moving surface, so each
+  // takes a different phase from the shared table.
+  assert.ok(parallax.includes("phaseDelay("), "parallax washes are offset against each other");
   // Washes must be clearly visible, not near-invisible ghosts.
   const backdrop = sources["AmbientBackdrop.tsx"];
   assert.ok(backdrop.includes("0.11") && backdrop.includes("0.14"), "hero wash opacity is visibly boosted");
+
+  // One period table, every consumer. `lib/motion-phases.ts` is the only place a
+  // duration or a delay may be invented; the CSS declarations it generates are
+  // the ones `globals.css` carries, asserted in lib/loop-contract.test.ts.
+  // What is asserted here is that the sections actually read from it — a table
+  // nobody imports is a table that has already drifted.
+  const phases = readFileSync(join(here, "..", "lib", "motion-phases.ts"), "utf8");
+  assert.ok(phases.includes("MOTION_PHASES"), "the shared period table exists");
+  for (const layer of ["Hero.tsx", "ParallaxField.tsx", "BentoVisuals.tsx", "GridDrift.tsx"]) {
+    assert.ok(
+      sources[layer]?.includes('from "@/lib/motion-phases"'),
+      `${layer} must take its periods from the shared table`,
+    );
+  }
+  // The grid drift is the rearmost layer of the page-level stack, behind the
+  // wash and the parallax washes — it is the plane the content sits on.
+  const grid = sources["GridDrift.tsx"];
+  assert.ok(grid, "GridDrift.tsx must exist");
+  assert.ok(grid.includes('aria-hidden="true"'), "the grid is decorative-only");
+  assert.ok(grid.includes("pointer-events-none"), "the grid cannot take a click");
+  assert.ok(grid.includes("motion-safe:animate-ambient-drift"), "the grid drifts, gated");
+  assert.ok(grid.includes("h-[100dvh]"), "the grid spans the viewport, not the content column");
+  assert.ok(grid.includes("[mask-image:"), "the grid fades out instead of ending in a hard cut");
+  assert.ok(page.includes("GridDrift"), "the page-level layer renders the grid drift");
   // No loop may escape the reduced-motion gate.
   for (const [f, src] of Object.entries(sources)) {
     const ungated =

@@ -6,16 +6,21 @@ import { fileURLToPath } from "node:url";
 
 const here = dirname(fileURLToPath(import.meta.url));
 const src = readFileSync(
-  join(here, "..", "app", "(auth)", "sign-in", "_components", "modern-animated-sign-in.tsx"),
+  join(here, "..", "app", "(auth)", "sign-in", "_components", "sign-in-form.tsx"),
   "utf8",
 );
 const shell = readFileSync(join(here, "..", "app", "(auth)", "_components", "auth-shell.tsx"), "utf8");
 
-test("login uses lucide icons only, no CDN or remote images", () => {
+// DESIGN.md mandates Phosphor-only for this project's icons ("No emojis in UI —
+// Phosphor only"), and the sign-in form is one of the nine files that used to
+// carry lucide alongside it. Two icon families in one tree is both a visual tell
+// and a written-rule violation, so the contract now names the winner.
+test("login uses Phosphor icons only, no CDN or remote images", () => {
   assert.ok(!src.includes("cdn.21st.dev"), "no 21st.dev CDN");
   assert.ok(!src.includes("next/image"), "no next/image remote");
   assert.ok(!src.includes("https://"), "no remote URLs");
-  assert.ok(src.includes("lucide-react"), "lucide icons required");
+  assert.ok(src.includes("@phosphor-icons/react"), "Phosphor icons required");
+  assert.ok(!src.includes("lucide-react"), "lucide-react is the family this project is leaving");
 });
 
 test("login has no debug logs, and the forgot-password link is live", () => {

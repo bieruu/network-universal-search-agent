@@ -53,7 +53,7 @@ export type ResetSenderDeps = {
   warn?: (message: string) => void;
 };
 
-const RESET_SUBJECT = "Reset your Universal Search password";
+const RESET_SUBJECT = "Reset your NUSA project password";
 
 /** Operator-visible, and shown nowhere in the UI. */
 export function describeResetDeliveryMode(env: ResetSenderEnv = process.env): string | null {
@@ -81,7 +81,7 @@ function escapeHtml(value: string): string {
  * `baseURL`, which is an operator-supplied env var, and an unescaped `&` in a
  * query string is enough to break the markup.
  */
-export function resetEmailHtml(url: string, appName = "Universal Search"): string {
+export function resetEmailHtml(url: string, appName = "NUSA project"): string {
   const safeUrl = escapeHtml(url);
   const safeName = escapeHtml(appName);
   return [
@@ -91,7 +91,7 @@ export function resetEmailHtml(url: string, appName = "Universal Search"): strin
   ].join("");
 }
 
-export function resetEmailText(url: string, appName = "Universal Search"): string {
+export function resetEmailText(url: string, appName = "NUSA project"): string {
   return [
     `Someone asked to set a new password for their ${appName} account.`,
     "",
@@ -119,7 +119,7 @@ export function createResetPasswordSender(env: ResetSenderEnv, deps: ResetSender
     warnedMissingKey = true;
     warn(missingKeyWarning);
   }
-  const from = env.AUTH_FROM_EMAIL?.trim() || "Universal Search <noreply@example.com>";
+  const from = env.AUTH_FROM_EMAIL?.trim() || "NUSA project <noreply@example.com>";
 
   // Returns `void` because that is what Better Auth's
   // `sendResetPassword` contract requires. The delivered/not-delivered outcome

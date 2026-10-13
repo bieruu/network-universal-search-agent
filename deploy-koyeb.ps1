@@ -3,6 +3,10 @@
   One-command deploy of the FastAPI backend to Koyeb.
 
 .DESCRIPTION
+  NOTE (2026-10-10): the active deploy target is now a Hugging Face Docker
+  Space (port 7860) -- see WORKFLOW.md 8.6 for the runbook. This script is
+  retained for the Koyeb path as an alternative host and is unchanged.
+
   Wraps the runbook in WORKFLOW.md 8.6. It exists because the manual version has
   four ways to fail *after* a slow Docker build: a `DATABASE_URL` that points at
   localhost, the wrong TLS spelling, a `BETTER_AUTH_SECRET` that does not match

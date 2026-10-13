@@ -1,7 +1,7 @@
 "use client";
 
 import * as React from "react";
-import { Pause, Play } from "lucide-react";
+import { Pause, Play } from "@phosphor-icons/react/dist/ssr";
 import {
   motion,
   useAnimationFrame,

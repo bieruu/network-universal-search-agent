@@ -1,25 +1,22 @@
 /** @type {import("next").NextConfig} */
 
-// SHA-256 of the inline theme-bootstrap script in app/layout.tsx. If that
-// script changes, recompute with:
-//   node -e "const{createHash}=require('crypto'),f=require('fs');const s=f.readFileSync('app/layout.tsx','utf8').match(/__html: `([\s\S]*?)`,\n/)[1];console.log('sha256-'+createHash('sha256').update(s,'utf8').digest('base64'))"
-// `npm test` (lib/security-headers.test.ts) fails if this drifts from the script.
-// CSP starts as report-only: Next.js also emits inline hydration scripts
-// (self.__next_f), so enforcement requires a nonce before flipping.
-const THEME_SCRIPT_HASH = "sha256-teEMKbLy9qaiCzLDSHDmAWxSyhs4oGVULwsBSVqD3aA=";
-
-const CSP_REPORT_ONLY = [
-  "default-src 'self'",
-  `script-src 'self' '${THEME_SCRIPT_HASH}'`,
-  "style-src 'self' 'unsafe-inline'",
-  "img-src 'self' data: https://cdn.simpleicons.org",
-  "font-src 'self' data:",
-  "connect-src 'self'",
-  "object-src 'none'",
-  "base-uri 'self'",
-  "form-action 'self'",
-  "frame-ancestors 'none'",
-].join("; ");
+// The CSP is NOT set here. It moved to `middleware.ts`, which mints a fresh
+// 128-bit nonce per request and applies the policy on both the request
+// hand-off and the response.
+//
+// Why it cannot live in a static `headers()` block: Next.js emits inline
+// hydration scripts (`self.__next_f`, the prefetch bootstrap, anything pushed
+// in through `ServerInsertedHTML`) whose bytes depend on the props of the page
+// being rendered. No static allowlist can name them — a hash goes stale the
+// moment any page's data changes, and `'unsafe-inline'` would make the policy
+// decorative. A nonce is the only source that scales: Next reads it back out
+// of the request's own policy header and stamps every script it emits with
+// it, so `app/layout.tsx` only has to carry `nonce={nonce}` on its own inline
+// theme bootstrap.
+//
+// In development the policy is sent report-only (`cspHeaderName`), because
+// `next dev` injects extra bootstrap that the nonce path does not always reach
+// and a false-positive there looks like a bug in the app.
 
 const nextConfig = {
   reactStrictMode: true,
@@ -36,7 +33,6 @@ const nextConfig = {
           { key: "X-Frame-Options", value: "DENY" },
           { key: "Referrer-Policy", value: "strict-origin-when-cross-origin" },
           { key: "Permissions-Policy", value: "camera=(), microphone=(), geolocation=()" },
-          { key: "Content-Security-Policy-Report-Only", value: CSP_REPORT_ONLY },
           {
             key: "Strict-Transport-Security",
             value: "max-age=31536000; includeSubDomains",

@@ -1,6 +1,5 @@
 "use client";
 import { useCallback, useState } from "react";
-import { Bug, Globe, Network, Server } from "lucide-react";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
@@ -10,6 +9,7 @@ import { scanStatusLabel, sourceFailureCount } from "@/lib/scan-status";
 import { latestFindings, statsFromScan } from "@/components/ui/app-1-utils/app-1-data";
 import TargetSearch from "./_components/TargetSearch";
 import ScanStatus from "./_components/ScanStatus";
+import CardWash from "./_components/card-wash";
 import PortsChart from "./_components/PortsChart";
 import RiskTrendChart from "./_components/RiskTrendChart";
 import PortsTable from "./_components/PortsTable";
@@ -19,8 +19,6 @@ import WhoisCard from "./_components/WhoisCard";
 import VulnerabilitiesCard from "./_components/VulnerabilitiesCard";
 import HistoryList from "./_components/HistoryList";
 import AppShell from "./_components/app-shell";
-
-const STAT_ICONS = { ports: Network, services: Server, vulns: Bug, subs: Globe } as const;
 
 /**
  * `errors[]` reaches the browser as `{source, message}` straight from the
@@ -44,6 +42,10 @@ function sourceName(id: string): string {
 export default function DashboardPage() {
   const [scan, setScan] = useState<ScanResult | null>(null);
   const [loading, setLoading] = useState(false);
+  // True only while a scan is actually being polled. `loading` cannot stand in
+  // for it: it is also true while a saved scan is being reopened from history,
+  // and the status badge's live dot must report polling, not every spinner.
+  const [polling, setPolling] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const [target, setTarget] = useState<string | null>(null);
 
@@ -53,6 +55,7 @@ export default function DashboardPage() {
     setTarget(t);
     try {
       const { scan_id } = await startScan(t, force);
+      setPolling(true);
       const done = await pollScan(scan_id, { onUpdate: setScan });
       setScan(done);
     } catch (e: unknown) {
@@ -62,6 +65,7 @@ export default function DashboardPage() {
           : "We could not start that search. Check the target and try again.",
       );
     } finally {
+      setPolling(false);
       setLoading(false);
     }
   }, []);
@@ -110,7 +114,7 @@ export default function DashboardPage() {
         <CardContent>
           <TargetSearch onSubmit={run} loading={loading} />
           <div className="mt-3">
-            <ScanStatus scan={scan} />
+            <ScanStatus scan={scan} polling={polling} />
           </div>
           {error && (
             <div className="mt-2">
@@ -135,28 +139,28 @@ export default function DashboardPage() {
         </CardContent>
       </Card>
 
-      {/* 2 — Stats */}
-      <div className="grid grid-cols-2 gap-3 lg:grid-cols-4" aria-label="scan stats">
+      {/* 2 — Stats: one instrument strip, not four gradient cards. The strip is
+          divided by hairlines (gap-px over a bordered surface) rather than by
+          four separate card borders, and it carries no icon chips and no hover
+          state — three of the four old cards advertised a hover they could not
+          honour. `tabular-nums` stays: these numbers change in place, and
+          proportional figures would jitter the whole strip as they did. */}
+      <div
+        className="grid grid-cols-2 gap-px overflow-hidden rounded-xl border border-btn-border bg-btn-border lg:grid-cols-4"
+        aria-label="scan stats"
+      >
         {loading
-          ? Array.from({ length: 4 }).map((_, i) => <Skeleton key={i} className="h-28 rounded-xl" />)
-          : stats.map((s) => {
-              const Icon = STAT_ICONS[s.key as keyof typeof STAT_ICONS] ?? Network;
-              return (
-                <Card key={s.key} className="relative overflow-hidden transition-colors hover:border-accent/40">
-                  <div aria-hidden="true" className="pointer-events-none absolute inset-0 bg-gradient-to-br from-accent/10 via-transparent to-transparent" />
-                  <CardHeader className="relative flex-row items-center justify-between space-y-0">
-                    <CardTitle className="text-xs font-medium uppercase tracking-wider text-slate-500 dark:text-neutral-400">{s.label}</CardTitle>
-                    <span className="flex h-8 w-8 items-center justify-center rounded-lg bg-accent/10 text-accent">
-                      <Icon size={18} strokeWidth={2} aria-hidden="true" />
-                    </span>
-                  </CardHeader>
-                  <CardContent className="relative">
-                    <p className="font-mono text-3xl font-bold tabular-nums">{s.value}</p>
-                    <CardDescription className="mt-1 truncate">{s.hint}</CardDescription>
-                  </CardContent>
-                </Card>
-              );
-            })}
+          ? Array.from({ length: 4 }).map((_, i) => (
+              <Skeleton key={i} className="h-[104px] rounded-none" />
+            ))
+          : stats.map((s, i) => (
+              <div key={s.key} className="relative overflow-hidden bg-background/95 p-4">
+                <CardWash index={i} />
+                <p className="relative text-sm text-slate-600 dark:text-neutral-400">{s.label}</p>
+                <p className="relative mt-1 font-mono text-3xl font-bold tabular-nums">{s.value}</p>
+                <p className="relative mt-1 truncate text-xs text-slate-500 dark:text-neutral-500">{s.hint}</p>
+              </div>
+            ))}
       </div>
 
       {/* 3 — Charts side by side */}
@@ -185,8 +189,9 @@ export default function DashboardPage() {
       {/* 6 — History + findings side by side */}
       <div className="grid gap-4 lg:grid-cols-2">
         <HistoryList onSelect={reopen} limit={5} />
-        <Card className="flex flex-col">
-          <CardHeader>
+        <Card className="relative flex flex-col overflow-hidden">
+          <CardWash index={2} />
+          <CardHeader className="relative">
             <CardTitle>Latest findings</CardTitle>
             <CardDescription>
             {scan
@@ -194,7 +199,7 @@ export default function DashboardPage() {
               : "Once you scan a target, its headline findings appear here."}
           </CardDescription>
           </CardHeader>
-          <CardContent>
+          <CardContent className="relative">
             {!scan ? (
               <p className="text-sm text-slate-500 dark:text-neutral-500">No findings yet — run a scan.</p>
             ) : findings.length === 0 ? (
