@@ -133,7 +133,7 @@ def scan_client(monkeypatch):
     from fastapi.testclient import TestClient
 
     from app.core import rate_limit
-    from app.core.security import require_user
+    from app.core.security import require_user, require_user_or_guest
     from app.db.session import get_session
     from app.main import create_app
 
@@ -141,6 +141,9 @@ def scan_client(monkeypatch):
     rate_limit.reset_for_tests()
     app = create_app()
     app.dependency_overrides[require_user] = lambda: "user:test"
+    # The scan endpoints moved to require_user_or_guest (guest reversal,
+    # 2026-10-14); the account identity has to be injected at that dependency.
+    app.dependency_overrides[require_user_or_guest] = lambda: "user:test"
     app.dependency_overrides[get_session] = lambda: None
     with TestClient(app) as client:
         yield client

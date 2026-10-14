@@ -45,8 +45,19 @@ test("WhoisCard explains why a withheld field has no value", () => {
 
 test("SubdomainsTable caps rendered rows and says how many it hid", () => {
   const src = sources["SubdomainsTable.tsx"];
-  assert.ok(src.includes("slice(0, MAX_ROWS)"), "row cap required");
-  assert.ok(src.includes("Showing the first"), "a silent row cap is a lie about coverage");
+  const view = readFileSync(join(here, "..", "lib", "subdomains-view.ts"), "utf8");
+  // The cap itself moved into lib/subdomains-view.ts when the table gained
+  // filtering and pagination: one page of MAX_ROWS rows is sliced there, and
+  // every surface that lists names reads the same view. What must NOT change is
+  // that a cap exists at all and that it is announced — so the same two
+  // assertions are made against the module that now owns them.
+  assert.ok(view.includes("slice(start, start + pageSize)"), "row cap required");
+  assert.ok(view.includes("Showing the first"), "a silent row cap is a lie about coverage");
+  assert.ok(view.includes("export const MAX_ROWS = 50"), "the page size is still 50");
+  // And the table renders the view's own sentences, so the two cannot drift.
+  assert.ok(src.includes("subdomainsVisibility"), "the table must read the shared view");
+  assert.ok(src.includes("visibility.rowNote"), "the table must render the announced hidden count");
+  assert.ok(src.includes("visibility.honestyNote"), "the table must state what was merged and relabelled");
 });
 
 test("loading skeletons present on data cards", () => {

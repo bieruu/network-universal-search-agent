@@ -113,6 +113,17 @@ test("floor 3: the stylesheet's periods are the shared table's periods", () => {
   }
 });
 
+// The globe's period used to be 3 seconds, advanced once per animation frame.
+// Two bugs stacked: a three-second revolution reads as a spinner, and a
+// per-frame step means the "period" was really `3s at 60fps` — measured at
+// 41fps on one machine and 144fps on another. Both halves are gone: the period
+// is a slow rotation, and every consumer multiplies it by elapsed time.
+test("the globe period is a rotation, not a spin", () => {
+  const seconds = PHASE_SECONDS.globe;
+  assert.ok(seconds >= 40, `globe: ${seconds}s per revolution is a spin — keep it at 40s or slower`);
+  assert.ok(seconds <= 120, `globe: ${seconds}s per revolution is so slow it reads as a frozen image`);
+});
+
 test("the phase table spreads delays instead of clumping them", () => {
   for (const name of Object.keys(PHASE_SECONDS) as Array<keyof typeof PHASE_SECONDS>) {
     const period = PHASE_SECONDS[name];

@@ -117,8 +117,10 @@ async def test_history_tautology_cannot_read_another_users_scans(db, payload):
         target=payload, page=1, limit=20, user_id="user:attacker", session=db
     )
 
-    assert result["items"] == []
-    assert result["total"] == 0
+    # The router returns a typed response model now (the OpenAPI response
+    # contract); the injection claim is unchanged.
+    assert result.items == []
+    assert result.total == 0
 
 
 @pytest.mark.asyncio
@@ -126,7 +128,7 @@ async def test_history_tautology_cannot_read_another_users_scans(db, payload):
 async def test_trend_tautology_cannot_read_another_users_scans(db, payload):
     result = await trend(t=payload, user_id="user:attacker", session=db)
 
-    assert result["points"] == []
+    assert result.points == []
 
 
 @pytest.mark.asyncio

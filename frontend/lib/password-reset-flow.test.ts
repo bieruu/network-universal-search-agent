@@ -42,13 +42,20 @@ test("the reset routes exist and are reachable while signed out", () => {
   assert.ok(forgotPage.includes("ForgotPasswordForm"));
   assert.ok(resetPage.includes("ResetPasswordForm"));
   // The matcher used to be the dashboard's alone. It is now wider, because the
-  // CSP nonce has to be minted wherever a document renders — so the invariant
-  // is no longer "the matcher mentions the dashboard" but "the *session gate*
-  // inside the middleware is scoped to the dashboard". A reset page behind a
-  // blanket gate could never be used by the person holding the emailed token.
+  // CSP nonce has to be minted wherever a document renders. What it must NOT
+  // carry is a session gate of any width: that gate was removed 2026-10-14 with
+  // the guest-scan reversal (a signed-out visitor is a supported visitor now),
+  // so the invariant this assertion used to express — "the session lookup is
+  // scoped to /dashboard" — is gone with it. A reset page behind a blanket gate
+  // could never be used by the person holding the emailed token; now there is
+  // no gate at all, and the backend still answers 401 for anything account-only.
   assert.ok(
-    middleware.includes('startsWith("/dashboard")'),
-    "the session lookup must stay scoped to /dashboard",
+    !middleware.includes('startsWith("/dashboard")'),
+    "no route may be session-gated in middleware (reversal 2026-10-14)",
+  );
+  assert.ok(
+    !middleware.includes("get-session"),
+    "middleware must not spend a session lookup it no longer acts on",
   );
   assert.ok(!middleware.includes("forgot-password") && !middleware.includes("reset-password"));
 

@@ -2,10 +2,12 @@ import type { Metadata } from "next";
 import { headers } from "next/headers";
 import type { HistoryItem, ScanResult } from "@/lib/api";
 import { terminalLinesFromScan, type TerminalSample } from "./_components/landing/terminal-lines";
+import Ambient3D from "./_components/landing/Ambient3D";
 import AmbientBackdrop from "./_components/landing/AmbientBackdrop";
 import CtaFooter from "./_components/landing/CtaFooter";
 import FeatureBento from "./_components/landing/FeatureBento";
 import GridDrift from "./_components/landing/GridDrift";
+import GlobeSection from "./_components/landing/GlobeSection";
 import Hero from "./_components/landing/Hero";
 import HowItWorks from "./_components/landing/HowItWorks";
 import LogoStrip from "./_components/landing/LogoStrip";
@@ -98,11 +100,13 @@ export default async function Home() {
         <GridDrift />
         <AmbientBackdrop variant="landing" />
         <ParallaxField />
+        <Ambient3D />
       </div>
       <Nav />
       <main>
         <Hero sample={sample} signedIn={signedIn} />
         <LogoStrip />
+        <GlobeSection />
         <FeatureBento />
         <HowItWorks />
         <SecurityStrip />

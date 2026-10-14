@@ -3,32 +3,29 @@ import type { NextRequest } from "next/server";
 import { contentSecurityPolicy, cspHeaderName, generateNonce } from "@/lib/csp";
 
 /**
- * One body for every way this middleware can refuse to continue.
+ * CSP + nonce only. This middleware used to carry three auth jobs as well —
+ * a session lookup behind `/dashboard`, a redirect to `/sign-in` when it found
+ * none, and a 503 whenever `BETTER_AUTH_URL` was unset or not https in
+ * production. All three were removed on 2026-10-14 by the operator-approved
+ * guest-scan reversal (see DESIGN.md for the dated note):
  *
- * These four branches used to return four different plain-text strings naming
- * the exact thing that broke — "Authentication is not configured", "URL must
- * use HTTPS in production", "URL is misconfigured", "Authentication service is
- * unavailable" — rendered raw into the browser. That hands an anonymous caller
- * a live map of which internal variable is unset. The branches stay (they are
- * still distinct code paths an operator needs); only the wording is unified.
- * The concrete reason is still available to operators in the server log.
+ *   * The redirect is gone because a signed-out visitor is a supported
+ *     visitor now: `/dashboard` renders in guest mode and scans against a
+ *     quota (`require_user_or_guest` on the backend). Sending them to
+ *     `/sign-in` was the very behaviour the reversal removed.
+ *   * The 503 is gone because it fired on EVERY page, including `/`: an auth
+ *     misconfiguration used to turn the landing page into the sentence
+ *     "Sign-in is temporarily unavailable." The landing page has nothing to do
+ *     with auth availability, so it must never be able to fail that way.
+ *   * The session lookup is gone because nothing here acts on the answer.
+ *
+ * Authorization did not move out of the app — it is where it always belonged:
+ * the backend gates every endpoint (`require_user`, and
+ * `require_user_or_guest` on the two scan routes), so a rendered shell without
+ * a session can read no data it is not allowed to ask for. What is given up is
+ * the fail-closed HTML gate: the dashboard document now renders for anyone and
+ * gets its 401s from the API, which is the honest place for them.
  */
-const UNAVAILABLE_BODY =
-  "Sign-in is temporarily unavailable. Please try again in a few minutes.";
-
-function unavailable(): NextResponse {
-  return new NextResponse(UNAVAILABLE_BODY, {
-    status: 503,
-    headers: { "content-type": "text/plain; charset=utf-8" },
-  });
-}
-
-function redirectToSignIn(req: NextRequest): NextResponse {
-  const url = req.nextUrl.clone();
-  url.pathname = "/sign-in";
-  return NextResponse.redirect(url);
-}
-
 export async function middleware(req: NextRequest) {
   const isProduction = process.env.NODE_ENV === "production";
 
@@ -47,71 +44,22 @@ export async function middleware(req: NextRequest) {
   requestHeaders.set("x-nonce", nonce);
   requestHeaders.set("content-security-policy", policy);
 
-  // Response side. Every response that leaves here — the redirect and the 503
-  // included — carries the policy, otherwise a refused request would render
-  // without a CSP at all. `x-nonce` deliberately does NOT go out: it is only
-  // meaningful server-side, and echoing it to the browser would advertise the
-  // value an attacker needs to forge for the next request.
-  const send = (response: NextResponse) => {
-    response.headers.set(headerName, policy);
-    return response;
-  };
-  const forward = () => send(NextResponse.next({ request: { headers: requestHeaders } }));
-
-  const authBaseURL = process.env.BETTER_AUTH_URL;
-  if (!authBaseURL) {
-    console.error("BETTER_AUTH_URL is not set; refusing to serve protected routes.");
-    return send(unavailable());
-  }
-
-  // Production auth must ride on TLS; fail closed on plain http.
-  // Localhost stays exempt so `npm run build && npm start` works without TLS.
-  if (isProduction) {
-    try {
-      const url = new URL(authBaseURL);
-      const local = url.hostname === "localhost" || url.hostname === "127.0.0.1";
-      if (url.protocol !== "https:" && !local) {
-        console.error("BETTER_AUTH_URL is not https in production; refusing to serve protected routes.");
-        return send(unavailable());
-      }
-    } catch {
-      console.error("BETTER_AUTH_URL is not a valid URL; refusing to serve protected routes.");
-      return send(unavailable());
-    }
-  }
-
-  // The session lookup is only needed behind the dashboard gate. `api/` is
-  // already gated by the backend's `require_user`, and the public pages have
-  // no session to look up, so a blanket fetch here would spend one round trip
-  // to the auth server on every asset-adjacent request the matcher reaches.
-  if (req.nextUrl.pathname.startsWith("/dashboard")) {
-    try {
-      const response = await fetch(new URL("/api/auth/get-session", authBaseURL), {
-        headers: { cookie: req.headers.get("cookie") ?? "" },
-        cache: "no-store",
-      });
-      if (!response.ok) return send(redirectToSignIn(req));
-
-      const session = await response.json();
-      if (session?.session && session?.user) return forward();
-      return send(redirectToSignIn(req));
-    } catch {
-      // The cause (DNS, connection refused, timeout) stays in the server log;
-      // the caller gets the same sentence as every other outage here.
-      console.error("Could not reach the session endpoint; refusing to serve protected routes.");
-      return send(unavailable());
-    }
-  }
-
-  return forward();
+  // Response side. Every response that leaves here carries the policy, so a
+  // document is never served without one — including the documents that used
+  // to be answered by the removed 503. `x-nonce` deliberately does NOT go out:
+  // it is only meaningful server-side, and echoing it to the browser would
+  // advertise the value an attacker needs to forge for the next request.
+  const response = NextResponse.next({ request: { headers: requestHeaders } });
+  response.headers.set(headerName, policy);
+  return response;
 }
 
 export const config = {
   matcher: [
     // Pages only. The CSP nonce has to be minted wherever a document renders,
-    // so this is wider than the dashboard gate. Excluded: `api/` (JSON proxies,
-    // gated by the backend's require_user), `_next/` (no document, no inline
-    // scripts) and the root favicon.
+    // so this is wider than any single route. Excluded: `api/` (JSON proxies,
+    // gated by the backend's require_user / require_user_or_guest), `_next/`
+    // (no document, no inline scripts) and the root favicon.
     "/((?!api/|_next/|favicon.ico).*)",
   ],
 };

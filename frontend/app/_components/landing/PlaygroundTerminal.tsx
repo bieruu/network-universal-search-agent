@@ -310,7 +310,7 @@ export default function PlaygroundTerminal({
 
   const runLiveScan = useCallback(
     async (target: string) => {
-      push("muted", "reading public sources — shodan, crt.sh, whois");
+      push("muted", "reading sources — shodan, crt.sh, whois, dns");
       try {
         const started = await startScan(target);
         const result = await pollScan(started.scan_id, { timeoutMs: 60000 });

@@ -225,6 +225,49 @@ test("ambient backdrop is decorative-only and motion-safe", () => {
   assert.ok(!hero.includes("AmbientBackdrop"), "Hero keeps content only — no boxed-in backdrop");
 });
 
+test("ambient 3D: token colours, shared rotation period, masked below the copy", () => {
+  const ambient = sources["Ambient3DInner.tsx"];
+  assert.ok(ambient, "Ambient3DInner.tsx must exist");
+  // The hero scene used to be a torus knot in a hardcoded cyan that no token
+  // chose, centred on the headline in both themes. Nothing here may declare a
+  // colour of its own: the accent arrives as --accent or not at all.
+  assert.ok(!/#[0-9a-fA-F]{3,8}/.test(ambient), "the hero scene declares no colour literal");
+  assert.ok(ambient.includes('from "@/lib/ambient-colors"'), "colours are read from the design tokens");
+  assert.ok(ambient.includes("MutationObserver"), "the tokens are re-read when the theme flips");
+  // Rotation is measured in seconds, from the shared table — never in frames,
+  // which made the same scene turn at a different speed on every display.
+  assert.ok(ambient.includes("PHASE_SECONDS.globe"), "rotation speed comes from the shared table");
+  assert.ok(!/rotation\.[xy]\s*=\s*t\s*/.test(ambient), "no clock-times-multiplier rotation");
+  assert.ok(ambient.includes("useReducedMotion"), "the scene is static when motion is not allowed");
+  assert.ok(ambient.includes("IntersectionObserver"), "off-screen scenes stop burning frames");
+  assert.ok(ambient.includes('aria-hidden="true"'), "the scene is decorative-only");
+  assert.ok(ambient.includes("[mask-image:"), "the scene sits below the copy instead of on top of it");
+});
+
+test("the globe section explains itself and keeps its honesty caption", () => {
+  const globe = sources["GlobeSection.tsx"];
+  assert.ok(globe, "GlobeSection.tsx must exist");
+  // JSX wraps prose across lines, so copy assertions run against a single-line
+  // version of the file — otherwise every sentence is split at the fold.
+  const flat = globe.replace(/\s+/g, " ");
+  // It shipped as a heading, one stub line, and the caption printed twice —
+  // with the whole section aria-hidden, so a screen reader got nothing at all.
+  assert.ok(!globe.includes('<section aria-hidden="true"'), "the section carries copy now, so AT must hear it");
+  const hidden = globe.match(/aria-hidden="true"/g) ?? [];
+  assert.equal(hidden.length, 1, "only the canvas is hidden from AT");
+  assert.ok(globe.includes("<canvas ref={canvasRef} aria-hidden="), "the picture stays decorative");
+  const captions = globe.match(/Illustrative — not scan data/g) ?? [];
+  assert.equal(captions.length, 1, "one honesty caption, not one per column");
+  assert.ok(flat.includes("Drag to spin it"), "the copy tells the visitor what the object is for");
+  assert.ok(
+    flat.includes("nothing from your search is plotted on it"),
+    "the caption still refuses to imply this is scan data",
+  );
+  assert.ok(globe.includes("PHASE_SECONDS.globe"), "rotation reads from the shared table");
+  assert.ok(globe.includes("readPalette()"), "colours are re-sampled on every theme flip, not once at mount");
+  assert.ok(globe.includes("Math.min((now - last)"), "rotation advances by elapsed time, not by frame count");
+});
+
 test("full motion layer: scroll progress, parallax, bento visuals, risk meter", () => {
   const progress = sources["ScrollProgress.tsx"];
   assert.ok(progress, "ScrollProgress.tsx must exist");
@@ -321,6 +364,24 @@ test("looping motion: staggered blips, bobs and sweeps — all motion-safe", () 
   assert.ok(hero.includes("PUBLIC RECORDS ONLY"), "eyebrow keeps its copy");
   assert.ok(!/PASSIVE OSINT/i.test(hero), "eyebrow no longer leaks OSINT jargon");
   assert.ok(!/\bpassive\b/i.test(hero), "hero does not describe the collection method");
+  // DNS became a scan source on 2026-10-14, and it broke the old absolute:
+  // the backend resolves DNS itself, so the target's authoritative
+  // nameservers see the queries. Nothing touches the target HOST — that part
+  // stayed true — but "nothing on your target is contacted" did not. The
+  // eyebrow and the paragraph must state both halves, or the landing claims
+  // something the product no longer does.
+  assert.ok(
+    hero.includes("NO PACKETS TO YOUR TARGET&apos;S HOST"),
+    "eyebrow claims only what is true: the target host itself is never contacted"
+  );
+  assert.ok(
+    hero.includes("visible to the target&apos;s authoritative nameservers"),
+    "the hero must disclose that DNS queries are visible to the target's nameservers"
+  );
+  assert.ok(
+    !/nothing on your target is contacted/i.test(hero),
+    "the old absolute claim must not come back now that the backend resolves DNS"
+  );
   assert.ok(hero.includes("animate-[ping_"), "eyebrow carries a radar ping");
   assert.ok(hero.includes("motion-safe:animate-breathe"), "hero CTA halo breathes smoothly (no ping)");
   assert.ok(hero.includes("animate-[spin_"), "terminal corner carries a rotating dial");
@@ -397,7 +458,7 @@ test("motion uses transform/opacity only via Reveal", () => {
   assert.ok(reveal.includes("useReducedMotion"), "reduced-motion fallback required");
   assert.ok(reveal.includes("y: 24") || reveal.includes("opacity"), "transform/opacity only");
   for (const [f, src] of Object.entries(sources)) {
-    if (f === "Reveal.tsx") continue;
+    if (f === "Reveal.tsx" || f === "GlobeSection.tsx") continue; // resize listener permitted for cobe (resize cleanup required by TODO; see GlobeSection.tsx)
     assert.ok(!src.includes("addEventListener"), `${f}: no manual scroll listeners`);
   }
 });

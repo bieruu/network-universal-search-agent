@@ -25,6 +25,11 @@ hostile server can shape — is cut as well.
 The resolver is asyncio-native (`dns.asyncresolver`), so awaiting it never
 blocks the event loop. The blocking `dns.resolver.Resolver` must never appear
 in this module (AGENTS.md §3); `test_dns_service.py` enforces that.
+
+The shape of a lookup is declared once, in `app/schemas/dns.py`, and this
+module builds its output through that model. It runs last — after truncation,
+capping and per-type isolation — so the model describes data that is already
+bounded instead of being the thing that bounds it.
 """
 
 from __future__ import annotations
@@ -40,6 +45,7 @@ from dns.exception import DNSException
 from dns.resolver import NXDOMAIN, NoAnswer
 
 from app.core.config import settings
+from app.schemas.dns import DnsLookupResult
 
 RECORD_TYPES: tuple[str, ...] = ("A", "AAAA", "MX", "NS", "TXT", "CNAME", "SOA")
 
@@ -375,14 +381,19 @@ async def lookup(
         if any(row.get("truncated") for row in rows):
             cut_types.append(rdtype)
 
-    return {
-        "source": "DNS",
-        "domain": domain,
-        "records": records,
-        "counts_truncated": counts_truncated,
-        "missing": missing,
-        "errors": errors,
-        "note": _build_note(
+    # The parsed result is typed at this boundary (Pydantic v2, app/schemas/
+    # dns.py). The model runs AFTER truncation and capping, so it describes
+    # what was already made safe rather than being the safety. It is also the
+    # shape the scan response model and the OpenAPI schema document, which a
+    # hand-built dict could never be.
+    return DnsLookupResult(
+        source="DNS",
+        domain=domain,
+        records=records,
+        counts_truncated=counts_truncated,
+        missing=missing,
+        errors=errors,
+        note=_build_note(
             domain,
             nxdomain,
             empty,
@@ -391,4 +402,4 @@ async def lookup(
             counts_truncated,
             any(records.values()),
         ),
-    }
+    ).model_dump()

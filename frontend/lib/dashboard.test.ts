@@ -11,6 +11,7 @@ const data = readFileSync(join(here, "..", "components", "ui", "app-1-utils", "a
 const page = readFileSync(join(here, "..", "app", "(dashboard)", "dashboard", "page.tsx"), "utf8");
 const trend = readFileSync(join(here, "..", "app", "(dashboard)", "dashboard", "_components", "RiskTrendChart.tsx"), "utf8");
 
+// Reversed 2026-10-14 (operator-approved redesign): 3D charts via three + @react-three/fiber + @react-three/drei are now allowed, data stays text/table a11y source, accessible labels, responsive, no pie-spam; chart.js retained because PortsChartInner/RiskTrendChartInner still import it.
 test("dashboard chart stays Chart.js, no recharts", () => {
   assert.ok(trend.includes("ssr: false"), "trend chart must stay ssr:false");
   for (const src of [shell, page, trend]) {
@@ -189,6 +190,40 @@ test("charts resolve colors from the global tokens", () => {
     assert.ok(src.includes("chartPalette"), `${f} must use token-driven chart colors`);
     assert.ok(!src.includes("#"), `${f} must not hardcode hex colors`);
   }
+});
+
+test("the scan detail surface exports what it shows, client-side", () => {
+  // The export card is a verb on the scan the page is already showing, so it
+  // comes after every data card rather than beside one of them.
+  const order = ["<VulnerabilitiesCard", "<SubdomainsTable", "<HistoryList", "<ExportFindingsCard"];
+  let last = -1;
+  for (const marker of order) {
+    const at = page.indexOf(marker);
+    assert.ok(at > last, `${marker} must come after the previous section`);
+    last = at;
+  }
+
+  const card = readFileSync(
+    join(here, "..", "app", "(dashboard)", "dashboard", "_components", "ExportFindingsCard.tsx"),
+    "utf8",
+  );
+  // Client-side only: no endpoint, no storage, and the PDF library is fetched
+  // when the analyst asks for a PDF instead of being shipped in the first load.
+  assert.ok(card.includes('await import("@/lib/export-pdf")'), "the PDF path must be dynamically imported");
+  assert.ok(!/^import .*export-pdf/m.test(card), "jspdf must not be statically imported into the page bundle");
+  assert.ok(!card.includes("fetch("), "the export must not make a request");
+  assert.ok(card.includes("EXPORT_CAVEAT_SUMMARY"), "the card must promise the caveats the file carries");
+  assert.ok(card.includes("variant=\"destructive\""), "a failed export must fail visibly");
+  assert.ok(card.includes("Skeleton"), "the export card has a loading state");
+  assert.ok(!card.includes("dangerouslySetInnerHTML"), "no raw HTML in the export card");
+
+  // `jspdf` is reachable from exactly one module, and the JSON/Markdown
+  // builders stay dependency-free.
+  const pdf = readFileSync(join(here, "..", "lib", "export-pdf.ts"), "utf8");
+  const findings = readFileSync(join(here, "..", "lib", "export-findings.ts"), "utf8");
+  assert.ok(pdf.includes('await import("jspdf")'), "export-pdf.ts is the only module that loads jspdf");
+  assert.ok(!/from\s+["']jspdf["']/.test(findings), "the JSON/Markdown builders must stay dependency-free");
+  assert.ok(!/from\s+["']jspdf["']/.test(card), "the export card must not import jspdf itself");
 });
 
 test("a failed history or trend request never reads as an empty account", () => {

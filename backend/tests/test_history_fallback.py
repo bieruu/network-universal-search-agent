@@ -306,7 +306,7 @@ async def test_a_pure_cache_hit_does_not_trigger_history_network(
     async def _hit(key: str) -> Any:
         if key.startswith("shodan:"):
             return _shodan()
-        if key.startswith(("crtsh:", "whois:")):
+        if key.startswith(("crtsh:", "whois:", "dns:")):
             return {"ok": True}
         return None  # history is cold
 
@@ -316,7 +316,7 @@ async def test_a_pure_cache_hit_does_not_trigger_history_network(
     monkeypatch.setattr(orchestrator.cache_mod, "cache_get_async", _hit)
     monkeypatch.setattr(orchestrator.cache_mod, "cache_set_async", _noop)
 
-    for name in ("shodan", "crtsh", "whois"):
+    for name in ("shodan", "crtsh", "whois", "dns"):
 
         async def _must_not_call(*args: Any, **kwargs: Any) -> Any:
             raise AssertionError("a source lookup ran despite a warm cache")

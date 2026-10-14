@@ -70,3 +70,16 @@ class AnalysisResponse(BaseModel):
     data: dict[str, Any] = {}
     errors: list[dict[str, str]] = []
     fetched_at: str
+
+
+class CapabilitiesResponse(BaseModel):
+    """Which capabilities ship always and which optional sources are live.
+
+    `optional_sources` is a bool per source rather than a status, because the
+    question it answers is "did the operator configure this", not "is it
+    healthy" — health is `/health/sources`, and conflating the two would let a
+    reachable-but-unkeyed source read as operational.
+    """
+
+    always_available: list[str] = []
+    optional_sources: dict[str, bool] = {}

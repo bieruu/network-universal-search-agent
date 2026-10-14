@@ -40,9 +40,11 @@ from app.core.security import assert_target_allowed, require_user
 from app.core.ssrf import SafeFetcher, SsrfBlocked, SsrfError, SsrfTimeout
 from app.schemas.analysis import (
     AnalysisResponse,
+    CapabilitiesResponse,
     DomainAnalysisRequest,
     UrlAnalysisRequest,
 )
+from app.schemas.common import error_responses
 from app.services import (
     contact_service,
     dns_service,
@@ -58,6 +60,21 @@ from app.services.exif_service import MAX_INPUT_BYTES
 router = APIRouter(prefix="/api/v1/analysis", tags=["analysis"])
 
 UserDep = Annotated[str, Depends(require_user)]
+
+# The codes a caller can get back other than 200. The rule this router owns is
+# that a policy or upstream failure is HTTP 200 with an entry in errors[], so
+# these all describe something about the CALL, never about the source.
+# Documenting them is what stops a client from reading a blocked target or an
+# exhausted quota as a dead backend.
+URL_CAPABILITY_ERROR_RESPONSES = error_responses(400, 401, 422, 429, 503)
+# DNS/TLS take a bare domain rather than a URL, so no size cap applies.
+DOMAIN_CAPABILITY_ERROR_RESPONSES = error_responses(400, 401, 422, 429, 503)
+# EXIF is the one capability with a body-size cap (413) and a rejected upload (400).
+EXIF_ERROR_RESPONSES = error_responses(400, 401, 413, 422, 429, 503)
+# Phone validation is offline: only the caller can be wrong.
+PHONE_ERROR_RESPONSES = error_responses(401, 422, 429, 503)
+# capabilities is a config read with no body at all.
+CAPABILITIES_ERROR_RESPONSES = error_responses(401, 429, 503)
 
 # How long a derived view of a target's live HTTP surface stays fresh. Shorter
 # than the scan cache TTL (24h) on purpose: a redirect chain, a cookie attribute
@@ -211,24 +228,24 @@ async def _run_fetching(
 # --- capabilities that fetch the target (all behind the SSRF guard) ----------
 
 
-@router.post("/headers")
+@router.post("/headers", responses=URL_CAPABILITY_ERROR_RESPONSES)
 async def post_headers(body: UrlAnalysisRequest, user_id: UserDep) -> AnalysisResponse:
     return await _run_fetching("headers", body, http_headers_service, user_id, "fetch")
 
 
-@router.post("/redirects")
+@router.post("/redirects", responses=URL_CAPABILITY_ERROR_RESPONSES)
 async def post_redirects(
     body: UrlAnalysisRequest, user_id: UserDep
 ) -> AnalysisResponse:
     return await _run_fetching("redirects", body, redirect_service, user_id, "fetch")
 
 
-@router.post("/sitemap")
+@router.post("/sitemap", responses=URL_CAPABILITY_ERROR_RESPONSES)
 async def post_sitemap(body: UrlAnalysisRequest, user_id: UserDep) -> AnalysisResponse:
     return await _run_fetching("sitemap", body, sitemap_service, user_id, "fetch")
 
 
-@router.post("/contacts")
+@router.post("/contacts", responses=URL_CAPABILITY_ERROR_RESPONSES)
 async def post_contacts(body: UrlAnalysisRequest, user_id: UserDep) -> AnalysisResponse:
     # Its own `contact` scope: this is an address-harvesting primitive and must
     # not be able to exhaust a user's scan allowance.
@@ -238,7 +255,7 @@ async def post_contacts(body: UrlAnalysisRequest, user_id: UserDep) -> AnalysisR
 # --- capabilities that query a data source ---------------------------------
 
 
-@router.post("/dns")
+@router.post("/dns", responses=DOMAIN_CAPABILITY_ERROR_RESPONSES)
 async def post_dns(body: DomainAnalysisRequest, user_id: UserDep) -> AnalysisResponse:
     target = body.target.strip().lower().rstrip(".")
     assert_target_allowed(target)
@@ -257,7 +274,7 @@ async def post_dns(body: DomainAnalysisRequest, user_id: UserDep) -> AnalysisRes
     return AnalysisResponse(**_envelope("dns", target, data, errors))
 
 
-@router.post("/tls")
+@router.post("/tls", responses=DOMAIN_CAPABILITY_ERROR_RESPONSES)
 async def post_tls(body: DomainAnalysisRequest, user_id: UserDep) -> AnalysisResponse:
     target = body.target.strip().lower().rstrip(".")
     assert_target_allowed(target)
@@ -272,7 +289,7 @@ async def post_tls(body: DomainAnalysisRequest, user_id: UserDep) -> AnalysisRes
     return AnalysisResponse(**_envelope("tls", target, data, errors))
 
 
-@router.post("/exif")
+@router.post("/exif", responses=EXIF_ERROR_RESPONSES)
 async def post_exif(body: dict[str, Any], user_id: UserDep) -> AnalysisResponse:
     """EXIF from an uploaded image.
 
@@ -310,7 +327,7 @@ async def post_exif(body: dict[str, Any], user_id: UserDep) -> AnalysisResponse:
     return AnalysisResponse(**_envelope("exif", filename or "upload", result, []))
 
 
-@router.get("/phone/{number:path}")
+@router.get("/phone/{number:path}", responses=PHONE_ERROR_RESPONSES)
 async def get_phone(number: str, user_id: UserDep) -> AnalysisResponse:
     """Offline phone format/country validation on its own endpoint.
 
@@ -326,8 +343,8 @@ async def get_phone(number: str, user_id: UserDep) -> AnalysisResponse:
     return AnalysisResponse(**_envelope("phone", number[:64], result, []))
 
 
-@router.get("/capabilities")
-async def get_capabilities(user_id: UserDep) -> dict[str, Any]:
+@router.get("/capabilities", responses=CAPABILITIES_ERROR_RESPONSES)
+async def get_capabilities(user_id: UserDep) -> CapabilitiesResponse:
     """Which optional sources are live in this deployment.
 
     Exists because several sources ship dark by design (Leak-Lookup needs a
@@ -336,8 +353,8 @@ async def get_capabilities(user_id: UserDep) -> dict[str, Any]:
     user to guess whether they found something or mis-configured something.
     """
     _ = user_id
-    return {
-        "always_available": [
+    return CapabilitiesResponse(
+        always_available=[
             "headers",
             "redirects",
             "sitemap",
@@ -347,7 +364,7 @@ async def get_capabilities(user_id: UserDep) -> dict[str, Any]:
             "exif",
             "phone",
         ],
-        "optional_sources": {
+        optional_sources={
             "leaklookup": bool((settings.leaklookup_api_key or "").strip()),
             "urlscan": True,
             "virustotal": bool((settings.virustotal_api_key or "").strip()),
@@ -356,4 +373,4 @@ async def get_capabilities(user_id: UserDep) -> dict[str, Any]:
             # empty-state wording.
             "otx": True,
         },
-    }
+    )

@@ -10,18 +10,32 @@ from app.core.security import require_user
 from app.db.session import get_session
 from app.models.scan import Scan
 from app.models.target import Target
+from app.schemas.common import error_responses
+from app.schemas.history import HistoryResponse, TrendResponse
 
 router = APIRouter(prefix="/api/v1", tags=["history"])
 
+HISTORY_ERROR_RESPONSES = error_responses(401, 422, 429, 503)
 
-@router.get("/history")
+
+@router.get(
+    "/history",
+    response_model=HistoryResponse,
+    responses=HISTORY_ERROR_RESPONSES,
+    summary="List your scans",
+    description=(
+        "The scans stored against your account, newest first, optionally "
+        "filtered to one target. Scans are immutable, so a re-scan appears as "
+        "a new item rather than replacing the old one."
+    ),
+)
 async def history(
     user_id: Annotated[str, Depends(require_user)],
     session: Annotated[AsyncSession, Depends(get_session)],
-    target: str | None = Query(default=None),
+    target: str | None = Query(default=None, description="Filter to one target."),
     page: int = Query(default=1, ge=1),
     limit: int = Query(default=20, ge=1, le=100),
-) -> dict:
+) -> HistoryResponse:
     stmt = (
         select(Scan, Target.value)
         .join(Target, Target.id == Scan.target_id)
@@ -44,15 +58,24 @@ async def history(
         }
         for s, v in rows
     ]
-    return {"items": items, "total": total, "page": page, "limit": limit}
+    return HistoryResponse(items=items, total=total, page=page, limit=limit)
 
 
-@router.get("/target/{t}/trend")
+@router.get(
+    "/target/{t}/trend",
+    response_model=TrendResponse,
+    responses=HISTORY_ERROR_RESPONSES,
+    summary="Risk score trend for one target",
+    description=(
+        "Up to the ten most recent scans for one of your targets, oldest point "
+        "first — the series the dashboard trend chart renders."
+    ),
+)
 async def trend(
     t: str,
     user_id: Annotated[str, Depends(require_user)],
     session: Annotated[AsyncSession, Depends(get_session)],
-) -> dict:
+) -> TrendResponse:
     _ = user_id
     stmt = (
         select(Scan)
@@ -70,4 +93,4 @@ async def trend(
         }
         for s in reversed(scans)
     ]
-    return {"target": t.lower(), "points": points}
+    return TrendResponse(target=t.lower(), points=points)

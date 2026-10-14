@@ -5,6 +5,7 @@ import Link from "next/link";
 import { ClockClockwise, SignIn, SignOut, SquaresFour } from "@phosphor-icons/react/dist/ssr";
 import { NAV_ITEMS, SOURCE_MONOGRAMS } from "./app-1-data";
 import { authClient } from "@/lib/auth-client";
+import { isGuestSession } from "@/lib/guest";
 import { cn } from "@/lib/utils";
 
 const NAV_ICONS = { Dashboard: SquaresFour, History: ClockClockwise, "Sign in": SignIn } as const;
@@ -19,10 +20,14 @@ export function SidebarInset({ children }: { children: React.ReactNode }) {
 
 export function App1Sidebar({ active = "/dashboard", className }: { active?: string; className?: string }) {
   const router = useRouter();
+  // Same rule as the header in app-shell.tsx: a guest has nothing to end, so
+  // the control is hidden rather than shown and then meaningless.
+  const guest = isGuestSession(authClient.useSession());
 
   async function handleLogout() {
     await authClient.signOut();
-    router.push("/sign-in");
+    // Landing, not /sign-in — reversal 2026-10-14, see app-shell.tsx.
+    router.push("/");
     router.refresh();
   }
 
@@ -78,17 +83,19 @@ export function App1Sidebar({ active = "/dashboard", className }: { active?: str
           ))}
         </ul>
       </div>
-      <div className="mt-auto border-t border-btn-border pt-3">
-        <button
-          type="button"
-          onClick={handleLogout}
-          className="flex w-full items-center gap-2 rounded-lg px-3 py-2 text-sm text-slate-600 transition-colors hover:bg-accent/10 hover:text-foreground dark:text-neutral-500 dark:hover:bg-accent/10 dark:hover:text-foreground"
-          aria-label="Log out"
-        >
-          <SignOut size={18} weight="regular" aria-hidden="true" />
-          Log out
-        </button>
-      </div>
+      {!guest && (
+        <div className="mt-auto border-t border-btn-border pt-3">
+          <button
+            type="button"
+            onClick={handleLogout}
+            className="flex w-full items-center gap-2 rounded-lg px-3 py-2 text-sm text-slate-600 transition-colors hover:bg-accent/10 hover:text-foreground dark:text-neutral-500 dark:hover:bg-accent/10 dark:hover:text-foreground"
+            aria-label="Log out"
+          >
+            <SignOut size={18} weight="regular" aria-hidden="true" />
+            Log out
+          </button>
+        </div>
+      )}
     </aside>
   );
 }

@@ -27,6 +27,7 @@ export default async function RootLayout({ children }: { children: React.ReactNo
       <body className={`min-h-screen bg-background text-foreground antialiased ${grotesk.className} ${mono.variable}`}>
         <script
           nonce={nonce}
+          suppressHydrationWarning
           dangerouslySetInnerHTML={{
             __html: `
               (() => {

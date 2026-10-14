@@ -2,6 +2,16 @@
 
 ## 1. System Overview
 
+```mermaid
+flowchart LR
+  A[Browser / Next.js] -->|session + /api/* proxy| B[Better Auth]
+  B --> C[FastAPI]
+  C -->|asyncio.gather| D[Passive sources<br/>Shodan, crt.sh, WHOIS, DNS, NVD]
+  C --> E[(PostgreSQL)]
+  C --> F[(TTL cache)]
+  E --> G[scans / targets / findings]
+```
+
 ```
 [ Browser: Next.js App Router ] 
    │ Better Auth session + fetch via /api/* (Next proxy)
@@ -10,9 +20,9 @@
                                                                       │ asyncio.gather
                                     ┌─────────────────┬────────────────┼──────────────┐
                                     ▼                 ▼                ▼              ▼
-                              Shodan API      crt.sh / Cert Spotter  WHOIS lib     SQLite cache (TTL 24h)
+                               Shodan API      crt.sh / Cert Spotter  WHOIS lib   DNS resolver
                                     │                 │                │              │
-                                    └─────────────────┴────────────────┴──────┬───────┘
+                                    └─────────────────┴────────────────┴───────────┬───────┘
                                                                               ▼
                                                               PostgreSQL (users/targets/scans/findings)
 ```
@@ -21,6 +31,10 @@ Principles:
 - Secrets never leave backend. Frontend never calls external OSINT providers directly.
 - FastAPI is stateless orchestrator; Postgres is source of truth; SQLite is quota-saving cache.
 - Partial failure is first-class: `partial` status + per-source errors.
+- DNS is the fifth source and the only one that is NOT a public-record read:
+  the backend resolves it, so the target's authoritative nameservers see the
+  query. Nothing is ever sent to the target host itself (see §4.3), and the
+  landing copy states exactly that rather than claiming nothing was contacted.
 
 ## 2. Repository Layout (Clean, Modular)
 
@@ -77,11 +91,39 @@ Principles:
 
 ```
 POST /api/v1/scan            { target, force?:bool } → { scan_id, status }
-GET  /api/v1/scan/{id}       → { scan_id, target, status, risk_score, results:{shodan,crtsh,whois}, errors[] }
+GET  /api/v1/scan/{id}       → { scan_id, target, status, risk_score, results:{shodan,crtsh,whois,dns,nvd,host,history}, errors[] }
 GET  /api/v1/history?target=&page=&limit= → { items[], total }
 GET  /api/v1/target/{t}/trend → { points: [{scan_id, created_at, risk_score}] }
-GET  /health /ready
+GET  /health /ready /health/sources
 ```
+
+Every response model above is a Pydantic v2 model in `app/schemas/`
+(`scan.py`, `history.py`, `health.py`, `common.py`), so the generated OpenAPI
+describes the contracts instead of showing bare `object` shapes.
+
+**Error codes** (documented in the schema, and asserted by
+`tests/test_openapi_contract.py`):
+
+| Code | When | Body |
+| ---- | ---- | ---- |
+| 400 | Policy refusal — private/localhost target, malformed URL | `{"detail": str}` |
+| 401 | No valid session on a gated endpoint | `{"detail": str}` |
+| 404 | Unknown scan id | `{"detail": str}` |
+| 413 | Body over `MAX_REQUEST_BODY_BYTES` | `{"detail": str}` |
+| 422 | Request validation failed (FastAPI) | `{"detail": [{loc, msg, type}]}` |
+| 429 | Rate limit — per-account hourly, instance daily, or key ceiling; `Retry-After` set | `{"detail": str}` |
+| 503 | Dependency unconfigured/unreachable | `{"detail": str}` |
+
+A **source** failure is not an error code at all: it is HTTP 200 with
+`errors: [{source, message}]` and a `partial` status. That distinction is the
+first thing the OpenAPI has to communicate, because it is the one thing a
+caller of a public deployment would otherwise get wrong.
+
+**Still open (operator decision):** whether `/docs` is exposed at all on a
+public deployment. `create_app()` disables `docs_url` / `redoc_url` /
+`openapi_url` when `is_production`, and that default stays closed — the
+schemas above are what make the docs useful once an operator decides to expose
+them, not a reason to flip them on. See TODO.md.
 
 Pydantic example:
 
@@ -161,16 +203,27 @@ Matching is exact (never a prefix, so `user:service` cannot exempt `user:service
 async def run_scan(target, force=False):
     scan_id = new_uuid(); persist(status="running")
     if not force: check sqlite cache per source
-    sh, ct, wh = await asyncio.gather(
+    # DNS is skipped for an IP literal: an MX lookup does not apply to an
+    # address, and an error there would fabricate a failure for a healthy scan.
+    sh, ct, wh, dns = await asyncio.gather(
         with_timeout(shodan_service.lookup(target), 12),
-        with_timeout(crtsh_service.lookup(target), 15),
+        with_timeout(crtsh_service.lookup(target), 30),
         with_timeout(whois_service.lookup(target), 10),
+        with_timeout(dns_service.lookup(target), 10),
         return_exceptions=True)
     normalize → risk.py score → persist scans + findings (JSONB snapshot, immutable)
     return aggregated
 ```
 
 - Timeout per source, `return_exceptions=True`, exception → `{ source, message }` in `errors[]`.
+- **Worst-case wall clock is the slowest chain, not the sum.** The jobs are
+  gathered together, so with the configured budgets the bound is
+  `max(12, 30 + 18 + 10, 10, 10) = 58s` — shodan 12s; crt.sh 30s plus its
+  fallback chain (Cert Spotter 18s → Subfinder 10s) when crt.sh fails;
+  whois 10s; dns 10s. The crt.sh fallback chain already dominated at 58s
+  before DNS existed, so adding DNS (10s, concurrent) changed nothing: its
+  budget expires inside the ceiling the crt.sh path already costs in the
+  worst case. Per-source timeouts are `SCAN_TIMEOUT_{SHODAN,CRTSH,WHOIS,DNS}` — env-overridable, so a deployment that lowers one lowers its own bound (the bundled `backend/.env` ships crt.sh at 15s, making the bound `max(12, 15+18+10, 10, 10) = 43s`). The shape of the claim is unchanged either way: DNS's 10s is concurrent and expires inside whichever crt.sh bound applies.
 - httpx.AsyncClient shared, connection pool, UA `osint-dashboard/1.0`, 2 retries with backoff for 429/5xx (crt.sh flaky).
 - Never trust external JSON: Pydantic parse + `.get()` defaults + truncate banners to 2KB.
 
@@ -198,7 +251,9 @@ async def run_scan(target, force=False):
 
 - **Passive host enrichment (v2):** `host_enrichment_service.enrich(shodan_payload)` — a **synchronous, pure derivation** with no network call and no second paid key. Diffed against the existing Shodan service first, as the TODO required: Shodan already pays for all fifteen fields (IP, ASN, org, ISP, geo, lat/long, timezone, network, domain, OS, hostnames, ports), but the normalisation boundary was dropping 11 of them. This module passes them through in a UI-ready shape rather than adding Censys/MaxMind/ipinfo. Open ports are read **only** from Shodan's passive records; `AGENTS.md §7` excludes active scanning, and a test asserts the module imports nothing networking-related so it cannot drift into a scanner. Safe to compute on a cache hit (no I/O), which is why it sits after the fan-out in `gather_results`.
 
-- **DNS records (v2):** `dns_service.lookup(target)` queries A, AAAA, MX, NS, TXT, CNAME, SOA through `dns.asyncresolver` (asyncio-native; the **sync** resolver is never used on the event loop). All seven types are queried concurrently against one resolver, so the worst case is one timeout rather than seven. **Per-type isolation is the core behaviour**: one type failing records an entry in `errors[]` and the other six still return. TXT is truncated to 512 chars (SPF/DKIM blobs run to several KB); record counts cap at 50/type; NXDOMAIN is reported distinctly from an empty answer, because they lead to different conclusions.
+- **DNS records (v2, fifth scan source):** `dns_service.lookup(target)` queries A, AAAA, MX, NS, TXT, CNAME, SOA through `dns.asyncresolver` (asyncio-native; the **sync** resolver is never used on the event loop). All seven types are queried concurrently against one resolver, so the worst case is one timeout rather than seven. **Per-type isolation is the core behaviour**: one type failing records an entry in `errors[]` and the other six still return. TXT is truncated to 512 chars (SPF/DKIM blobs run to several KB); record counts cap at 50/type; NXDOMAIN is reported distinctly from an empty answer, because they lead to different conclusions. The parsed result is typed by `app/schemas/dns.py` (`DnsLookupResult`) — the model runs after truncation, so it describes data that is already bounded rather than being the safety. It is reachable both through the scan path (`results.dns`, bounded by `SCAN_TIMEOUT_DNS`, skipped for an IP literal) and through `POST /api/v1/analysis/dns`.
+
+  **Honesty note, and why the landing copy changed:** this is a lookup that is *active*, not a read of a public record. No packet is sent to the target host — the backend asks the target's authoritative nameservers directly, which is what makes the DNS source passive in the SSRF taxonomy of §4.1b but visible to the target's DNS operator. That is why the source is allowed on the scan path, and why the landing copy no longer claims "nothing on your target is contacted": it now states that no packets touch the target host while DNS queries are resolved by the backend and visible to the target's authoritative nameservers.
 
 - **TLS certificate detail (v2):** `tls_service.lookup(target)` performs a live handshake — the only module that opens a raw socket, and the first to use `validate_host()` instead of `SafeFetcher`. Client-side verification is deliberately **disabled** (`check_hostname=False`, `CERT_NONE`) because an OSINT scan must *report* an expired, self-signed or mismatched certificate rather than fail on it; rejecting it client-side would hide the finding the module exists to surface. The peer DER is parsed with `cryptography` (the stdlib refuses to decode it when verification is off; hand-rolling a DER walk would be worse). Note the overlap with CT: crt.sh and Cert Spotter return the same names and issuance windows, but they return *logged issuance history*, deduped per name — so their `not_after` can be a stale entry rather than the live certificate. Render validity once, from this source.
 
@@ -263,15 +318,17 @@ CREATE TABLE IF NOT EXISTS cache(key TEXT PRIMARY KEY, payload TEXT, expires_at 
 ## 6. Auth & Security
 
 - Better Auth (OAuth + email/password) issues session cookie (httpOnly, Secure, SameSite=Lax).
-- Next `middleware.ts` guards `/dashboard/*` and fails closed (503) when `BETTER_AUTH_URL` is non-localhost plain http in production. Next proxy `app/api/scan/[...path]/route.ts` reads session, forwards it (cookie / `Authorization` header) to FastAPI.
+- Next `middleware.ts` is **CSP-only since 2026-10-14** (reversal, guest scan): it no longer gates `/dashboard/*`, no longer redirects signed-out visitors to `/sign-in`, and no longer answers 503 when `BETTER_AUTH_URL` is missing/non-https in production — that check ran on every matched page including `/`, so an auth misconfiguration could refuse the *landing page* with the sentence "Sign-in is temporarily unavailable." What replaced it is where the gate always belonged: the shell renders for anyone and the backend answers 401 for every request it does not admit. Next proxy `app/api/scan/[...path]/route.ts` reads the session cookie and forwards it (cookie / `Authorization` header) to FastAPI; when there is no identity yet it mints one and sends it as `X-Guest-Token`.
 - FastAPI `core/security.py: require_user()` verifies the Better Auth session via the shared secret + shared PostgreSQL session store; rejects missing/invalid with 401. Enforces per-user rate limit (in-memory fixed window; see limitation below).
+  - `require_user_or_guest()` (same module) is the only other gate, and the two scan routes are its entire footprint: `POST /api/v1/scan` and `GET /api/v1/scan/{id}` admit a signed-out visitor as subject `guest:<id>` — the 2026-10-14 operator reversal of "no anonymous scan path". Admission re-verifies `base64url(hmac_sha256(BETTER_AUTH_SECRET, "nusa-guest:" + id))` with `hmac.compare_digest` (domain separation, so a signature valid for one namespace is not replayable in another), rejects an id that is not exactly `[0-9a-f]{32}` *before* computing anything (the id becomes a rate-limit bucket key, so it is data, not a namespace), and never lets a failed `Bearer` attempt fall through to the guest path. History, trend, analysis and health keep `require_user()`, and ownership is the subject string itself: a guest reads only rows stored as its own `guest:<id>`, with no second query path in the router. `GUEST_SCAN_LIMIT_PER_DAY = 0` closes admission with a 401 instead of a 429, so an operator switching the feature off reads as "not available" rather than a quota that will reset.
 - Machine-to-machine access uses a dedicated `SERVICE_TOKEN` env (`Authorization: Bearer <token>` → `user:service`); the session-signing `BETTER_AUTH_SECRET` is never accepted as an API key.
 - **Known limitation — rate limiting:** `app/core/rate_limit.py` is a per-process in-memory fixed window. Counters reset on restart and are not shared across uvicorn workers, so every bound below multiplies with worker count. Run a single worker in production (the default) or move the counter to Redis/Postgres before scaling out (v2).
   - Buckets are per-user, so the quota is also per account: N accounts mean N × `RATE_LIMIT_PER_HOUR` scans per hour against one Shodan key. The per-account window cannot express a budget for the shared key, which is what `RATE_LIMIT_DAILY_TOTAL` exists for — an opt-in instance-wide ceiling on *admitted* scans per rolling 24h, counted in hourly buckets so the counter itself stays bounded. Disabled by default (0), because the right number is a billing decision.
   - Production refuses to boot unless `RATE_LIMIT_PER_HOUR` is set in the process environment and is at most `PRODUCTION_RATE_LIMIT_CEILING` (5). An unset quota is a silent budget decision on a paid API key. The constant lives in code so raising it is a reviewable change rather than a quiet env edit.
   - `RATE_LIMIT_MAX_KEYS` (default 10000) is the absolute ceiling on live bucket keys. The periodic sweep only bounds growth relative to arrival rate — "keys touched in the last ~65 minutes" — not absolute size. At the cap, an *unknown* key is refused with 429 until the next sweep. Fail closed on purpose: LRU eviction would reset a live user's remaining quota, so anyone able to mint keys could mint free scans. The cost is that a signup burst can lock out new users for up to one sweep interval; existing accounts are never affected.
+  - **Guest scans carry two bounds of their own** (2026-10-14 reversal), because neither existing one fits them. Per-guest, `GUEST_SCAN_LIMIT_PER_DAY` (default 2) charges a rolling **24h** window keyed `guest:<id>` — an hourly window would let a guest 5×/hour all day. That bound is soft by construction and is documented as such: the identity is a cookie minted by the frontend, so clearing it buys a new id, and the backend cannot fall back to per-IP bucketing because the caller it sees is always the Next proxy (the same Vercel-ingress problem recorded as residual #2). The hard bound is therefore `GUEST_SCAN_DAILY_TOTAL` (default 20) — an instance-wide guest budget no cookie can reset, counted in the same hourly buckets and swept on the same schedule — and guest scans are *also* charged to `RATE_LIMIT_DAILY_TOTAL`, since they spend the same paid Shodan key. Order matters: both instance budgets are checked before the per-guest window, so a spent budget answers even for a guest holding its own quota.
   - **Account-age quota weighting was evaluated and rejected.** The limiter receives the opaque string `user:<better-auth-user-id>` and has no DB session, so weighting a new account's quota by its age needs an awaitable query on the hot path of every scan, in a module that is currently synchronous and dependency-free — and it still fails open exactly when the DB is down. The instance daily cap covers the same blast-radius concern without the per-request cost.
-- **CSP is enforced via a per-request nonce:** `frontend/middleware.ts` mints a nonce, sets it on the *request* headers (so Next stamps every inline script it emits — `self.__next_f`, prefetch bootstrap, `ServerInsertedHTML`) and on the *response* under `content-security-policy` in production, `content-security-policy-report-only` in development. `app/layout.tsx` reads the nonce via `next/headers` and applies it to the theme-bootstrap script. `x-nonce` is deliberately request-only and never sent to the browser. Consequence of the nonce design: the root layout reads `headers()`, so every route renders dynamically — which the app already did (`app/page.tsx` and `app/(auth)/sign-up/page.tsx` export `force-dynamic`). As a result the auth session lookup is scoped to `/dashboard` and the matcher excludes `api/` (the JSON proxies, already gated by the backend's `require_user`) and `_next/`.
+- **CSP is enforced via a per-request nonce:** `frontend/middleware.ts` mints a nonce, sets it on the *request* headers (so Next stamps every inline script it emits — `self.__next_f`, prefetch bootstrap, `ServerInsertedHTML`) and on the *response* under `content-security-policy` in production, `content-security-policy-report-only` in development. `app/layout.tsx` reads the nonce via `next/headers` and applies it to the theme-bootstrap script. `x-nonce` is deliberately request-only and never sent to the browser. Consequence of the nonce design: the root layout reads `headers()`, so every route renders dynamically — which the app already did (`app/page.tsx` and `app/(auth)/sign-up/page.tsx` export `force-dynamic`). As a result the matcher excludes `api/` (the JSON proxies, already gated by the backend's `require_user` / `require_user_or_guest`) and `_next/`. Since the 2026-10-14 reversal middleware does no auth work at all — no session lookup, no `/sign-in` redirect, no auth-availability 503 — and what it used to do is recorded in the CSP-only comment at the top of `middleware.ts`.
 - **Known limitation — every `SERVICE_TOKEN` shares one identity:** `app/core/security.py` returns `user:service` for any `Authorization: Bearer` value matching `SERVICE_TOKEN`. All machine-to-machine scans therefore land on one owner, one history row per target, and one rate-limit bucket. Acceptable while there is a single consumer; more than one consumer needs a per-token identity before it ships.
 - **Target validation has two layers.** `assert_target_allowed` checks the literal string (catches `localhost`, RFC1918, link-local, IPv6 ranges); `assert_resolved_target_allowed` additionally resolves a hostname and re-checks the address it points at, so a public-looking name pointing at `127.0.0.1` or `169.254.169.254` is rejected. Resolution runs through `asyncio.to_thread` under a `wait_for` bound (`SCAN_TIMEOUT_SHODAN`) — `gethostbyname` blocks for as long as the resolver takes and would otherwise stall the whole worker (AGENTS.md §3).
 - The resolved-IP check runs in `routers/scan.py`, **not** in a source service: the orchestrator folds every source exception into `errors[]` and still answers `200`, so an `HTTPException` raised inside a service can never reach the client. `shodan_service.lookup` keeps its own `assert_target_allowed(resolved_ip)` as the enforcement point that guarantees no request is sent upstream.
@@ -281,6 +338,17 @@ CREATE TABLE IF NOT EXISTS cache(key TEXT PRIMARY KEY, payload TEXT, expires_at 
 ## 7. Observability & Config
 
 - `/health` (liveness, no DB), `/ready` (DB + SQLite ping).
+- `/health/sources` (session-gated): a cached per-source probe of shodan,
+  crt.sh, whois, nvd and dns, served from the TTL cache for
+  `SOURCE_HEALTH_TTL_SECONDS` (default 300). It is **never** called on the scan
+  path — a scan must not pay for a status check. Statuses are `ok` (probe
+  answered), `degraded` (answered but signalled a problem: 429/5xx/rejected
+  key) and `unknown` (nothing could be established: timeout, connection
+  failure, or the source is not configured). `unknown` is not "down" — the
+  payload says so, because a timeout describes the network in between as much
+  as the source. Probes use one bounded httpx client plus
+  `asyncio.wait_for` around WHOIS/DNS, against the RFC 2606 reserved name
+  `example.com`, so a health check adds no third party's load.
 - JSON logs: `{ request_id, user_id, target, source, latency_ms, status }`.
 - Config via `pydantic-settings`, all secrets from env, `.env.example` committed, `.env` gitignored.
 - Cache backend flag: `CACHE_BACKEND=sqlite|postgres` (`app/core/config.py`). `sqlite` = local file at `SQLITE_PATH`; `postgres` = `osint_cache` table via asyncpg (DSN derived from `DATABASE_URL`, `CREATE TABLE IF NOT EXISTS`, 2s timeout). Async entry points `cache_get_async`/`cache_set_async` in `app/core/cache.py` (orchestrator uses these; sync helpers kept for compat). Either backend failing never fails a scan — get returns `None`, set swallows.

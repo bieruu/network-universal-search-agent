@@ -58,18 +58,28 @@ test("the CSP is set on both the request and the response hand-off", () => {
     "middleware must forward the request headers through NextResponse.next",
   );
   // Response side: the policy the browser actually enforces. Every response
-  // leaves through one helper, including the redirect and the 503.
+  // leaves through this path — and after the 2026-10-14 reversal there is only
+  // one path, because the two refusal branches are gone (see the test below).
   assert.ok(
     /response\.headers\.set\(\s*headerName\s*,\s*policy\s*\)/.test(middleware),
     "middleware must put the CSP on the response it returns",
   );
+  // Reversal 2026-10-14 (operator, guest scan): the two branches these used to
+  // pin are deliberately gone.
+  //   * `send(unavailable())` answered a 503 to EVERY matched page — including
+  //     "/" — whenever BETTER_AUTH_URL was unset or not https in production, so
+  //     an auth misconfiguration could refuse the landing page with the
+  //     sentence "Sign-in is temporarily unavailable."
+  //   * `send(redirectToSignIn(req))` sent every signed-out /dashboard to
+  //     /sign-in, which is exactly what the guest reversal removed.
+  // What must survive is the policy on the response, pinned above.
   assert.ok(
-    /unavailable\(\)/.test(middleware) && /send\(unavailable\(\)\)/.test(middleware),
-    "the refusal branches must carry the CSP too",
+    !/redirectToSignIn/.test(middleware),
+    "no redirect to /sign-in may come back to the middleware (reversal 2026-10-14)",
   );
   assert.ok(
-    /send\(redirectToSignIn\(req\)\)/.test(middleware),
-    "the sign-in redirect must carry the CSP too",
+    !/unavailable\(\)/.test(middleware),
+    "the auth-availability 503 must stay gone: it could refuse the landing page",
   );
 });
 
@@ -176,26 +186,31 @@ test("CSP directive set stays locked down", () => {
   assert.ok(!csp.includes("unsafe-eval"), "no unsafe-eval");
 });
 
-test("the dashboard session gate survived the matcher widening", () => {
-  // The matcher now runs middleware over the whole site, so the session lookup
-  // got a path guard. The gate itself must stay intact: it is what keeps an
-  // anonymous caller out of scans and history.
+test("the dashboard session gate is gone, and nothing else took its place", () => {
+  // Removed 2026-10-14 by the operator-approved guest-scan reversal (see
+  // DESIGN.md): a signed-out visitor renders /dashboard in guest mode and scans
+  // against a daily quota, so redirecting them to /sign-in was precisely the
+  // behaviour the reversal removed. Authorization did not move with it — the
+  // backend has always owned that, on `require_user` for every account-only
+  // route and `require_user_or_guest` for the two scan routes. What is given up
+  // is the fail-closed HTML gate: the shell renders for anyone and the API
+  // answers its 401s, which is the honest place for them.
   assert.ok(
-    middleware.includes('req.nextUrl.pathname.startsWith("/dashboard")'),
-    "the session fetch must be guarded to /dashboard so the public pages and the JSON proxies do not pay for it",
+    !middleware.includes('startsWith("/dashboard")'),
+    "no path may be session-gated in middleware (reversal 2026-10-14)",
   );
   assert.ok(
-    middleware.includes('new URL("/api/auth/get-session", authBaseURL)'),
-    "the get-session fetch must survive",
-  );
-  assert.ok(middleware.includes('url.pathname = "/sign-in"'), "the /sign-in redirect must survive");
-  assert.ok(
-    /session\?\.session && session\?\.user/.test(middleware),
-    "both halves of the session payload must be checked",
+    !middleware.includes("get-session"),
+    "middleware must not spend a session lookup it has nothing to do with",
   );
   assert.ok(
-    middleware.includes('cache: "no-store"'),
-    "the session response must never be cached",
+    !middleware.includes('"/sign-in"'),
+    "the /sign-in redirect must not return (reversal 2026-10-14)",
   );
-  assert.ok(middleware.includes("UNAVAILABLE_BODY"), "the fail-closed body must survive");
+  assert.ok(
+    !middleware.includes("UNAVAILABLE_BODY"),
+    "the fail-closed page body must not return — it could refuse the landing page",
+  );
+  // What the matcher is still for: minting one nonce per rendered document.
+  assert.ok(middleware.includes("generateNonce()"), "the nonce must still be minted per request");
 });

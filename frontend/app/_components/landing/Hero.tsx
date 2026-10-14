@@ -52,7 +52,7 @@ export default function Hero({
               <span className="h-full w-full rounded-full bg-accent motion-safe:animate-blip" />
               <span className="absolute inset-0 rounded-full bg-accent motion-safe:animate-[ping_1.8s_ease-out_infinite]" />
             </span>
-            PUBLIC RECORDS ONLY · NOTHING ON YOUR TARGET IS TOUCHED
+            PUBLIC RECORDS ONLY · NO PACKETS TO YOUR TARGET&apos;S HOST · DNS QUERIES REACH ITS NAMESERVERS
           </Badge>
         </Reveal>
         <Reveal delay={0.05}>
@@ -63,8 +63,9 @@ export default function Hero({
         <Reveal delay={0.1}>
           <p className="mt-5 max-w-[65ch] text-base leading-relaxed text-slate-600 dark:text-neutral-400">
             Enter one domain and read its open ports, subdomain names, registration
-            details, and a risk score in a single place. Nothing on your target is
-            contacted.
+            details, and a risk score in a single place. No packets are sent to your
+            target&apos;s host. DNS queries are resolved by our backend, which makes
+            them visible to the target&apos;s authoritative nameservers.
           </p>
         </Reveal>
         <Reveal delay={0.15}>
@@ -91,7 +92,7 @@ export default function Hero({
         </Reveal>
       </div>
       <Reveal delay={0.1}>
-        <div className="relative">
+        <div className="relative overflow-x-clip">
           {/* Rotating dashed dial + radar ping at the terminal corner. */}
           <span
             aria-hidden="true"

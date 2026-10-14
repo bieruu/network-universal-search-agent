@@ -278,7 +278,7 @@ def scan_client(monkeypatch):
     from fastapi.testclient import TestClient
 
     from app.core import rate_limit
-    from app.core.security import require_user
+    from app.core.security import require_user, require_user_or_guest
     from app.db.session import get_session
     from app.main import create_app
 
@@ -286,6 +286,9 @@ def scan_client(monkeypatch):
     rate_limit.reset_for_tests()
     app = create_app()
     app.dependency_overrides[require_user] = lambda: "user:test"
+    # POST /scan is gated by require_user_or_guest since the 2026-10-14 guest
+    # reversal, so the account identity has to be injected there too.
+    app.dependency_overrides[require_user_or_guest] = lambda: "user:test"
     app.dependency_overrides[get_session] = lambda: None
     with TestClient(app) as client:
         yield client
@@ -488,11 +491,15 @@ async def test_orchestrator_failed_when_all_sources_fail(monkeypatch):
     async def subfinder_down(target):
         raise RuntimeError("Subfinder CLI is unavailable on PATH")
 
+    async def dns_down(target):
+        raise RuntimeError("down")
+
     monkeypatch.setattr(orchestrator.shodan_service, "lookup", boom)
     monkeypatch.setattr(orchestrator.crtsh_service, "lookup", boom)
     monkeypatch.setattr(certspotter_service, "lookup", certspotter_down)
     monkeypatch.setattr(orchestrator.subfinder_service, "lookup", subfinder_down)
     monkeypatch.setattr(orchestrator.whois_service, "lookup", boom_whois)
+    monkeypatch.setattr(orchestrator.dns_service, "lookup", dns_down)
     monkeypatch.setattr(orchestrator.cache_mod, "cache_get_async", _no_cache_get)
     monkeypatch.setattr(orchestrator.cache_mod, "cache_set_async", _no_cache_set)
 
@@ -502,6 +509,7 @@ async def test_orchestrator_failed_when_all_sources_fail(monkeypatch):
         "shodan",
         "crtsh",
         "whois",
+        "dns",
     }
 
     payload = await orchestrator.run_scan("example.com", "u1", force=True)

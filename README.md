@@ -1,15 +1,27 @@
 # Network Universal Search Agent
 
-Secure passive OSINT dashboard (Next.js 15 + FastAPI). One search box → Shodan ports, crt.sh subdomains, WHOIS + transparent risk heuristic, session-gated and rate-limited.
+Secure OSINT dashboard (Next.js 15 + FastAPI). One search box → Shodan ports, crt.sh subdomains, WHOIS, DNS records (A/AAAA/MX/NS/TXT/CNAME/SOA) + CVE tiers and a transparent risk heuristic, rate-limited throughout. History, trend and analysis are session-gated; the two scan routes also admit a signed-out visitor under a guest quota (2 scans/day per guest, plus an instance-wide cap, results not saved — the 2026-10-14 reversal of "no anonymous scan path", dashboard only, never the landing playground). No packets are sent to the target host; DNS queries are resolved by the backend and are visible to the target's authoritative nameservers.
 
 ![Landing hero](frontend/public/evidence/landing-hero-desktop.png)
+![Dashboard as a signed-out guest: quota banner, locked history and risk trend, no logout](frontend/public/evidence/guest-dashboard-dark.png)
 
 - **Status:** v1 implemented. Open items → [TODO.md](./TODO.md).
 - **Docs map:** setup/commands → [WORKFLOW.md](./WORKFLOW.md) · system design → [ARCHITECTURE.md](./ARCHITECTURE.md) · requirements → [PRD.md](./PRD.md) · UI tokens → [DESIGN.md](./DESIGN.md) · contribution rules → [AGENTS.md](./AGENTS.md) · history → [CHANGELOG.md](./CHANGELOG.md).
 
-## Features
+## Architecture
 
-- Aggregated scan: open ports, services, CVEs (NVD cross-checked tiers), subdomains, WHOIS
+```mermaid
+flowchart LR
+  A[Browser / Next.js] -->|session + /api/* proxy| B[Better Auth]
+  B --> C[FastAPI]
+  C -->|asyncio.gather| D[Passive sources<br/>Shodan, crt.sh, WHOIS, DNS, NVD]
+  C --> E[(PostgreSQL)]
+  C --> F[(TTL cache SQLite/Postgres)]
+  E --> G[scans / targets / findings]
+```
+
+## Features
+- Aggregated scan: open ports, services, CVEs (NVD cross-checked tiers), subdomains, WHOIS, DNS records
 - Partial failure is first-class: one dead source never 500s the scan — per-source error badges
 - Better Auth sessions (email/password + optional Google/GitHub), per-user rate limit, immutable scan history
 - Dark-first UI, reduced-motion aware, Chart.js dashboards

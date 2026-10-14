@@ -1,7 +1,9 @@
-"""In-memory per-user fixed-window rate limiter (5/hour default).
+"""In-memory fixed-window rate limiter: per-account hourly (5/hour default),
+per-guest daily (2/day default), plus opt-in instance-wide daily cost caps.
 
-Two bounds sit on top of the hourly window: an absolute ceiling on live bucket
-keys (memory) and an opt-in instance-wide daily cap (cost).
+Three bounds sit on top of the windows: an absolute ceiling on live bucket
+keys (memory), an opt-in instance-wide cap on admitted scans (cost), and the
+guest budget that bounds signed-out traffic no cookie can reset.
 """
 
 from __future__ import annotations
@@ -33,6 +35,13 @@ _DAILY_WINDOW = 24.0 * _HOUR
 # matter how many scans run, so the cost backstop can never become the unbounded
 # growth the per-key ceiling exists to prevent.
 _instance: dict[int, int] = {}
+# Same shape as `_instance`, counting ONLY guest scans (subject `guest:<id>`)
+# against `settings.guest_scan_daily_total`. Separate because the two budgets
+# answer different questions: `_instance` bounds spend on the shared Shodan key
+# across everything, this one bounds the signed-out surface specifically — a
+# guest can mint a fresh id by clearing a cookie, so per-guest buckets alone
+# cannot bound that traffic. Hour buckets keep this map at <= 25 entries.
+_guest_instance: dict[int, int] = {}
 
 
 def _sweep_expired(now: float, window: float) -> None:
@@ -52,26 +61,35 @@ def _sweep_expired(now: float, window: float) -> None:
 def _prune_instance(now: float) -> None:
     """Drop hourly counters that fell out of the rolling daily window.
 
-    O(#hours), so it is safe on the same amortized schedule as _sweep_expired.
+    O(#hours) for each map, so it is safe on the same amortized schedule as
+    _sweep_expired. Both instance counters share this schedule: they only ever
+    count admitted scans, which arrive through the same sweep-owning callers.
     """
     oldest = int((now - _DAILY_WINDOW) // _HOUR) + 1
-    for key in [k for k in _instance if k < oldest]:
-        del _instance[key]
+    for buckets in (_instance, _guest_instance):
+        for key in [k for k in buckets if k < oldest]:
+            del buckets[key]
 
 
-def _check_instance_daily_cap(now: float, cap: int) -> None:
-    """Refuse a scan when the instance has already spent its 24h budget.
+def _check_instance_daily_cap(
+    now: float, cap: int, buckets: dict[int, int] | None = None
+) -> None:
+    """Refuse a scan when `buckets` has already spent its 24h budget.
 
-    The hourly quota is per account and cannot express "this one paid Shodan key
-    must not draw more than X per day" — N accounts each inside their own quota
+    The hourly quota is per subject and cannot express "this one paid Shodan key
+    must not draw more than X per day" — N subjects each inside their own quota
     still add up, and the sign-up gate is an admission control, not a budget.
-    cap <= 0 disables the cap, which is the default so nothing changes for
-    deployments that do not opt in.
+    `buckets` selects which budget: the shared one (`_instance`, the default) or
+    the guest-only one (`_guest_instance`).
+    cap <= 0 disables the cap, which is the default for `rate_limit_daily_total`
+    so nothing changes for deployments that do not opt in; the guest cap ships
+    enabled because the guest path itself is new.
     """
     if cap <= 0:
         return
+    buckets = _instance if buckets is None else buckets
     oldest = int((now - _DAILY_WINDOW) // _HOUR) + 1
-    used = sum(count for k, count in _instance.items() if k >= oldest)
+    used = sum(count for k, count in buckets.items() if k >= oldest)
     if used < cap:
         return
     # Retry-After points at the hour bucket that pushed the running total over
@@ -80,8 +98,8 @@ def _check_instance_daily_cap(now: float, cap: int) -> None:
     # conservative rather than exact.
     running = 0
     culprit = oldest
-    for key in sorted(k for k in _instance if k >= oldest):
-        running += _instance[key]
+    for key in sorted(k for k in buckets if k >= oldest):
+        running += buckets[key]
         if running >= cap:
             culprit = key
             break
@@ -93,14 +111,15 @@ def _check_instance_daily_cap(now: float, cap: int) -> None:
     )
 
 
-def _count_instance(now: float) -> None:
-    """Bill one admitted scan against the instance daily budget.
+def _count_instance(now: float, buckets: dict[int, int] | None = None) -> None:
+    """Bill one admitted scan against an instance daily budget.
 
-    Called only after the per-account check has already passed, so the budget
+    Called only after the per-subject check has already passed, so the budget
     tracks real Shodan spend and a request that never ran does not consume it.
     """
     hour = int(now // _HOUR)
-    _instance[hour] = _instance.get(hour, 0) + 1
+    buckets = _instance if buckets is None else buckets
+    buckets[hour] = buckets.get(hour, 0) + 1
 
 
 def _is_exempt(user_id: str) -> bool:
@@ -262,9 +281,79 @@ def check_free_rate_limit(user_id: str, scope: str) -> None:
     stamps.append(now)
 
 
+def check_guest_rate_limit(subject: str) -> None:
+    """Charge one guest scan (subject `guest:<id>`): daily window + budgets.
+
+    Called ONLY from `POST /api/v1/scan` when `require_user_or_guest` admitted a
+    guest. Three bounds, in this order:
+
+      1. the shared live-key ceiling — one sweep, one memory bound, same
+         fail-closed policy as every other bucket (never evict);
+      2. the two instance budgets — `rate_limit_daily_total` (a guest scan spends
+         the same paid Shodan key) and `guest_scan_daily_total` (bounds the
+         signed-out surface itself). Both are checked BEFORE the per-guest window
+         on purpose: a spent budget must answer even for a guest that still holds
+         its own quota, because the whole point of these caps is that a guest id
+         can be replaced by clearing a cookie;
+      3. the per-guest rolling 24h window (`guest_scan_limit_per_day`).
+
+    The per-guest window is soft by construction — see the config comment. It
+    still matters: it is what makes honest traffic behave (two scans a day, then
+    a 429 with a Retry-After that names the horizon), while the caps carry the
+    cost guarantee.
+    """
+    global _last_sweep
+    if _is_exempt(subject):
+        return
+    now = time.time()
+    window = _DAILY_WINDOW
+    limit = settings.guest_scan_limit_per_day
+    if now - _last_sweep >= _SWEEP_INTERVAL:
+        _last_sweep = now
+        _sweep_expired(now, window)
+        _prune_instance(now)
+
+    # Fail closed, never evict: see the reasoning in check_rate_limit. LRU
+    # eviction would hand the caller a fresh quota.
+    if subject not in _buckets and len(_buckets) >= settings.rate_limit_max_keys:
+        retry = max(1, int(_SWEEP_INTERVAL - (now - _last_sweep)) + 1)
+        raise HTTPException(
+            status_code=429,
+            detail="Rate limit exceeded",
+            headers={"Retry-After": str(retry)},
+        )
+
+    _check_instance_daily_cap(now, settings.rate_limit_daily_total)
+    _check_instance_daily_cap(now, settings.guest_scan_daily_total, _guest_instance)
+
+    if limit <= 0:
+        # Unreachable through `require_user_or_guest` (admission refuses guests
+        # first, so this reads as 401). Here for a direct call: refuse, never
+        # fall through with an empty `stamps[0]` to compute a retry from.
+        raise HTTPException(
+            status_code=429,
+            detail="Rate limit exceeded",
+            headers={"Retry-After": str(int(window))},
+        )
+
+    stamps = [t for t in _buckets[subject] if now - t < window]
+    _buckets[subject] = stamps
+    if len(stamps) >= limit:
+        retry = int(window - (now - stamps[0])) + 1
+        raise HTTPException(
+            status_code=429,
+            detail="Rate limit exceeded",
+            headers={"Retry-After": str(retry)},
+        )
+    stamps.append(now)
+    _count_instance(now)
+    _count_instance(now, _guest_instance)
+
+
 def reset_for_tests() -> None:
     global _last_sweep
     _buckets.clear()
     _instance.clear()
+    _guest_instance.clear()
     # Zeroed so the next call sweeps even when a test clock starts near 0.
     _last_sweep = 0.0

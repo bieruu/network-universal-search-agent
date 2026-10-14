@@ -2,14 +2,17 @@
 
 import type { ReactNode } from "react";
 import { useRouter } from "next/navigation";
-import { List, MagnifyingGlass, SignOut } from "@phosphor-icons/react/dist/ssr";
-import { Button } from "@/components/ui/button";
+import { GithubLogo, List, MagnifyingGlass, SignOut } from "@phosphor-icons/react/dist/ssr";
+import { Button, buttonClasses } from "@/components/ui/button";
 import { Sheet, SheetContent, SheetHeader, SheetTitle, SheetTrigger } from "@/components/ui/sheet";
+import { GITHUB_LINK_LABEL, GITHUB_REPO_URL } from "@/lib/site";
 import { ThemeToggle } from "@/components/ui/theme-toggle";
 import { App1Sidebar, SidebarInset, SidebarProvider } from "@/components/ui/app-1-utils/app-1-sidebar";
 import { authClient } from "@/lib/auth-client";
+import { isGuestSession } from "@/lib/guest";
+import { cn } from "@/lib/utils";
 import AmbientLayer from "./ambient-layer";
-
+import Ambient3D from "./Ambient3D";
 // Pure shell: sidebar + sticky header + content slot. All scan sections
 // (stats, charts, tables, history) live in page.tsx so one file owns the order.
 //
@@ -29,11 +32,18 @@ export default function AppShell({
   children: ReactNode;
 }) {
   const router = useRouter();
-  const { data: session } = authClient.useSession();
+  const sessionState = authClient.useSession();
+  const session = sessionState.data;
+  // Logout only means something with a session to end. A guest clicking it
+  // would call signOut() against no session and land on a sign-in page for an
+  // account they do not have — so the control is hidden instead of faked.
+  const guest = isGuestSession(sessionState);
 
   async function handleLogout() {
     await authClient.signOut();
-    router.push("/sign-in");
+    // Landing, not /sign-in (reversal 2026-10-14): leaving the app should not
+    // drop you on the one page whose only business is starting an account.
+    router.push("/");
     router.refresh();
   }
 
@@ -62,7 +72,7 @@ export default function AppShell({
           already uses. */}
       <div className="relative isolate flex w-full">
         <AmbientLayer />
-        <App1Sidebar active="/dashboard" />
+        <Ambient3D />        <App1Sidebar active="/dashboard" />
         <SidebarInset>
           <header className="sticky top-0 z-10 flex h-16 items-center gap-2 border-b border-btn-border bg-background/90 px-4 backdrop-blur-sm">
             <Sheet>
@@ -95,13 +105,36 @@ export default function AppShell({
                 <span className="truncate">{session.user.name ?? session.user.email}</span>
               </p>
             )}
+            {/* The repo link, in the ghost icon-button family the header's
+                other controls already use — the same classes, on an <a>,
+                so it reads as one of the header's controls rather than a
+                stray link. Taken from `buttonClasses` rather than retyped so
+                the two cannot drift apart.
+                `shrink-0` matters: the <h1> beside it is `flex-1 min-w-0
+                truncate`, so on a 390px viewport the title is what gives up
+                the width, never the control being pushed off-screen.
+                The ring is added rather than inherited: `buttonClasses` carries
+                `focus:outline-hidden`, which hides the UA outline without
+                replacing it, so an anchor in that family would be focusable
+                with nothing to show for it. */}
+            <a
+              href={GITHUB_REPO_URL}
+              target="_blank"
+              rel="noreferrer noopener"
+              aria-label={GITHUB_LINK_LABEL}
+              className={cn(buttonClasses("ghost", "icon"), "shrink-0 focus-visible:ring-2 focus-visible:ring-accent/40")}
+            >
+              <GithubLogo size={20} weight="regular" aria-hidden="true" />
+            </a>
             <Button variant="ghost" size="icon" className="shrink-0" aria-label="Search target" onClick={() => document.getElementById("target-search")?.focus()}>
               <MagnifyingGlass size={20} weight="regular" />
             </Button>
             <ThemeToggle />
-            <Button variant="ghost" size="icon" className="shrink-0" aria-label="Log out" title="Log out" onClick={handleLogout}>
-              <SignOut size={20} weight="regular" />
-            </Button>
+            {!guest && (
+              <Button variant="ghost" size="icon" className="shrink-0" aria-label="Log out" title="Log out" onClick={handleLogout}>
+                <SignOut size={20} weight="regular" />
+              </Button>
+            )}
           </header>
 
           <main className="mx-auto flex w-full max-w-6xl flex-col gap-4 p-4 md:p-6">{children}</main>

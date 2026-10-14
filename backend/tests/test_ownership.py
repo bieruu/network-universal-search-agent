@@ -53,16 +53,16 @@ async def test_history_trend_and_scan_details_are_owner_scoped():
             user_id="user:alice",
             session=session,
         )
-        assert [item["scan_id"] for item in alice_history["items"]] == ["scan-alice"]
+        assert [item.scan_id for item in alice_history.items] == ["scan-alice"]
         alice_trend = await trend(
             t="example.com", user_id="user:alice", session=session
         )
-        assert [point["scan_id"] for point in alice_trend["points"]] == ["scan-alice"]
+        assert [point.scan_id for point in alice_trend.points] == ["scan-alice"]
         with pytest.raises(HTTPException) as not_owner:
             await get_scan("scan-bob", user_id="user:alice", session=session)
         assert not_owner.value.status_code == 404
 
         bob_scan = await get_scan("scan-bob", user_id="user:bob", session=session)
-        assert bob_scan["scan_id"] == "scan-bob"
+        assert bob_scan.scan_id == "scan-bob"
 
     await engine.dispose()

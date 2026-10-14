@@ -53,6 +53,14 @@ class Settings(BaseSettings):
     # money or need an operator's own credentials, so the key is a deliberate
     # budget decision rather than a boot blocker.
     scan_timeout_dns: int = 10
+    # How long a per-source health probe result stays fresh in the TTL cache
+    # (GET /health/sources, app/services/source_health_service.py). The probe
+    # spends upstream requests — an NVD query and a WHOIS lookup among them —
+    # so it must never run per-scan and must never run per-request either: the
+    # first caller in a window pays, every caller inside it is served from the
+    # cache. 5 minutes keeps a status page honest without turning a refresh
+    # button into an outbound-request generator.
+    source_health_ttl_seconds: int = Field(default=300, ge=0)
     # Leak-Lookup: the key is free but is REQUIRED, and the free tier is capped
     # at 10 queries/day. Its ToS restricts queries to targets the operator is
     # authorised to search, so wiring it to arbitrary signed-in users is an
@@ -112,6 +120,27 @@ class Settings(BaseSettings):
     #
     # Default empty: nobody is exempt until an operator opts in by name.
     rate_limit_exempt_subjects: str = ""
+    # --- Guest (signed-out) scans -------------------------------------------
+    # Reversal 2026-10-14 (operator): DESIGN.md used to state "there is
+    # deliberately no anonymous scan path". Guests may now scan from the
+    # dashboard, admitted by `require_user_or_guest()` and charged here.
+    #
+    # WHY THESE TWO NUMBERS AND NOT AN IP BUCKET
+    # ------------------------------------------
+    # The backend never sees a visitor's IP: the caller is always the Next.js
+    # proxy, so a per-IP limiter here would be one bucket shared by every guest
+    # (the same "Vercel does not publish its edge ingress ranges" problem that
+    # keeps residual #2 open for Better Auth). The guest identity is therefore
+    # an HMAC-signed cookie minted by the frontend, and its quota is soft:
+    # clearing the cookie mints a new id, which is why the hard bound is
+    # `guest_scan_daily_total` — an instance-wide budget that no cookie can
+    # reset. `rate_limit_daily_total` (the shared Shodan budget) is charged
+    # too, because a guest scan spends the same paid key.
+    # 0 for `guest_scan_limit_per_day` disables guest scans entirely —
+    # `require_user_or_guest` then refuses guests with a 401 instead of a 429,
+    # so turning the feature off reads as "not available", not "quota spent".
+    guest_scan_limit_per_day: int = Field(default=2, ge=0)
+    guest_scan_daily_total: int = Field(default=20, ge=0)
     cache_ttl_hours: int = 24
     # Ceiling on an inbound request body. It is enforced by
     # `BodySizeLimitMiddleware` BEFORE anything reads the payload, because

@@ -20,11 +20,11 @@ from app.services import orchestrator
 
 @pytest.mark.asyncio
 async def test_cache_hit_under_1_5s(monkeypatch, tmp_path):
-    """Pre-populated SQLite cache → gather_results serves all 3 sources fast."""
+    """Pre-populated SQLite cache → gather_results serves all 4 sources fast."""
     monkeypatch.setattr(settings, "cache_backend", "sqlite")
     monkeypatch.setattr(settings, "sqlite_path", str(tmp_path / "perf.db"))
     target = "perf-hit.example.com"
-    for source in ("shodan", "crtsh", "whois"):
+    for source in ("shodan", "crtsh", "whois", "dns"):
         cache_mod.cache_set(settings.sqlite_path, f"{source}:{target}", {"src": source})
 
     async def _must_not_call(*args, **kwargs):  # proves no network on cache hit
@@ -33,6 +33,7 @@ async def test_cache_hit_under_1_5s(monkeypatch, tmp_path):
     monkeypatch.setattr(orchestrator.shodan_service, "lookup", _must_not_call)
     monkeypatch.setattr(orchestrator.crtsh_service, "lookup", _must_not_call)
     monkeypatch.setattr(orchestrator.whois_service, "lookup", _must_not_call)
+    monkeypatch.setattr(orchestrator.dns_service, "lookup", _must_not_call)
 
     start = time.perf_counter()
     results, errors = await orchestrator.gather_results(target, force=False)
@@ -41,7 +42,7 @@ async def test_cache_hit_under_1_5s(monkeypatch, tmp_path):
     # `host` is host_enrichment_service.enrich() applied to the cached Shodan
     # payload: a pure synchronous derivation with no I/O, which is why it is
     # allowed on a cache hit when the network-bound `history` block is not.
-    assert set(results) == {"shodan", "crtsh", "whois", "host"}
+    assert set(results) == {"shodan", "crtsh", "whois", "dns", "host"}
     assert errors == []
     assert elapsed < 1.5
 
@@ -66,9 +67,30 @@ async def test_cache_miss_mocked_under_12s(monkeypatch):
     async def _no_set(*args, **kwargs):
         return None
 
+    async def _slow_ok_dns(target, client=None):
+        await asyncio.sleep(0.3)
+        return {"domain": target, "records": {}}
+
+    async def _noop_history(*args, **kwargs):
+        await asyncio.sleep(0)
+        return {"entries": [], "error": None}
+
+    async def _noop_active(*args, **kwargs):
+        await asyncio.sleep(0)
+        return {"CVEs": [], "error": None}
+
     monkeypatch.setattr(orchestrator.shodan_service, "lookup", _slow_ok_shodan)
     monkeypatch.setattr(orchestrator.crtsh_service, "lookup", _slow_ok_crtsh)
     monkeypatch.setattr(orchestrator.whois_service, "lookup", _slow_ok_whois)
+    # These sources are not timed by the contract under test but otherwise hit the
+    # live network (DNS resolver + NVD/OTX/URLScan), which is what made this
+    # test flaky (12s vs observed 36s). Stub them deterministic and fast.
+    if hasattr(orchestrator, "dns_service"):
+        monkeypatch.setattr(orchestrator.dns_service, "lookup", _slow_ok_dns)
+    if hasattr(orchestrator, "active_service"):
+        monkeypatch.setattr(orchestrator.active_service, "lookup", _noop_active)
+    if hasattr(orchestrator, "history_service"):
+        monkeypatch.setattr(orchestrator.history_service, "lookup", _noop_history)
     monkeypatch.setattr(orchestrator.cache_mod, "cache_set_async", _no_set)
 
     start = time.perf_counter()

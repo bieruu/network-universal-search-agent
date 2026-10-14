@@ -3,6 +3,7 @@
 from __future__ import annotations
 
 import asyncio
+import ipaddress
 import uuid
 from datetime import datetime, timezone
 from typing import Any
@@ -15,6 +16,7 @@ from app.core.errors import sanitize_error
 from app.services import (
     certspotter_service,
     crtsh_service,
+    dns_service,
     host_enrichment_service,
     leaklookup_service,
     nvd_service,
@@ -36,6 +38,20 @@ async def _with_timeout(coro, seconds: int, source: str) -> Any:
         ) from e
     except Exception as e:
         raise RuntimeError(sanitize_error(source, e)) from e
+
+
+def _is_ip_literal(target: str) -> bool:
+    """True when the target is an address rather than a name.
+
+    Used to skip the DNS source, which is a domain-only lookup: an MX record
+    for `93.184.216.34` does not exist and cannot be asked for. `ip_address`
+    accepts both IPv4 and IPv6, which the scan request's own pattern does not.
+    """
+    try:
+        ipaddress.ip_address(target.strip())
+    except ValueError:
+        return False
+    return True
 
 
 async def _certificate_fallback(target: str, client: httpx.AsyncClient) -> Any:
@@ -287,6 +303,24 @@ async def gather_results(
 ) -> tuple[dict[str, Any], list[dict[str, str]]]:
     """Run sources concurrently; use passive fallbacks if crt.sh fails.
 
+    The fan-out is four jobs (five counting NVD, which runs after Shodan on the
+    CPEs it returned), each bounded by its own `SCAN_TIMEOUT_*`: shodan 12s,
+    crt.sh 30s + its fallback chain (Cert Spotter 18s, then Subfinder 10s) when
+    crt.sh fails, whois 10s, dns 10s. Because the jobs are gathered together,
+    the worst-case wall clock is the SLOWEST chain rather than the sum:
+    max(12, 30+18+10, 10, 10) = 58s, which is what the crt.sh fallback chain
+    already dominated before DNS existed. DNS adds no wall clock of its own —
+    its 10s budget runs concurrently and expires inside the 58s the crt.sh
+    chain already costs in the worst case. A cache hit for any source costs
+    zero network for that source.
+
+    The budgets above are the code defaults. Every `SCAN_TIMEOUT_*` is an env
+    knob, so a deployment that lowers one lowers its own bound — the local
+    `backend/.env` ships crt.sh at 15s, which makes the bound
+    `max(12, 15+18+10, 10, 10) = 43s` there. The shape of the claim does not
+    change either way: DNS's 10s budget is concurrent and expires inside
+    whichever crt.sh bound applies.
+
     `resolved_ip` is the caller's already-validated answer for this target (see
     _shodan_lookup). It is only consulted by the Shodan job, and that job is
     never built on a cache hit, so a cached Shodan still costs zero DNS queries
@@ -300,8 +334,7 @@ async def gather_results(
         limits=httpx.Limits(max_connections=20),
     ) as client:
         # Build coroutines (cache-aware)
-        jobs = {}
-        for source, fn, timeout in (
+        jobs_specs = (
             (
                 "shodan",
                 lambda: _shodan_lookup(target, client, resolved_ip),
@@ -317,7 +350,33 @@ async def gather_results(
                 lambda: whois_service.lookup(target),
                 settings.scan_timeout_whois,
             ),
-        ):
+            (
+                # Fifth source: DNS records. This is NOT a read of a public
+                # record the way Shodan/crt.sh/WHOIS are — the query is
+                # resolved by the backend and is visible to the target's
+                # authoritative nameservers. It never sends a packet to the
+                # target host itself, which is why it is allowed here rather
+                # than behind the SSRF guard: nothing in this module connects
+                # to a name it was not asked about (app/core/ssrf.py calls the
+                # same distinction "passive — query a third party about a
+                # target"). The honesty cost is on the UI: the landing copy
+                # says the backend's DNS queries are visible to the target's
+                # nameservers instead of claiming nothing was contacted.
+                "dns",
+                lambda: dns_service.lookup(target),
+                settings.scan_timeout_dns,
+            ),
+        )
+        if _is_ip_literal(target):
+            # DNS records are meaningless for an address. Skipping — rather
+            # than letting the source raise — is the honest option: producing
+            # an error here would mark every healthy IP scan `partial` for a
+            # lookup that does not apply, which is a failure that never
+            # happened. The DNS block is simply absent, and the UI says
+            # records apply to domains.
+            jobs_specs = tuple(spec for spec in jobs_specs if spec[0] != "dns")
+        jobs = {}
+        for source, fn, timeout in jobs_specs:
             key = f"{source}:{target.lower()}"
             if not force:
                 hit = await cache_mod.cache_get_async(key)

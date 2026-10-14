@@ -21,10 +21,10 @@
  *
  * WHY THESE NUMBERS
  * -----------------
- * The four long periods are separated by more than a factor of two from their
- * nearest neighbour (26 / 14 / 9 / 5). Two loops whose periods are close but
- * not equal still re-converge every few seconds, which is the same visual
- * problem wearing a disguise. The short ones (`blip` .. `breathe`) are the
+ * The five long periods are separated from their nearest neighbour by at least
+ * a factor of one and a half (52 / 26 / 14 / 9 / 5). Two loops whose periods are
+ * close but not equal still re-converge every few seconds, which is the same
+ * visual problem wearing a disguise. The short ones (`blip` .. `breathe`) are the
  * local micro-loops: fast enough to read as "this thing is live", slow enough
  * not to flicker.
  *
@@ -44,6 +44,13 @@ export const MOTION_PHASES = {
   drift: 9,
   /** Cards, cells and resting dots. */
   pulse: 5,
+  /**
+   * Slow scene rotation: the interactive globe and the ambient 3D scenes
+   * (hero node graph, dashboard sphere). One number for all of them so a
+   * "too fast" complaint is one edit here, not three guesses in three files.
+   * 52s per revolution — a spin that fast you notice is a spinner, not a globe.
+   */
+  globe: 52,
 } as const;
 
 /** Short, local micro-loops, in seconds. */

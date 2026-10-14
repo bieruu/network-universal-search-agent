@@ -6,6 +6,7 @@ import asyncio
 import base64
 import hmac
 import ipaddress
+import re
 import socket
 from urllib.parse import unquote
 
@@ -150,12 +151,26 @@ async def assert_resolved_target_allowed(target: str) -> str | None:
     return ip
 
 
-async def require_user(
-    authorization: str | None = Header(default=None),
-    cookie: str | None = Header(default=None),
-    session: AsyncSession = Depends(get_session),  # noqa: B008
-) -> str:
-    """Verify a Better Auth session against its shared PostgreSQL session store."""
+async def _session_subject(
+    authorization: str | None,
+    cookie: str | None,
+    session: AsyncSession,
+) -> str | None:
+    """The authenticated subject for this request, or `None` when there is none.
+
+    Everything `require_user` did before it was split lives here, including the
+    two branches that RAISE instead of returning `None`:
+
+      * a malformed/unset `BETTER_AUTH_SECRET` (401) — nothing can be trusted to
+        be signed, including the guest token verified by `require_user_or_guest`;
+      * a `Bearer` token that does not match `SERVICE_TOKEN` (401) — a failed
+        credential attempt must never fall through to a weaker one;
+      * a session cookie present while the store is not PostgreSQL (503) — the
+        operator error stays visible rather than silently downgrading to guest.
+
+    Returning `None` means "no usable session": absent cookie, or a token the
+    session store did not honour. The caller decides what that permits.
+    """
     secret = (settings.better_auth_secret or "").strip()
     if (
         not secret
@@ -207,7 +222,98 @@ async def require_user(
         if isinstance(user_id, str) and user_id.strip():
             return f"user:{user_id.strip()}"
 
+    return None
+
+
+# Frontend mint format, pinned on both sides (`frontend/app/api/scan/.../route.ts`
+# is the only minter): 16 random bytes as lowercase hex. The shape is checked
+# before the signature so an attacker-controlled string can never become the key
+# of a rate-limit bucket or a log field — the id is data, not a namespace.
+# `fullmatch`, not `match`: `$` also accepts a trailing newline, and this value
+# ends up in a bucket key.
+_GUEST_ID_PATTERN = re.compile(r"[0-9a-f]{32}")
+
+
+def _unwrap_guest_token(value: str, secret: str) -> str | None:
+    """`<guest-id>.<signature>` → guest id, or `None` if anything is off.
+
+    The signature is `base64url_unpadded(hmac_sha256(secret, "nusa-guest:" + id))`.
+    The `"nusa-guest:"` prefix is domain separation: the same shared
+    `BETTER_AUTH_SECRET` signs session cookies here, and a signature that is
+    valid in one namespace must not be replayable in the other. Unpadded base64url
+    is what `crypto.createHmac(...).digest("base64url")` emits in the minter, so
+    the two sides agree without a padding round-trip.
+
+    `hmac.compare_digest` compares, never `==` — same rule as the session and
+    service-token paths.
+    """
+    if "." not in value:
+        return None
+    guest_id, signature = value.rsplit(".", 1)
+    if not guest_id or not signature:
+        return None
+    if not _GUEST_ID_PATTERN.fullmatch(guest_id):
+        return None
+    expected = (
+        base64.urlsafe_b64encode(
+            hmac.new(
+                secret.encode(), f"nusa-guest:{guest_id}".encode(), "sha256"
+            ).digest()
+        )
+        .decode("ascii")
+        .rstrip("=")
+    )
+    return guest_id if hmac.compare_digest(signature, expected) else None
+
+
+async def require_user(
+    authorization: str | None = Header(default=None),
+    cookie: str | None = Header(default=None),
+    session: AsyncSession = Depends(get_session),  # noqa: B008
+) -> str:
+    """Verify a Better Auth session against its shared PostgreSQL session store."""
+    subject = await _session_subject(authorization, cookie, session)
+    if subject is not None:
+        return subject
     raise HTTPException(status_code=status.HTTP_401_UNAUTHORIZED, detail="Unauthorized")
+
+
+async def require_user_or_guest(
+    guest_token: str | None = Header(default=None, alias="x-guest-token"),
+    authorization: str | None = Header(default=None),
+    cookie: str | None = Header(default=None),
+    session: AsyncSession = Depends(get_session),  # noqa: B008
+) -> str:
+    """A signed-in subject (`user:<id>` / `user:service`) or a guest (`guest:<id>`).
+
+    The two scan endpoints (`POST /api/v1/scan`, `GET /api/v1/scan/{id}`) are the
+    ONLY routes on this dependency — history, trend, analysis and health keep
+    `require_user()`, so a guest can scan but can never enumerate an account's
+    saved scans (reversal note: DESIGN.md, 2026-10-14).
+
+    The subject string is the ownership key: a guest reads only rows written as
+    its own `guest:<id>`, so two guests and every account are mutually invisible
+    without a second code path in the router.
+
+    `guest_scan_limit_per_day <= 0` turns the feature off at admission time, so
+    an operator's opt-out reads as 401 "no credential" rather than a 429 that
+    implies a quota exists and will reset.
+    """
+    subject = await _session_subject(authorization, cookie, session)
+    if subject is not None:
+        return subject
+
+    secret = (settings.better_auth_secret or "").strip()
+    if settings.guest_scan_limit_per_day <= 0 or not secret or not guest_token:
+        raise HTTPException(
+            status_code=status.HTTP_401_UNAUTHORIZED, detail="Unauthorized"
+        )
+    guest_id = _unwrap_guest_token(guest_token.strip(), secret)
+    if guest_id is None:
+        raise HTTPException(
+            status_code=status.HTTP_401_UNAUTHORIZED, detail="Unauthorized"
+        )
+    return f"guest:{guest_id}"
 
 
 UserDep = Depends(require_user)

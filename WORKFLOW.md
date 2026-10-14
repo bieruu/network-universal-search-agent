@@ -111,6 +111,9 @@ RATE_LIMIT_PER_HOUR=5
 # v2 analysis capabilities that cost no Shodan credit get their own quota, so a
 # cheap endpoint can never exhaust a user's scan allowance. See backend/.env.example.
 FREE_RATE_LIMIT_PER_HOUR=20
+# Guest (signed-out) scans — dashboard only, reversal 2026-10-14 (DESIGN.md).
+GUEST_SCAN_LIMIT_PER_DAY=2
+GUEST_SCAN_DAILY_TOTAL=20
 # Testing only — see §3.1.
 RATE_LIMIT_EXEMPT_SUBJECTS=
 # Optional v2 sources. All blank = supported; each reports `not_configured`.
@@ -340,6 +343,8 @@ Everything below is injected as a real environment variable at container start, 
 | `CACHE_BACKEND` | `postgres` | The Space has no persistent volume, so there is nowhere for the SQLite TTL cache to survive a restart and the cache has to live in the database (ARCHITECTURE.md §7). |
 | `RATE_LIMIT_PER_HOUR` | `5` | **Required.** It must be a real injected variable rather than a file in the image: `config.py` checks `os.getenv` so that "unset" stays distinguishable from a deliberate value, and the backend refuses to boot under production without it (§8.4). |
 | `RATE_LIMIT_DAILY_TOTAL` | `50` | Instance-wide backstop over the one paid Shodan key (§8.4). |
+| `GUEST_SCAN_LIMIT_PER_DAY` | `2` | Scans per signed-out guest per rolling 24h (guest scan path, 2026-10-14 reversal). `0` disables guest scans: admission then answers 401 instead of 429, so switching it off reads as "not available" rather than a quota that will reset. |
+| `GUEST_SCAN_DAILY_TOTAL` | `20` | The bound that actually costs money: instance-wide guest budget per rolling 24h. The per-guest number above is soft by construction (the identity is a cookie, and clearing it mints a new id), and the backend cannot bucket per IP because the only caller it sees is the Next proxy. Guest scans are charged to this *and* to `RATE_LIMIT_DAILY_TOTAL` when that is set, because both spend the same paid key. Keep it on while guest scans are on. |
 | `MAX_REQUEST_BODY_BYTES` | (unset → `16777216`) | Ceiling on an inbound request body. It is enforced by `BodySizeLimitMiddleware` BEFORE anything reads the payload, because FastAPI solves dependencies — `require_user` included — only after `await request.body()`. Without it an anonymous caller can make the worker buffer an arbitrarily large body on the way to its 401. The default is sized by the largest legitimate body, the EXIF base64 upload (`(MAX_INPUT_BYTES // 3) * 4 + 4` ≈ 13.98 MiB) plus envelope overhead; `backend/tests/test_body_limit.py` pins that relationship, so raising it past the default reopens the bug and lowering it gives legitimate uploads a spurious 413. The frontend proxy applies the same 16 MiB cap. |
 
 Three points the tables cannot carry:

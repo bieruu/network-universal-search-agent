@@ -43,7 +43,7 @@ Node ≥22.18 (the test suite runs `.ts` files directly, which needs Node's unfl
 ## 5. Security — MUST Follow
 
 1. **Secrets:** only via env (`SHODAN_API_KEY`, `BETTER_AUTH_SECRET`, `DATABASE_URL`). Never log, never return to client, never commit `.env`. Grep before PR: `SHODAN|SECRET|DATABASE_URL`.
-2. **Auth:** every scan/history endpoint calls `require_user()`. Frontend proxy forwards session; direct FastAPI call without session → 401.
+2. **Auth:** account-only endpoints (history, trend, analysis, health) call `require_user()`. The two scan routes (`POST /api/v1/scan`, `GET /api/v1/scan/{id}`) call `require_user_or_guest()`, which also admits an HMAC-signed `X-Guest-Token` minted by the frontend proxy as subject `guest:<id>` — **reversal 2026-10-14 (operator)** of "no anonymous scan path", bounded by `GUEST_SCAN_LIMIT_PER_DAY` (2/guest/24h) + `GUEST_SCAN_DAILY_TOTAL` (instance-wide, the bound a cookie cannot reset). Frontend proxy forwards session + guest token; direct FastAPI call with neither → 401.
 3. **Validation:** Zod (FE) + Pydantic regex (BE) for domain/IP; block `localhost` + RFC1918 + `169.254/16`. Render banners/WHOIS as plain text.
 4. **External data:** treat Shodan/crt.sh/WHOIS as untrusted — Pydantic parse, `.get()` defaults, catch `Timeout/HTTPError` → `errors[]`, never 500 on source failure.
 5. **Limits:** respect `RATE_LIMIT_PER_HOUR`, per-source timeouts (12/15/10s), shared httpx client, no parallel fan-out beyond orchestrator.
@@ -53,6 +53,7 @@ Node ≥22.18 (the test suite runs `.ts` files directly, which needs Node's unfl
 - Dark default (`class="dark"`), shadcn `Card/Table/Badge/Skeleton/Tabs` only. No inline `style` for theme.
 - Per-card loading (`Skeleton`) + error (`Badge variant=destructive`) + empty state ("No subdomains found"). Partial results must still render.
 - Charts: Chart.js only, accessible labels, `aria-label`, responsive, no 3D/pie-spam.
+  > Reversed 2026-10-14 (operator-approved redesign): 3D charts via `three` + `@react-three/fiber` + `@react-three/drei` are now allowed, subject to data still being available as text/table (a11y source), accessible labels, responsive, and no pie-spam; `chart.js`/`react-chartjs-2` removable only after a grep proves zero remaining imports (still present in PortsChartInner/RiskTrendChartInner, so retained).
 
 ## 7. DO / DON'T
 

@@ -166,7 +166,7 @@ async def test_whois_redacted_emails_still_completes(monkeypatch):
 
 @pytest.mark.asyncio
 async def test_full_failure_all_sources_down_never_raises(monkeypatch):
-    """All 3 sources raise different error types → status failed, 3 errors, no raise."""
+    """All 4 sources raise different error types → status failed, 4 errors, no raise."""
     _stub_cache(monkeypatch)
 
     async def shodan_down(target, client=None):
@@ -178,22 +178,26 @@ async def test_full_failure_all_sources_down_never_raises(monkeypatch):
     async def whois_down(target):
         raise httpx.ConnectError("DNS unreachable")
 
+    async def dns_down(target):
+        raise RuntimeError("dns: resolver timed out")
+
     monkeypatch.setattr(orchestrator.shodan_service, "lookup", shodan_down)
     monkeypatch.setattr(orchestrator.crtsh_service, "lookup", crtsh_slow)
     monkeypatch.setattr(certspotter_service, "lookup", _failed_certspotter)
     monkeypatch.setattr(orchestrator.subfinder_service, "lookup", _missing_subfinder)
     monkeypatch.setattr(orchestrator.whois_service, "lookup", whois_down)
+    monkeypatch.setattr(orchestrator.dns_service, "lookup", dns_down)
 
     results, errors = await orchestrator.gather_results("example.com", force=True)
     assert results == {}
-    assert {e["source"] for e in errors} == {"shodan", "crtsh", "whois"}
+    assert {e["source"] for e in errors} == {"shodan", "crtsh", "whois", "dns"}
     assert "Subfinder" in next(e["message"] for e in errors if e["source"] == "crtsh")
 
     payload = await orchestrator.run_scan(
         "example.com", "u1", force=True
     )  # must not raise
     assert payload["status"] == "failed"
-    assert len(payload["errors"]) == 3
+    assert len(payload["errors"]) == 4
 
 
 @pytest.mark.asyncio

@@ -26,7 +26,7 @@ export default function CtaFooter() {
       </section>
       <footer className="border-t border-neutral-200 dark:border-neutral-800/80">
         <div className="mx-auto flex max-w-7xl flex-col items-center justify-between gap-3 px-4 py-6 font-mono text-xs text-slate-500 dark:text-neutral-500 sm:flex-row sm:px-6">
-          <p>Public sources only · your targets are never contacted</p>
+          <p>Public records only · no packets to your target&apos;s host · DNS queries reach its nameservers</p>
           <div className="flex gap-5">
             <Link href="/dashboard" className="transition-colors hover:text-accent">
               Dashboard
