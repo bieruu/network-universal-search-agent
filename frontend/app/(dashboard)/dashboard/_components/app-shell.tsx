@@ -12,7 +12,6 @@ import { authClient } from "@/lib/auth-client";
 import { isGuestSession } from "@/lib/guest";
 import { cn } from "@/lib/utils";
 import AmbientLayer from "./ambient-layer";
-import Ambient3D from "./Ambient3D";
 // Pure shell: sidebar + sticky header + content slot. All scan sections
 // (stats, charts, tables, history) live in page.tsx so one file owns the order.
 //
@@ -72,7 +71,7 @@ export default function AppShell({
           already uses. */}
       <div className="relative isolate flex w-full">
         <AmbientLayer />
-        <Ambient3D />        <App1Sidebar active="/dashboard" />
+        <App1Sidebar active="/dashboard" />
         <SidebarInset>
           <header className="sticky top-0 z-10 flex h-16 items-center gap-2 border-b border-btn-border bg-background/90 px-4 backdrop-blur-sm">
             <Sheet>
@@ -81,7 +80,7 @@ export default function AppShell({
                   <List size={22} weight="regular" />
                 </Button>
               </SheetTrigger>
-              <SheetContent>
+              <SheetContent side="left">
                 <SheetHeader>
                   <SheetTitle>NUSA project</SheetTitle>
                 </SheetHeader>

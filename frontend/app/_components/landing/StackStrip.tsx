@@ -92,8 +92,8 @@ export default function StackStrip() {
             The stack this runs on
           </h2>
           <p className="mx-auto mt-3 max-w-[65ch] text-center text-sm leading-relaxed text-slate-600 dark:text-neutral-400">
-            Nothing here is a claim about a future version — every name is a
-            dependency this project already ships with.
+            Every name here comes from this project's own dependency files —
+            what it runs on today.
           </p>
         </Reveal>
 

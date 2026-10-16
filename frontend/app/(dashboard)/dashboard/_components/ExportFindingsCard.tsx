@@ -97,8 +97,7 @@ export default function ExportFindingsCard({
           <Skeleton className="h-24" />
         ) : !scan ? (
           <p className="text-sm text-slate-500 dark:text-neutral-500">
-            No findings to export yet — run a search first. The file is built from what this screen showed you, so
-            there is nothing to build before there is a scan.
+            No findings to export yet — run a scan first.
           </p>
         ) : (
           <>

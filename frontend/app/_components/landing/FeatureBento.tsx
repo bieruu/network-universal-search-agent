@@ -7,13 +7,13 @@ const CELLS = [
   {
     icon: HardDrives,
     title: "See what is open, and what is running",
-    body: "Every open port with the product and version answering on it. Nothing is probed to find out — the answers come from data the internet already publishes.",
+    body: "Every open port, with the product and version answering on it — read from internet-wide scan data. Nothing is probed to find out.",
     visual: "grid" as const,
   },
   {
     icon: Certificate,
     title: "Names nobody put on a page",
-    body: "Machine names under your domain, taken from the public certificate log. If that log is slow, the rest of the result still arrives and says what is missing.",
+    body: "Machine names under your domain, read from the public certificate log.",
     visual: "none" as const,
   },
   {
@@ -25,13 +25,13 @@ const CELLS = [
   {
     icon: TrendUp,
     title: "Know where to look first",
-    body: "Each search gets a 0 to 100 risk score, and your last ten searches for the same target are charted so you can see a host getting worse, not just one bad afternoon.",
+    body: "Every search gets a 0 to 100 risk score, and your last ten scans of the same target are charted so you can see a host getting worse over time.",
     visual: "metrics" as const,
   },
   {
     icon: LockKey,
     title: "Only you can see your searches",
-    body: "Sign-in required, nobody outside your account can read your history, and every search you run is written down so you can prove what was looked up and when.",
+    body: "Sign-in is required, nobody outside your account can read your history, and every search is recorded so you can show what was looked up, and when.",
     visual: "tint" as const,
   },
 ];
@@ -56,10 +56,10 @@ export default function FeatureBento() {
     <section id="sources" className="mx-auto max-w-7xl px-4 py-16 sm:px-6 md:py-24">
       <Reveal>
         <h2 className="max-w-[20ch] text-3xl font-bold tracking-tighter text-slate-900 dark:text-neutral-50 md:text-4xl">
-          Everything about one domain, in one place
+          What one search shows you
         </h2>
         <p className="mt-3 max-w-[65ch] text-slate-600 dark:text-neutral-400">
-          If one of those places is slow or unreachable, you still get the rest — and the result tells you plainly what it could not check, so a gap is never mistaken for good news.
+          A slow or unreachable source never blanks the report — the rest still arrives, and the card it owns says what could not be checked.
         </p>
       </Reveal>
       <div className="mt-10 grid gap-4 sm:grid-cols-2 lg:grid-cols-3">

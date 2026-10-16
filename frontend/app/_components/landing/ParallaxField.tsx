@@ -1,5 +1,6 @@
 "use client";
 
+import { useLayoutEffect, useState } from "react";
 import { motion, useReducedMotion, useScroll, useTransform } from "motion/react";
 import { phaseDelay } from "@/lib/motion-phases";
 
@@ -11,12 +12,26 @@ import { phaseDelay } from "@/lib/motion-phases";
 // (`phaseDelay`), so the two washes never breathe on the same beat. Unoffset
 // they rose and fell together, which made the whole backdrop read as one
 // moving surface rather than two layers at different depths.
+//
+// HYDRATION (fix 2026-10-14). `useReducedMotion()` answers `null` on the
+// server but `true` on a reduced-motion client at first render, so the old
+// `if (reduce) return null` rendered a div in the server HTML and `null` in
+// the client — a hydration mismatch that fired in reduce mode only, 4 of 4
+// loads. The gate is now `mounted`: server and pre-mount client both render
+// `null` (identical trees), and only after hydration does the real answer
+// apply — reduce keeps `null`, normal motion renders the washes. The state
+// flips in a layout effect so the washes appear before paint instead of
+// popping in a frame late.
 export default function ParallaxField() {
+  const [mounted, setMounted] = useState(false);
+  useLayoutEffect(() => {
+    setMounted(true);
+  }, []);
   const reduce = useReducedMotion();
   const { scrollY } = useScroll();
   const ySlow = useTransform(scrollY, [0, 800], [0, 70]);
   const yFast = useTransform(scrollY, [0, 800], [0, -50]);
-  if (reduce) return null;
+  if (!mounted || reduce) return null;
   return (
     <div aria-hidden="true" className="pointer-events-none absolute inset-0 overflow-hidden">
       <motion.div

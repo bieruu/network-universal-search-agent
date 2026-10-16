@@ -231,6 +231,7 @@ Backend tests mock upstream OSINT services. For auth, tests verify active/expire
 | Backend unreachable (502) | Start FastAPI on port 8000 and check `BACKEND_URL`. |
 | Private target rejected | Expected: localhost, RFC1918, link-local, and other restricted addresses are blocked. |
 | OneDrive `EINVAL` under `.next` | `npm run clean`, then retry; `predev` and `prebuild` also clean the affected Next.js output. |
+| `/` returns 500 mid-session with `SyntaxError: Unexpected end of JSON input`, `PageNotFoundError` for a route that does exist, `Failed to generate static paths … Cannot read properties of undefined (reading 'call')`, or `Caching failed for pack … rename *.pack.gz_` | The same OneDrive `.next` corruption, just during HMR instead of at boot — the landing parses no JSON at all, so do not chase application code for this. `npm run clean`, then `npm run dev` (its `predev` cleans anyway) and the page is 200 on the next request. Observed 2026-10-14: two `GET / 500` during a Fast Refresh full reload, 200 again immediately after, with the `rename` ENOENT on `1.pack.gz` in the same log. |
 
 ## 8. Deployment
 

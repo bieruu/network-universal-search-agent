@@ -34,6 +34,9 @@ export default function CtaFooter() {
             <Link href="/sign-in" className="transition-colors hover:text-accent">
               Sign in
             </Link>
+            <Link href="/demo" className="transition-colors hover:text-accent">
+              Demo report
+            </Link>
           </div>
         </div>
       </footer>

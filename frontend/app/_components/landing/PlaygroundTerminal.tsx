@@ -40,12 +40,14 @@ import {
  *
  * WHY SIGNED-OUT NEVER TOUCHES THE NETWORK
  * -----------------------------------------
- * There is no anonymous scan route; every backend scan endpoint calls
- * `require_user()` (AGENTS.md 5.2), and Shodan is metered by ONE shared paid
- * key (AGENTS.md 5.5). So a signed-out "scan" answers from static fixtures and
- * says so, twice: a notice above the output, and a DEMO caption under the
- * window. A simulated result that could be mistaken for a real one would be the
- * one unacceptable bug in this file.
+ * The two backend scan routes accept a signed-in session OR an
+ * HMAC-signed guest token minted by the frontend proxy, bounded by a daily
+ * quota (AGENTS.md 5.2, guest reversal 2026-10-14), and Shodan is metered by
+ * ONE shared paid key (AGENTS.md 5.5). The playground itself stays
+ * fixture-only and never touches the network, so a signed-out "scan" here
+ * answers from static fixtures and says so, twice: a notice above the
+ * output, and a DEMO caption under the window. A simulated result that could
+ * be mistaken for a real one would be the one unacceptable bug in this file.
  *
  * PRIVACY
  * -------

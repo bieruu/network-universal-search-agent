@@ -1,13 +1,25 @@
 "use client";
 
 import type { ReactNode } from "react";
+import { useLayoutEffect, useState } from "react";
 import { motion, useReducedMotion } from "motion/react";
 import { ThemeToggle } from "@/components/ui/theme-toggle";
 import { DEMO_SCANS } from "@/app/_components/landing/playground-samples";
 
+// HYDRATION (2026-10-14, same fix as ParallaxField/ScrollProgress).
+// `useReducedMotion()` answers `null` on the server but `true` on a
+// reduced-motion client at first render, so every pre-mount branch on it —
+// here, the local Reveal's `<div>` vs `motion.div` and the two decorative
+// spans below — mismatches the server HTML in reduce mode. The gate is now
+// `mounted`: server and pre-mount client render the same tree, and the real
+// answer applies after a layout-effect mount, before paint.
 function Reveal({ children, delay = 0 }: { children: ReactNode; delay?: number }) {
+  const [mounted, setMounted] = useState(false);
+  useLayoutEffect(() => {
+    setMounted(true);
+  }, []);
   const reduce = useReducedMotion();
-  if (reduce) return <div>{children}</div>;
+  if (!mounted || reduce) return <div>{children}</div>;
   return (
     <motion.div
       initial={{ opacity: 0, y: 16 }}
@@ -49,6 +61,10 @@ export function AuthShell({
   description: string;
   children: ReactNode;
 }) {
+  const [mounted, setMounted] = useState(false);
+  useLayoutEffect(() => {
+    setMounted(true);
+  }, []);
   const reduce = useReducedMotion();
 
   return (
@@ -69,11 +85,11 @@ export function AuthShell({
             className="relative flex h-[clamp(11rem,18vw,14rem)] w-[clamp(11rem,18vw,14rem)] items-center justify-center"
             aria-hidden="true"
           >
-            {!reduce && <span className="absolute inset-0 rounded-full border border-dashed border-accent/20 motion-safe:animate-[spin_60s_linear_infinite]" />}
+            {mounted && !reduce && <span className="absolute inset-0 rounded-full border border-dashed border-accent/20 motion-safe:animate-[spin_60s_linear_infinite]" />}
             <span className="absolute inset-10 rounded-full border border-neutral-200 dark:border-neutral-800" />
             <span className="relative flex h-20 w-20 items-center justify-center rounded-2xl bg-accent font-mono text-3xl font-bold text-accent-foreground">
               N
-              {!reduce && <span className="pointer-events-none absolute inset-0 rounded-2xl border border-accent/60 motion-safe:animate-breathe" />}
+              {mounted && !reduce && <span className="pointer-events-none absolute inset-0 rounded-2xl border border-accent/60 motion-safe:animate-breathe" />}
             </span>
           </div>
           {/* A real sample transcript, not a picture of one. */}

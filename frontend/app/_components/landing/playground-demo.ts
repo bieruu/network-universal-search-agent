@@ -5,18 +5,19 @@
  * the network, and that is a deliberate design decision rather than a missing
  * feature:
  *
- *   - There is no anonymous scan endpoint. Every scan route calls
- *     `require_user()` (AGENTS.md 5.2), so an anonymous path would have to be
- *     a new, deliberately weaker surface.
+ *   - The two scan routes accept a signed-in session OR an HMAC-signed guest
+ *     token minted by the frontend proxy, bounded by a daily quota
+ *     (`require_user_or_guest`, AGENTS.md 5.2; guest reversal 2026-10-14).
  *   - Shodan is queried with ONE shared paid API key, metered by
- *     `RATE_LIMIT_PER_HOUR` (AGENTS.md 5.5). If anonymous traffic could reach
- *     it, anyone on the internet could spend that key on scans they never
- *     pay for.
+ *     `RATE_LIMIT_PER_HOUR` (AGENTS.md 5.5). If that key were reachable
+ *     without that bound, anyone on the internet could spend it on scans they
+ *     never pay for.
  *
  * So the playground answers from the samples in `playground-samples.ts` and
- * nothing else — the same three the hero terminal replays while nobody is in a
- * session, so what a visitor gets from `scan` here is exactly what they just
- * watched on the static hero.
+ * nothing else — it stays fixture-only and never touches the network — the
+ * same three the hero terminal replays while nobody is in a session, so what a
+ * visitor gets from `scan` here is exactly what they just watched on the
+ * static hero.
  *
  * THE HONESTY RULE: a simulated result must never be mistakable for a real one.
  * Every number in the samples is invented. The terminals that render it must

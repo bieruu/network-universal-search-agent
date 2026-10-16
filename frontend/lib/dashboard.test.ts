@@ -86,6 +86,50 @@ test("mobile sheet sidebar stays visible below md", () => {
   );
 });
 
+// Two contracts the burger sheet learned from a live report rather than a
+// review (operator, 2026-10-16, mobile /dashboard):
+//
+// 1. The surface must be a theme TOKEN. It was `bg-neutral-950` — the same near
+//    black in both themes — while the sheet embeds App1Sidebar, which paints
+//    bg-background. The sheet's own p-4 padding, gap-4 and header band show
+//    through around that panel, so in light mode the navigation opened framed
+//    in solid black: the reported "outline hitam di luar NUSA project utama"
+//    (measured at 390px as black pixel runs x=0-15, x=271-288, y=0-51).
+// 2. Open AND close must animate, gated, on BOTH panel and scrim — a scrim that
+//    snaps while the panel glides is two unrelated events. These classes are
+//    variant-stacked (`motion-safe:data-[state=...]:animate-*`), which
+//    lib/loop-contract.test.ts's floor 1 does not tokenize, so the gate and the
+//    state pair are pinned here instead of being unchecked.
+test("burger sheet: theme surface, gated open/close on panel and scrim", () => {
+  const raw = readFileSync(join(here, "..", "components", "ui", "sheet.tsx"), "utf8");
+  // Comments are stripped first: the guard's own explanation names the surface
+  // it forbids (same technique the layout guard above uses).
+  const sheet = raw.replace(/\/\*[\s\S]*?\*\//g, "").replace(/^\s*\/\/.*$/gm, "");
+  assert.ok(sheet.includes("bg-background"), "the sheet surface follows the theme token");
+  // The panel is autofocused on open, so its UA focus ring is a full-panel
+  // outline: black in light, near-white in dark — the reported outline itself.
+  assert.ok(
+    sheet.includes("focus:outline-hidden"),
+    "the autofocused panel must not paint a UA focus ring around itself",
+  );
+  assert.ok(
+    !sheet.includes("bg-neutral-950"),
+    "no hard-coded near-black surface — it framed the light-mode sheet in black",
+  );
+  for (const marker of [
+    "motion-safe:data-[state=open]:animate-sheet-in",
+    "motion-safe:data-[state=closed]:animate-sheet-out",
+    "motion-safe:data-[state=open]:animate-overlay-in",
+    "motion-safe:data-[state=closed]:animate-overlay-out",
+  ]) {
+    assert.ok(sheet.includes(marker), `sheet must carry ${marker}`);
+  }
+  // The durations live in the shared table, never in this component.
+  const phases = readFileSync(join(here, "..", "lib", "motion-phases.ts"), "utf8");
+  assert.ok(phases.includes("sheetIn"), "the open period comes from the phase table");
+  assert.ok(phases.includes("sheetOut"), "the close period comes from the phase table");
+});
+
 // The old contract read `dashboard data surfaces stay static — ambient motion is
 // landing/auth only`, and it was reversed on 2026-10-12 (see DESIGN.md for the
 // dated reversal note and the reason). What the reversal KEPT is the reason the

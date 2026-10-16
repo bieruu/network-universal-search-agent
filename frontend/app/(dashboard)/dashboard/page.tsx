@@ -157,7 +157,7 @@ export default function DashboardPage() {
             <div>
               <CardTitle>New scan</CardTitle>
               <CardDescription>
-                Reads public records only — no packets are sent to your target&apos;s host. DNS queries are resolved by our backend and are visible to the target&apos;s authoritative nameservers.
+                Reads public records only: no packets reach your target&apos;s host. DNS lookups come from our servers, so they show in the target&apos;s nameserver logs.
               </CardDescription>
             </div>
             {target && (

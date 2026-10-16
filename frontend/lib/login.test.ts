@@ -48,6 +48,13 @@ test("login accent uses the global token, no hardcoded hex", () => {
 
 test("login motion is transform/opacity with reduced-motion fallback", () => {
   assert.ok(shell.includes("useReducedMotion"), "reduced-motion fallback required");
+  // Hydration (2026-10-14): `useReducedMotion()` answers null on the server but
+  // true on a reduce client at first render, so a pre-mount branch on it
+  // mismatches the server HTML. The shell gates both of its branches — the
+  // local Reveal and the two decorative spans — behind `mounted`.
+  assert.ok(shell.includes("const [mounted, setMounted] = useState(false)"), "the shell gates on mount, not on first render");
+  assert.ok(shell.includes("if (!mounted || reduce) return <div>"), "Reveal must render the same tree on server and pre-mount client");
+  assert.ok(shell.includes("mounted && !reduce"), "the decorative spans must stay absent until mount");
   assert.ok(shell.includes("motion-safe:animate-ambient"), "login ambient must be motion-safe CSS only");
   assert.ok(!shell.includes("addEventListener"), "no manual listeners");
 });

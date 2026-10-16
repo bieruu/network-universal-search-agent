@@ -177,7 +177,17 @@ export function ToolchainMarquee({
   stacks,
   ...props
 }: ToolchainMarqueeProps) {
-  const reduceMotion = Boolean(useReducedMotion());
+  // HYDRATION (fix 2026-10-14): `useReducedMotion()` is `null` on the server
+  // but `true` at first render on a reduced-motion client, and this flag
+  // changes the DOM (copy count, pause control, `data-reduced-motion`). It
+  // therefore takes effect only once `mounted`, so server HTML and the
+  // hydration render agree; the layout effect flips it before paint. The hook
+  // stays unconditional (first operand) for the rules of hooks.
+  const [mounted, setMounted] = React.useState(false);
+  React.useLayoutEffect(() => {
+    setMounted(true);
+  }, []);
+  const reduceMotion = Boolean(useReducedMotion()) && mounted;
   const [paused, setPaused] = React.useState(false);
   const rowCount = Math.max(1, Math.min(8, Math.round(rows)));
   const customStacks = stacks?.filter((stack) => stack.length > 0);

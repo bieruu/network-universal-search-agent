@@ -52,10 +52,15 @@ test("single CTA label per intent", () => {
 
 test("no fake precision stats or testimonials", () => {
   // Strip gradient color-stop percentages (e.g. `transparent_62%`, `at_50%_30%`)
-  // and the CDN emerald param before looking for marketing claims.
+  // and the CDN emerald param before looking for marketing claims. Also strip
+  // bracket-wrapped geometry percentages (`[-72%]`, `[95%]`, `[124%]`) —
+  // Tailwind arbitrary sizing in the hero band decoration (2026-10-16). Those
+  // are layout tokens inside class brackets, not copy: a claim would read
+  // "98% faster", unbracketed, and still fails this assertion.
   const copy = all
     .replace(/(transparent|at|_)\d+%/g, "$1")
     .replace(/_50%_30%/g, "")
+    .replace(/\[-?\d+(\.\d+)?%\]/g, "")
     .replace(/00E59B/g, "");
   assert.ok(!/%/.test(copy), "no percentage claims");
   assert.ok(!/\d+\.\d+×/.test(all), "no multiplier claims");
@@ -225,47 +230,151 @@ test("ambient backdrop is decorative-only and motion-safe", () => {
   assert.ok(!hero.includes("AmbientBackdrop"), "Hero keeps content only — no boxed-in backdrop");
 });
 
-test("ambient 3D: token colours, shared rotation period, masked below the copy", () => {
-  const ambient = sources["Ambient3DInner.tsx"];
-  assert.ok(ambient, "Ambient3DInner.tsx must exist");
-  // The hero scene used to be a torus knot in a hardcoded cyan that no token
-  // chose, centred on the headline in both themes. Nothing here may declare a
-  // colour of its own: the accent arrives as --accent or not at all.
-  assert.ok(!/#[0-9a-fA-F]{3,8}/.test(ambient), "the hero scene declares no colour literal");
-  assert.ok(ambient.includes('from "@/lib/ambient-colors"'), "colours are read from the design tokens");
-  assert.ok(ambient.includes("MutationObserver"), "the tokens are re-read when the theme flips");
+// Rewritten 2026-10-14: the node-graph scene this test used to pin
+// (`Ambient3DInner.tsx`) is gone with the hero revision — the hero's picture is
+// now the cobe globe (`HeroGlobe.tsx`), and every floor this test defended
+// moved with it.
+test("hero globe: token colours, shared rotation period, masked below the copy", () => {
+  const globe = sources["HeroGlobe.tsx"];
+  assert.ok(globe, "HeroGlobe.tsx must exist");
+  // The picture this replaced was a torus knot in a hardcoded cyan that no
+  // token chose, centred on the headline in both themes. Nothing here may
+  // declare a colour of its own: the accent arrives as --accent or not at all.
+  assert.ok(!/#[0-9a-fA-F]{3,8}/.test(globe), "the hero globe declares no colour literal");
+  assert.ok(globe.includes('from "@/lib/ambient-colors"'), "colours are read from the design tokens");
+  assert.ok(globe.includes("MutationObserver"), "the tokens are re-read when the theme flips");
   // Rotation is measured in seconds, from the shared table — never in frames,
   // which made the same scene turn at a different speed on every display.
-  assert.ok(ambient.includes("PHASE_SECONDS.globe"), "rotation speed comes from the shared table");
-  assert.ok(!/rotation\.[xy]\s*=\s*t\s*/.test(ambient), "no clock-times-multiplier rotation");
-  assert.ok(ambient.includes("useReducedMotion"), "the scene is static when motion is not allowed");
-  assert.ok(ambient.includes("IntersectionObserver"), "off-screen scenes stop burning frames");
-  assert.ok(ambient.includes('aria-hidden="true"'), "the scene is decorative-only");
-  assert.ok(ambient.includes("[mask-image:"), "the scene sits below the copy instead of on top of it");
+  assert.ok(globe.includes("PHASE_SECONDS.globe"), "rotation speed comes from the shared table");
+  assert.ok(globe.includes("Math.min((now - last)"), "rotation advances by elapsed time, not by frame count");
+  assert.ok(globe.includes("useRef(0)"), "phi lives in a ref, so a re-render cannot reset the rotation");
+  assert.ok(globe.includes("useReducedMotion"), "the globe is static when motion is not allowed");
+  assert.ok(globe.includes("IntersectionObserver"), "off-screen scenes stop burning frames");
+  assert.ok(globe.includes('aria-hidden="true"'), "the picture is decorative-only");
+  assert.ok(globe.includes("[mask-image:"), "the globe sits below the copy instead of on top of it");
+  assert.ok(globe.includes("removeEventListener"), "the globe's own listeners are cleaned up");
+  // Rewritten 2026-10-16: the exact-string pin `<HeroGlobe />` could not
+  // survive the interactive-flanks revision — the call now carries the lifted
+  // selection props (`<HeroGlobe selected={selected} onSelect={setSelected} />`),
+  // which is the whole point of the change. What stays pinned is the same
+  // thing the old string asserted: the hero renders the globe. The prop
+  // wiring itself is pinned by the flank contract test below.
+  assert.ok(sources["Hero.tsx"].includes("<HeroGlobe "), "the hero renders the globe");
+  // The page-level node-graph layer is gone, not merely unmounted.
+  assert.ok(!page.includes("Ambient3D"), "the ambient node-graph layer must stay deleted from the page");
+  assert.ok(!page.includes("GlobeSection"), "the standalone globe section must stay deleted from the page");
 });
 
-test("the globe section explains itself and keeps its honesty caption", () => {
-  const globe = sources["GlobeSection.tsx"];
-  assert.ok(globe, "GlobeSection.tsx must exist");
+test("the hero globe keeps an sr-only honesty line and its example-website markers", () => {
+  const globe = sources["HeroGlobe.tsx"];
+  assert.ok(globe, "HeroGlobe.tsx must exist");
+  // The old globe section shipped as a heading, a stub line and the caption
+  // printed twice — with the whole section aria-hidden, so a screen reader got
+  // nothing at all. The hero globe is decoration inside the hero, so the
+  // rule is: only the canvas is hidden from AT, and the honesty line stays in the accessibility tree (sr-only — the operator removed the visible caption, 2026-10-15).
+  const hidden = globe.match(/aria-hidden="true"/g) ?? [];
+  assert.equal(hidden.length, 1, "only the canvas is hidden from AT");
+  assert.ok(
+    /<canvas\s+ref=\{canvasRef\}\s+aria-hidden=/.test(globe),
+    "the picture stays decorative",
+  );
+  const captions = globe.match(/Illustrative — not scan data/g) ?? [];
+  assert.equal(captions.length, 1, "one honesty line, sr-only — not one per surface");
   // JSX wraps prose across lines, so copy assertions run against a single-line
   // version of the file — otherwise every sentence is split at the fold.
   const flat = globe.replace(/\s+/g, " ");
-  // It shipped as a heading, one stub line, and the caption printed twice —
-  // with the whole section aria-hidden, so a screen reader got nothing at all.
-  assert.ok(!globe.includes('<section aria-hidden="true"'), "the section carries copy now, so AT must hear it");
-  const hidden = globe.match(/aria-hidden="true"/g) ?? [];
-  assert.equal(hidden.length, 1, "only the canvas is hidden from AT");
-  assert.ok(globe.includes("<canvas ref={canvasRef} aria-hidden="), "the picture stays decorative");
-  const captions = globe.match(/Illustrative — not scan data/g) ?? [];
-  assert.equal(captions.length, 1, "one honesty caption, not one per column");
-  assert.ok(flat.includes("Drag to spin it"), "the copy tells the visitor what the object is for");
   assert.ok(
-    flat.includes("nothing from your search is plotted on it"),
-    "the caption still refuses to imply this is scan data",
+    flat.includes("example website points at arbitrary positions"),
+    "the caption names the markers for what they are: arbitrary illustrative points, not locations",
   );
-  assert.ok(globe.includes("PHASE_SECONDS.globe"), "rotation reads from the shared table");
-  assert.ok(globe.includes("readPalette()"), "colours are re-sampled on every theme flip, not once at mount");
+  assert.ok(globe.includes('className="sr-only"'), "the visible caption is gone; the honesty line is screen-reader-only (operator, 2026-10-15)");
+  assert.ok(/<p className="sr-only">\s*Illustrative — not scan data/.test(globe), "the sr-only line carries the honesty text");
+  assert.ok(!globe.includes("drag to spin"), "the visible drag hint is deleted; the grab cursor carries the affordance");
+  // The markers are the site's own reserved-name demo targets, positioned by
+  // a deterministic hash of the name — never a fabricated city list.
+  assert.ok(globe.includes("DEMO_SCANS"), "the markers are the site's own example targets");
+  assert.ok(globe.includes("mulberry32"), "marker positions are deterministic, not re-rolled per mount");
+  assert.ok(globe.includes("readScene()"), "colours are re-sampled on every theme flip, not once at mount");
   assert.ok(globe.includes("Math.min((now - last)"), "rotation advances by elapsed time, not by frame count");
+});
+
+// Operator, 2026-10-16: the band's lg+ flanks were "too empty" even after the
+// passive decoration landed — the ask was an INTERACTIVE component, not more
+// washes. What must stay true now that `HeroFlanks.tsx` exists:
+//   - one selection, owned by Hero, forwarded to the globe AND the chips;
+//   - the chips are the shared demo targets, single-select with toggle-off,
+//     announced via aria-pressed, keyboard reachable, hover via colour only;
+//   - the readout's facts come from the /demo fixtures by IMPORT (one source
+//     of truth — the nvd failure scripted for api.acme.co must not be copied
+//     by hand into a second table);
+//   - lg+ only, token colours only, no keyframe loops, no pointer theft.
+test("hero flanks: interactive example-target panels beside the globe", () => {
+  const flanks = sources["HeroFlanks.tsx"];
+  assert.ok(flanks, "HeroFlanks.tsx must exist in the landing components dir");
+  const hero = sources["Hero.tsx"];
+  const globe = sources["HeroGlobe.tsx"];
+  // State flow: Hero owns the selection and both consumers receive it.
+  assert.ok(
+    hero.includes("useState<string | null>(null)"),
+    "the selection state lives in the hero (null = resting)",
+  );
+  assert.ok(
+    hero.includes("selected={selected}") && hero.includes("onSelect={setSelected}"),
+    "the hero passes the selection and its toggle into the globe band",
+  );
+  assert.ok(
+    globe.includes("<HeroFlanks selected={selected} onSelect={onSelect} />"),
+    "the band renders the flanks with the same lifted state",
+  );
+  // Placement: lg+ only — below lg the sphere fills the band and there is no
+  // side space for a panel.
+  assert.ok(flanks.includes("hidden lg:block"), "the flanks render at lg and up only");
+  // Chips: the shared targets, announced toggle semantics, toggle-off, keys.
+  assert.ok(
+    flanks.includes('from "./playground-samples"'),
+    "the chips are the shared demo targets, not a second list",
+  );
+  assert.ok(/aria-pressed/.test(flanks), "a selected chip is announced to AT, not just painted");
+  assert.ok(
+    flanks.includes("onSelect(on ? null : target)"),
+    "clicking the active chip again clears the selection",
+  );
+  assert.ok(flanks.includes("focus:ring-accent"), "the chips are keyboard reachable with the token ring");
+  assert.ok(
+    flanks.includes("transition-colors") && !flanks.includes("animate-"),
+    "hover/selection feedback is a colour transition, never a keyframe loop",
+  );
+  // Pointer discipline: the band keeps pointer-events-none; only real
+  // controls opt back in. Drag-to-spin must still reach the canvas.
+  assert.ok(globe.includes("pointer-events-none"), "the band root keeps pointer-events-none");
+  assert.ok(
+    !/<(?:section|div|ul|li|p)[^>]*onClick/.test(flanks),
+    "only the chip buttons and the links are controls — no layout element handles clicks",
+  );
+  assert.ok(
+    flanks.includes("pointer-events-auto"),
+    "the real controls opt into the pointer explicitly",
+  );
+  // Readout honesty: fixture facts by import, the demo caption, the two links.
+  assert.ok(
+    flanks.includes('from "../../demo/demo-report"'),
+    "the readout reads the /demo fixtures by import — no second hand-written fact table",
+  );
+  assert.ok(
+    flanks.includes("Demo — simulated output"),
+    "the readout stays labelled as simulated, same spirit as /demo",
+  );
+  assert.ok(
+    flanks.includes('href="/demo"') && flanks.includes('href="/dashboard"'),
+    "the readout links to the full demo report and to the dashboard",
+  );
+  // Globe emphasis: the selected target's label strengthens, anchor mechanics
+  // (positionAnchor + --cobe-visible vars) untouched.
+  assert.ok(globe.includes("target === selected"), "the selected target's label is emphasised");
+  assert.ok(globe.includes("positionAnchor"), "the labels keep their CSS-anchor binding");
+  assert.ok(globe.includes("transition-colors"), "the label emphasis is a colour transition");
+  // Token colours only — zero hex literals across landing sources.
+  assert.ok(!/#[0-9a-fA-F]{3,8}/.test(flanks), "the flanks declare no colour literal");
 });
 
 test("full motion layer: scroll progress, parallax, bento visuals, risk meter", () => {
@@ -274,12 +383,35 @@ test("full motion layer: scroll progress, parallax, bento visuals, risk meter", 
   assert.ok(progress.includes("useScroll"), "progress bar reads scroll position");
   assert.ok(progress.includes("scaleX"), "progress bar animates transform scaleX only");
   assert.ok(progress.includes("useReducedMotion"), "progress bar hides on reduced motion");
+  // Hydration (2026-10-14): the bar's `if (reduce) return null` was the second
+  // instance of the reduce-only mismatch (after ParallaxField). Both must be
+  // gated behind `mounted` or the bug simply moves to the next offender.
+  const progressCode = progress
+    .replace(/\/\*[\s\S]*?\*\//g, "")
+    .replace(/^\s*\/\/.*$/gm, "");
+  assert.ok(
+    progressCode.includes("if (!mounted || reduce) return null"),
+    "the progress bar must render the same tree on server and pre-mount client",
+  );
 
   const parallax = sources["ParallaxField.tsx"];
   assert.ok(parallax, "ParallaxField.tsx must exist");
   assert.ok(parallax.includes("useTransform"), "parallax drifts layers at scroll speed");
   assert.ok(parallax.includes('aria-hidden="true"'), "parallax is decorative-only");
   assert.ok(parallax.includes("useReducedMotion"), "parallax collapses on reduced motion");
+  // Hydration fix (2026-10-14): `if (reduce) return null` mismatched the
+  // server HTML in reduce mode only. Server and pre-mount render `null`
+  // together; the real answer applies after a layout-effect mount. Comments
+  // are stripped first because the file's own fix note quotes the old gate.
+  const parallaxCode = parallax
+    .replace(/\/\*[\s\S]*?\*\//g, "")
+    .replace(/^\s*\/\/.*$/gm, "");
+  assert.ok(parallaxCode.includes("useLayoutEffect"), "the mount gate flips before paint, not a frame late");
+  assert.ok(
+    parallaxCode.includes("if (!mounted || reduce) return null"),
+    "server and client must agree before mount",
+  );
+  assert.ok(!parallaxCode.includes("if (reduce) return null"), "the pre-mount mismatching gate must not come back");
   assert.ok(!parallax.includes("blur"), "no blur filters — transform-only parallax");
   const hero = sources["Hero.tsx"];
   assert.ok(page.includes("ParallaxField"), "page-level layer must render the parallax field");
@@ -458,7 +590,7 @@ test("motion uses transform/opacity only via Reveal", () => {
   assert.ok(reveal.includes("useReducedMotion"), "reduced-motion fallback required");
   assert.ok(reveal.includes("y: 24") || reveal.includes("opacity"), "transform/opacity only");
   for (const [f, src] of Object.entries(sources)) {
-    if (f === "Reveal.tsx" || f === "GlobeSection.tsx") continue; // resize listener permitted for cobe (resize cleanup required by TODO; see GlobeSection.tsx)
+    if (f === "Reveal.tsx" || f === "HeroGlobe.tsx") continue; // pointer + resize listeners permitted for cobe; cleanup (incl. removeEventListener) is required and asserted in the hero-globe contract above
     assert.ok(!src.includes("addEventListener"), `${f}: no manual scroll listeners`);
   }
 });
@@ -566,8 +698,8 @@ test("tech stack: two named marquee rows, every name a real dependency", () => {
   // The drift is driven per frame from a measured width, so the motion-safe
   // gate cannot be a `motion-safe:` class — it has to be the hook.
   assert.ok(
-    /const reduceMotion = Boolean\(useReducedMotion\(\)\)/.test(marquee),
-    "the reduced-motion gate is the hook, not a class",
+    /const reduceMotion = Boolean\(useReducedMotion\(\)\) && mounted/.test(marquee),
+    "the reduced-motion gate is the hook, not a class — and it applies only after mount (hydration)",
   );
   assert.ok(marquee.includes("useAnimationFrame"), "the distance travelled comes from a measurement");
   // One readable list of names: the duplicate groups exist only to fill the

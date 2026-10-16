@@ -45,15 +45,24 @@ export const MOTION_PHASES = {
   /** Cards, cells and resting dots. */
   pulse: 5,
   /**
-   * Slow scene rotation: the interactive globe and the ambient 3D scenes
-   * (hero node graph, dashboard sphere). One number for all of them so a
-   * "too fast" complaint is one edit here, not three guesses in three files.
-   * 52s per revolution — a spin that fast you notice is a spinner, not a globe.
+   * Slow scene rotation: the hero globe (`HeroGlobe.tsx`). It used to also
+   * drive the ambient 3D scenes — the hero node graph and the dashboard
+   * sphere — both removed 2026-10-14 when the globe became the hero's picture.
+   * The entry stays in the table because the globe still reads it, and
+   * `lib/loop-contract.test.ts` pins the range: a revolution, not a spin.
    */
   globe: 52,
 } as const;
 
-/** Short, local micro-loops, in seconds. */
+/**
+ * Short, local micro-phases, in seconds.
+ *
+ * Most of these are loops, but the table's rule is about *inventing numbers*,
+ * not about repetition: a duration may not appear at a use site whether it
+ * repeats or plays once. So the burger sheet's one-shot open/close pair lives
+ * here too, and `PHASE_CSS` declares it with `iterations: "1"` instead of the
+ * default `infinite`.
+ */
 export const MICRO_PHASES = {
   /** Scanline / shimmer sweep. */
   sweep: 2.4,
@@ -63,6 +72,13 @@ export const MICRO_PHASES = {
   eq: 1.6,
   /** CTA halo. */
   breathe: 2.6,
+  /** Burger sheet opening: panel in from its own edge, scrim up with it. */
+  sheetIn: 0.2,
+  /**
+   * Burger sheet closing. Shorter than the open — leaving should feel quicker
+   * than arriving, and an exit that lingers reads as the page hesitating.
+   */
+  sheetOut: 0.14,
 } as const;
 
 export type MotionPhase = keyof typeof MOTION_PHASES;
@@ -117,6 +133,16 @@ const PHASE_CSS: readonly PhaseCss[] = [
   { property: "--animate-blip", keyframes: "blip", phase: "blip", easing: "ease-in-out" },
   { property: "--animate-eq", keyframes: "eq", phase: "eq", easing: "ease-in-out" },
   { property: "--animate-breathe", keyframes: "breathe", phase: "breathe", easing: "ease-in-out" },
+  // The burger sheet and its scrim (components/ui/sheet.tsx). One-shot, so
+  // `iterations: "1"` rather than the default infinite. All four share one
+  // curve because panel and scrim are one event: a scrim fading on a different
+  // beat from the panel in front of it reads as two unrelated things happening
+  // (AGENTS.md §6 — the overlay moves with the sheet). `cubic-bezier(0.32,0.72,0,1)`
+  // is the drawer curve: quick off the mark, long settle.
+  { property: "--animate-sheet-in", keyframes: "sheet-in", phase: "sheetIn", easing: "cubic-bezier(0.32,0.72,0,1)", iterations: "1" },
+  { property: "--animate-sheet-out", keyframes: "sheet-out", phase: "sheetOut", easing: "cubic-bezier(0.32,0.72,0,1)", iterations: "1" },
+  { property: "--animate-overlay-in", keyframes: "overlay-in", phase: "sheetIn", easing: "cubic-bezier(0.32,0.72,0,1)", iterations: "1" },
+  { property: "--animate-overlay-out", keyframes: "overlay-out", phase: "sheetOut", easing: "cubic-bezier(0.32,0.72,0,1)", iterations: "1" },
 ];
 
 /**

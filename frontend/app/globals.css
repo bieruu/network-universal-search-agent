@@ -29,6 +29,10 @@
   --animate-blip: blip 1.3s ease-in-out infinite;
   --animate-eq: eq 1.6s ease-in-out infinite;
   --animate-breathe: breathe 2.6s ease-in-out infinite;
+  --animate-sheet-in: sheet-in 0.2s cubic-bezier(0.32,0.72,0,1) 1;
+  --animate-sheet-out: sheet-out 0.14s cubic-bezier(0.32,0.72,0,1) 1;
+  --animate-overlay-in: overlay-in 0.2s cubic-bezier(0.32,0.72,0,1) 1;
+  --animate-overlay-out: overlay-out 0.14s cubic-bezier(0.32,0.72,0,1) 1;
 
   @keyframes breathe {
     0% {
@@ -115,6 +119,51 @@
     }
     100% {
       transform: rotate(360deg) translateY(calc(var(--radius) * 1px)) rotate(-360deg);
+    }
+  }
+
+  /* Burger sheet open/close (components/ui/sheet.tsx). Transform + opacity
+     only — floor 2 of lib/loop-contract.test.ts. `--sheet-off` is the distance
+     from the sheet's OWN edge and is set per side in the component (`-100%` for
+     side="left", `100%` for side="right"), so one pair of keyframes serves both
+     directions; the fallback covers a sheet rendered before that class exists. */
+  @keyframes sheet-in {
+    0% {
+      transform: translateX(var(--sheet-off, -100%));
+      opacity: 0;
+    }
+    100% {
+      transform: translateX(0);
+      opacity: 1;
+    }
+  }
+
+  @keyframes sheet-out {
+    0% {
+      transform: translateX(0);
+      opacity: 1;
+    }
+    100% {
+      transform: translateX(var(--sheet-off, -100%));
+      opacity: 0;
+    }
+  }
+
+  @keyframes overlay-in {
+    0% {
+      opacity: 0;
+    }
+    100% {
+      opacity: 1;
+    }
+  }
+
+  @keyframes overlay-out {
+    0% {
+      opacity: 1;
+    }
+    100% {
+      opacity: 0;
     }
   }
 }
@@ -208,5 +257,29 @@ body {
   .terminal-scroll:hover::-webkit-scrollbar-thumb,
   .terminal-scroll:focus-within::-webkit-scrollbar-thumb {
     background-color: hsl(var(--accent) / 0.55);
+  }
+}
+
+/* cobe marker labels (HeroGlobe). CSS Anchor Positioning only:
+   Chrome/Edge 125+, Firefox 147+, Safari 26+. Without anchor-name the anchors
+   do not exist, so labels stay display:none and the sr-only honesty line in
+   HeroGlobe is the only disclosure. The per-label position/visibility bindings
+   live inline in HeroGlobe (cobe's own README pattern). */
+@layer components {
+  .cobe-label {
+    display: none;
+    pointer-events: none; /* the canvas drag must still receive every hit */
+    white-space: nowrap;
+  }
+  @supports (anchor-name: --cobe-probe) {
+    .cobe-label {
+      display: block;
+      position: absolute;
+      bottom: anchor(top); /* above the dot */
+      left: anchor(center);
+      translate: -50% 0;
+      margin-bottom: 8px; /* clears the marker dot; tune ±4px visually */
+      transition: opacity 0.3s ease, filter 0.3s ease;
+    }
   }
 }

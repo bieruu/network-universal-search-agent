@@ -29,7 +29,7 @@ export default function SecurityStrip() {
     <section id="security" className="mx-auto max-w-7xl px-4 py-16 sm:px-6 md:py-24">
       <Reveal>
         <h2 className="max-w-[20ch] text-3xl font-bold tracking-tighter text-slate-900 dark:text-neutral-50 md:text-4xl">
-          Secure by default, not by toggle
+          How your searches are protected
         </h2>
       </Reveal>
       <ul className="mt-10 grid gap-x-8 gap-y-6 sm:grid-cols-2 lg:grid-cols-4">

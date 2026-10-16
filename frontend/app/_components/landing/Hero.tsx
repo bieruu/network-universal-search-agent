@@ -1,7 +1,11 @@
+"use client";
+
+import { useState } from "react";
 import Link from "next/link";
 import { Badge } from "@/components/ui/badge";
 import { phaseDelay } from "@/lib/motion-phases";
 import Reveal from "./Reveal";
+import HeroGlobe from "./HeroGlobe";
 import PlaygroundTerminal from "./PlaygroundTerminal";
 import type { TerminalSample } from "./terminal-lines";
 
@@ -43,8 +47,15 @@ export default function Hero({
   sample?: TerminalSample | null;
   signedIn?: boolean;
 }) {
+  // The flank chips' single selection (operator's interactive-flanks
+  // revision, 2026-10-16). Lives HERE rather than in HeroGlobe so the globe
+  // component stays a pure picture engine: `selected` flows down as a prop,
+  // `setSelected` doubles as the chips' toggle handler (null = resting state),
+  // and HeroGlobe uses the same value to emphasise the matching marker label
+  // and forwards both into HeroFlanks. One selection, three surfaces.
+  const [selected, setSelected] = useState<string | null>(null);
   return (
-    <section className="relative mx-auto grid max-w-7xl items-center gap-10 px-4 pb-16 pt-12 sm:px-6 md:pt-20 lg:min-h-[calc(100dvh-4rem)] lg:grid-cols-2 lg:gap-14">
+    <section className="relative mx-auto grid max-w-7xl items-center gap-10 px-4 pb-[25rem] pt-12 sm:px-6 sm:pb-[30rem] md:pt-16 lg:min-h-[calc(100dvh-4rem)] lg:grid-cols-2 lg:gap-x-14 lg:gap-y-8 lg:pb-10">
       <div>
         <Reveal>
           <Badge variant="outline" className="border-accent/40 font-mono text-accent">
@@ -63,9 +74,9 @@ export default function Hero({
         <Reveal delay={0.1}>
           <p className="mt-5 max-w-[65ch] text-base leading-relaxed text-slate-600 dark:text-neutral-400">
             Enter one domain and read its open ports, subdomain names, registration
-            details, and a risk score in a single place. No packets are sent to your
-            target&apos;s host. DNS queries are resolved by our backend, which makes
-            them visible to the target&apos;s authoritative nameservers.
+            details and risk score. No packets are sent to your target&apos;s host.
+            DNS queries are resolved by our backend, which makes them
+            visible to the target&apos;s authoritative nameservers.
           </p>
         </Reveal>
         <Reveal delay={0.15}>
@@ -92,11 +103,15 @@ export default function Hero({
         </Reveal>
       </div>
       <Reveal delay={0.1}>
-        <div className="relative overflow-x-clip">
-          {/* Rotating dashed dial + radar ping at the terminal corner. */}
+        <div className="relative">
+          {/* Rotating dashed dial + radar ping at the terminal corner.
+              A rotated 64px square paints a ~90.5px bbox (+13.25px per side),
+              so the offset must stay ≤2.75px under px-4 (16px) page padding to
+              keep the page overflow-free at 390 — hence right-0 below sm and
+              the 8px bleed only at sm+ where px-6 (24px) absorbs it. */}
           <span
             aria-hidden="true"
-            className="pointer-events-none absolute -right-4 -top-4 z-10 flex h-16 w-16 items-center justify-center rounded-full border border-dashed border-accent/50 motion-safe:animate-[spin_10s_linear_infinite]"
+            className="pointer-events-none absolute -top-4 right-0 z-10 flex h-16 w-16 items-center justify-center rounded-full border border-dashed border-accent/50 motion-safe:animate-[spin_10s_linear_infinite] sm:-right-2"
           >
             <span className="h-2 w-2 rounded-full bg-accent motion-safe:animate-ping" />
           </span>
@@ -109,8 +124,44 @@ export default function Hero({
                 : "Example terminal output of a search for example.com showing open ports, subdomain names, domain details, and a risk score"
             }
           />
+          {/* The window answers four lines; `/demo` is the same fixtures laid
+              out as a full report. Sits under the terminal, where the demo
+              caption already told the visitor the output is simulated — the
+              link inherits that context instead of asking for trust twice. */}
+          <p className="mt-2 text-right font-mono text-xs text-slate-500 dark:text-neutral-500">
+            <Link
+              href="/demo"
+              className="transition-colors hover:text-accent focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-accent/40 lg:inline-block lg:rounded-full lg:border lg:border-neutral-200/80 lg:bg-background/85 lg:px-3 lg:py-1 dark:lg:border-neutral-800/80"
+            >
+              Open the full demo report →
+            </Link>
+          </p>
         </div>
       </Reveal>
+      {/* Globe stage (2026-10-15 architecture; operator's z-order override):
+          the band carries NO negative z-index — it paints in normal flow, on
+          top by paint order, and stays out of the copy's way through geometry
+          alone. On lg+ the band is its own grid row (`lg:col-span-2`) below
+          both columns; below lg it occupies the dedicated stage the section's
+          bottom padding carves out (pb-[25rem] under w-[min(24rem,88vw)],
+          sm:pb-[30rem] under sm:w-[26rem] — measured gap below the demo link:
+          ≈25px at 390 (measured 24.8px), at least 32px at 768), so it never
+          covers the H1, the paragraph or the CTAs. WHY it must not go back to
+          `-z-10`:
+          a negative z-index paints the canvas BELOW `section` and `main` (both
+          pointer-events:auto, both border boxes covering the sphere), so
+          hit-testing never reaches it and drag-to-spin dies silently — proven
+          2026-10-15 by elementFromPoint (always SECTION/terminal, never the
+          canvas) plus a 0-pixel drag diff against baseline. The corner dial is
+          deliberately `-right-2` (8px slack at 390) inside a wrapper with no
+          overflow clip, so the ring is never sliced. The band still fades in
+          from its top edge (mask at the 30 percent mark). The band's lg+
+          flanks now also carry two INTERACTIVE panels (`HeroFlanks.tsx`,
+          operator 2026-10-16): example-target chips on the left, a fixture
+          readout of the pick on the right — outside the sphere's square
+          wrapper, lg+ only, so they never touch the copy or the drag
+          surface. The selection state lives above and arrives via props. */}
+      <HeroGlobe selected={selected} onSelect={setSelected} />
     </section>
   );
 }

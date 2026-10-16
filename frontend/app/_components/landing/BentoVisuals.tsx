@@ -1,6 +1,7 @@
 "use client";
 
 import { motion, useReducedMotion } from "motion/react";
+import { useLayoutEffect, useState } from "react";
 import { phaseDelay } from "@/lib/motion-phases";
 import { demoSampleMetrics } from "./playground-samples";
 
@@ -26,7 +27,12 @@ const ROWS = demoSampleMetrics();
 export function BentoGridVisual() {
   return (
     <div className="relative mt-4 h-36 overflow-hidden rounded-xl border border-accent/15 bg-slate-900/95 p-2">
-      <div className="flex h-full flex-col justify-between gap-1.5">
+      {/* Centered with a fixed gap instead of justify-between: distributing
+          three ~16px rows across the h-36 slack floated them ~68px apart, so
+          they read as satellites rather than one list. 3 rows + 2 × 8px gaps ≈
+          64px centered in the 128px content box → symmetric air, grouped rows.
+          h-36 stays (parity with BentoMetricsVisual as a system). */}
+      <div className="flex h-full flex-col justify-center gap-2">
         {ROWS.map(({ sample, metrics }, row) => (
           <div key={sample.target} className="flex min-w-0 items-center gap-2">
             <span className="w-24 shrink-0 truncate font-mono text-[10px] text-slate-400">
@@ -62,6 +68,15 @@ export function BentoGridVisual() {
 }
 
 export function BentoMetricsVisual() {
+  // HYDRATION (fix 2026-10-14): the static `reduce` branch replaced the
+  // motion.div bars with bare divs during hydration on reduced-motion
+  // clients (the hook answers `null` server-side, `true` client-side).
+  // `mounted` keeps server and first client render on the motion branch;
+  // the layout effect swaps to the static bars before paint.
+  const [mounted, setMounted] = useState(false);
+  useLayoutEffect(() => {
+    setMounted(true);
+  }, []);
   const reduce = useReducedMotion();
   return (
     <div className="mt-4 flex h-36 items-end gap-3 rounded-xl border border-accent/15 bg-slate-900/95 p-3">
@@ -81,7 +96,7 @@ export function BentoMetricsVisual() {
           );
         }
         const height = Math.max(names * NAMES_PER_PX, 8);
-        if (reduce)
+        if (mounted && reduce)
           return (
             <div key={sample.target} className="flex h-full flex-1 flex-col justify-end gap-1">
               <div

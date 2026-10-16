@@ -6,7 +6,7 @@ const STEPS = [
   {
     n: "01",
     title: "Sign in",
-    body: "Your account is the key. Nobody who is not signed in to it can see your searches, your targets, or your results.",
+    body: "Your account is the key: nobody signed out of it can see your searches, targets, or results.",
   },
   {
     n: "02",
@@ -72,13 +72,13 @@ export default function HowItWorks() {
           />
           <div className="relative flex h-full flex-col">
             <div className="flex items-center justify-between text-[10px] uppercase tracking-[0.2em] text-slate-500 dark:text-neutral-400">
-              <span>one result, four sources</span>
+              <span>one search · four sources</span>
               <span className="flex items-center gap-1.5">
                 <span aria-hidden="true" className="relative inline-flex h-1.5 w-1.5">
                   <span className="h-full w-full rounded-full bg-accent motion-safe:animate-blip" />
                   <span className="absolute inset-0 rounded-full bg-accent motion-safe:animate-[ping_1.8s_ease-out_infinite]" />
                 </span>
-                read separately
+                each source answers on its own
               </span>
             </div>
             <ul className="mt-5 divide-y divide-neutral-200 dark:divide-neutral-800">
