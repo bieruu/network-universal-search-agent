@@ -37,14 +37,14 @@ export default function VulnerabilitiesCard({
         <CardDescription>
           {scan
             ? `${scan.target} · ${view.label}`
-            : "Published software vulnerabilities matched against what this host is running."}
+            : "Published vulnerabilities matched against what the host runs."}
         </CardDescription>
       </CardHeader>
       <CardContent>
         {loading ? (
           <Skeleton className="h-24" />
         ) : !scan ? (
-          <p className="text-sm text-slate-500 dark:text-neutral-500">Run a scan to see which published vulnerabilities apply.</p>
+          <p className="text-sm text-slate-500 dark:text-neutral-500">Run a scan to see matching vulnerabilities.</p>
         ) : !nvd ? (
           <p className="text-sm text-slate-500 dark:text-neutral-500">
             We did not check this target against the vulnerability catalogue. That means unknown, not none.

@@ -63,7 +63,7 @@ export default function Hero({
               <span className="h-full w-full rounded-full bg-accent motion-safe:animate-blip" />
               <span className="absolute inset-0 rounded-full bg-accent motion-safe:animate-[ping_1.8s_ease-out_infinite]" />
             </span>
-            PUBLIC RECORDS ONLY · NO PACKETS TO YOUR TARGET&apos;S HOST · DNS QUERIES REACH ITS NAMESERVERS
+            PUBLIC RECORDS ONLY
           </Badge>
         </Reveal>
         <Reveal delay={0.05}>
@@ -73,10 +73,9 @@ export default function Hero({
         </Reveal>
         <Reveal delay={0.1}>
           <p className="mt-5 max-w-[65ch] text-base leading-relaxed text-slate-600 dark:text-neutral-400">
-            Enter one domain and read its open ports, subdomain names, registration
-            details and risk score. No packets are sent to your target&apos;s host.
-            DNS queries are resolved by our backend, which makes them
-            visible to the target&apos;s authoritative nameservers.
+            Enter one domain and read its open ports, subdomains, registration
+            details and risk score — only DNS lookups reach
+            the target&apos;s nameservers.
           </p>
         </Reveal>
         <Reveal delay={0.15}>
@@ -120,8 +119,8 @@ export default function Hero({
             signedIn={signedIn}
             label={
               sample
-                ? "Terminal output from your most recent search, with the domain name shortened"
-                : "Example terminal output of a search for example.com showing open ports, subdomain names, domain details, and a risk score"
+                ? "Output of your most recent search, domain name masked"
+                : "Example terminal output for example.com: open ports, subdomains, domain details, risk score"
             }
           />
           {/* The window answers four lines; `/demo` is the same fixtures laid

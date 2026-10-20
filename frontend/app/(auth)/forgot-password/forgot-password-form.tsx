@@ -74,7 +74,7 @@ export function ForgotPasswordForm() {
   return (
     <AuthShell
       title="Reset your password"
-      description="Enter the email address on your account and we will send you a link to set a new password."
+      description="Enter your email and we will send a link to set a new password."
     >
       {sent ? (
         <div className="mt-6 flex flex-col gap-4">

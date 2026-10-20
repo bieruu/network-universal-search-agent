@@ -23,7 +23,7 @@ import DemoReportView from "./demo-report-view";
 export const metadata: Metadata = {
   title: "Demo report — simulated output, no live scan",
   description:
-    "A static sample of what this product's report looks like, built from fixtures that ship with the site. Nothing on this page is a real scan: no source is contacted and no request is made.",
+    "A static sample of the report, built from shipped fixtures: no source is contacted and no request is made.",
   robots: { index: false, follow: true },
 };
 

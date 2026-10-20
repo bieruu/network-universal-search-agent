@@ -279,8 +279,8 @@ test("every format carries the two headline caveats", () => {
 test("an NVD no_match is spelled out as a non-result, not as a clean sweep", () => {
   const s = scan({ results: { nvd: { status: "no_match", cve_rows: [] } } });
   const md = buildMarkdownExport(s, NOW);
-  assert.ok(md.includes("That is not proof the host is safe"), md);
-  assert.ok(buildPdfLines(s, NOW).join("\n").includes("That is not proof the host is safe"));
+  assert.ok(md.includes("not proof the host is safe"), md);
+  assert.ok(buildPdfLines(s, NOW).join("\n").includes("not proof the host is safe"));
 });
 
 test("an absent source reads as unknown, never as none", () => {

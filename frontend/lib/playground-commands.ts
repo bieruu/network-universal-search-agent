@@ -71,13 +71,13 @@ export interface ParsedCommand {
 export const HELP_LINES: readonly string[] = [
   "A small terminal over this product's scan API. Four commands.",
   "  help            show this list",
-  "  list            show the targets this playground can scan",
-  "  scan <domain>   scan a target and print a summary",
+  "  list            show the targets this playground scans",
+  "  scan <domain>   run a scan and print a summary",
   "  clear           wipe the transcript",
-  "Run list before scan. Signed out, the targets are three fixed",
-  "demo hosts and their output is SIMULATED, not a live scan.",
+  "Run list before scan. Signed out, targets are three fixed demo",
+  "hosts and their output is SIMULATED, not a live scan.",
   "Signed in, scan queries the real API for any domain or public IP.",
-  "Typing a bare domain, for example wikipedia.org, is shorthand for scan.",
+  "A bare domain, e.g. wikipedia.org, is shorthand for scan.",
 ];
 
 /**
@@ -115,7 +115,7 @@ export function parseCommand(raw: string, ctx: { listed: boolean }): ParsedComma
   return {
     command: null,
     target: "",
-    error: `Unknown command: "${shown}". Type help to see what this terminal accepts.`,
+    error: `Unknown command: "${shown}". Type help.`,
     echo,
   };
 }
@@ -135,7 +135,7 @@ function resolveScan(target: string, ctx: { listed: boolean }, echo: string): Pa
     return {
       command: "scan",
       target: "",
-      error: "Run list first — it shows what this playground can scan.",
+      error: "Run list first — it shows what this terminal scans.",
       echo,
     };
   }

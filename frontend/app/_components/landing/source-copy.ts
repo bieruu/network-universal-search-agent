@@ -33,34 +33,34 @@ export interface Source {
 export const SOURCES: readonly Source[] = [
   {
     mark: "shodan",
-    detail: "internet-wide service and host data",
+    detail: "public scan records anyone can look up",
     gives:
-      "The open ports on a target and the product and version answering on each one, read from internet-wide scan data — nothing on your target is contacted to find out.",
+      "Open ports, and the software answering on each.",
     whenSlow:
-      "If Shodan is slow or unreachable, the rest of the result still arrives and the ports card says it could not check — a blank port list is never read as \"nothing is open\".",
+      "If Shodan is slow, the ports card says it could not check — an empty list is not proof that nothing is open.",
   },
   {
     mark: "crt.sh",
     detail: "the public certificate log",
     gives:
-      "Machine names under your domain that have ever appeared in a publicly logged TLS certificate — including names nobody ever put on a page.",
+      "Machine names under your domain that ever appeared in a public certificate.",
     whenSlow:
-      "If the certificate log is slow, the rest of the result still arrives and the subdomains card says the log was unreachable, so an empty list is never mistaken for \"no subdomains\".",
+      "If the certificate log is slow, the subdomains card says it could not check — no names there is not proof none exist.",
   },
   {
     mark: "whois",
-    detail: "public domain registration records",
+    detail: "the public domain registration record",
     gives:
-      "The registration record behind a domain: who holds it, when it was created, when it expires, and which nameservers answer for it.",
+      "Who holds the domain, and when it was created and expires.",
     whenSlow:
-      "If the registry does not answer, the rest of the result still arrives and the details card says the record could not be read.",
+      "If the domain record does not answer, the details card says so.",
   },
   {
     mark: "NVD",
-    detail: "the NIST vulnerability database",
+    detail: "the public vulnerability database",
     gives:
-      "Known vulnerabilities matched against the software a source reports running, with severity taken from the NIST vulnerability database.",
+      "Weak spots in the software the target reports — listed when we can match them.",
     whenSlow:
-      "If matching does not complete, the vulnerabilities card says what it could not check rather than presenting an empty list as \"nothing found\".",
+      "If matching does not complete, the vulnerabilities card says what was not checked.",
   },
 ];

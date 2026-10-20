@@ -26,8 +26,8 @@ export default function PortsTable({
         <CardTitle>{TERM.ports.label} &amp; {TERM.services.label.toLowerCase()}</CardTitle>
         <CardDescription>
           {services.length === 0
-            ? `Read from Shodan, a public index of internet-wide scans.${ip ? ` Host ${ip}.` : ""}`
-            : `${services.length} ${plural(services.length, "service", "services")} found${ip ? ` on ${ip}` : ""}, from Shodan's public internet index. Nothing was probed.`}
+            ? `From Shodan's public scan records.${ip ? ` Host ${ip}.` : ""}`
+            : `${services.length} ${plural(services.length, "service", "services")}${ip ? ` on ${ip}` : ""}, from Shodan's public scan records.`}
         </CardDescription>
       </CardHeader>
       <CardContent>
@@ -38,7 +38,7 @@ export default function PortsTable({
         ) : services.length === 0 ? (
           <p className="text-sm text-slate-500 dark:text-neutral-500">
             {scan?.errors.some((e) => e.source === "shodan")
-              ? "We have nothing for this host: Shodan and its public InternetDB fallback could not be reached. See the source error above."
+              ? "Shodan and its fallback could not be reached — see the source error above."
               : "No open ports were found for this host."}
           </p>
         ) : (

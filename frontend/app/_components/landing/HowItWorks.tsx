@@ -6,17 +6,17 @@ const STEPS = [
   {
     n: "01",
     title: "Sign in",
-    body: "Your account is the key: nobody signed out of it can see your searches, targets, or results.",
+    body: "Your searches are visible only to your account.",
   },
   {
     n: "02",
     title: "Scan a target",
-    body: "Enter a domain or a public IP address. Addresses that only exist inside a network are refused, because there is nothing public to look up.",
+    body: "Enter a domain or public IP. Private network addresses are refused.",
   },
   {
     n: "03",
     title: "Read the result",
-    body: "Results arrive as cards, tables and charts, and every search you have run stays in your history so you can reopen it or compare it against a later one.",
+    body: "Cards, tables and charts; every search stays in your history to reopen and compare.",
   },
 ];
 

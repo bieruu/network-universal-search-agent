@@ -28,7 +28,7 @@ export interface StatusView {
 const SCAN_STATUS: Record<ScanStatus, StatusView> = {
   pending: {
     label: "Queued",
-    detail: "Your search is in the queue and will start shortly.",
+    detail: "In the queue — it will start shortly.",
     tone: "secondary",
   },
   running: {
@@ -43,7 +43,7 @@ const SCAN_STATUS: Record<ScanStatus, StatusView> = {
   },
   partial: {
     label: "Partly answered",
-    detail: "At least one source failed, so this result is incomplete. Missing items were not checked — treat them as unknown, not as absent.",
+    detail: "A source failed, so the result is incomplete. Missing items were not checked — treat them as unknown, not absent.",
     tone: "default",
   },
   failed: {
@@ -59,7 +59,7 @@ export function scanStatusView(status: ScanStatus | string | null | undefined): 
   }
   return {
     label: "Unknown",
-    detail: "This search returned a status this dashboard does not recognise. Treat the result as unknown, not as clean.",
+    detail: "Unknown status returned — treat the result as unknown, not clean.",
     tone: "outline",
   };
 }
@@ -72,27 +72,27 @@ export function scanStatusLabel(status: ScanStatus | string | null | undefined):
 const NVD_STATUS: Record<NvdStatus, StatusView> = {
   found: {
     label: "Checked against known vulnerabilities",
-    detail: "We identified the running software and found catalogue entries that match this exact product and version.",
+    detail: "Catalogue entries match the running product and version exactly.",
     tone: "default",
   },
   no_match: {
     label: "Checked — no matching entries",
-    detail: "We identified the running software and found no catalogue entry for that exact product and version. That is not proof the host is safe.",
+    detail: "No catalogue entry matches the exact product and version — not proof the host is safe.",
     tone: "secondary",
   },
   insufficient_evidence: {
     label: "Could not check",
-    detail: "The running software did not advertise an exact product and version, so there was nothing precise to check. Coverage is unknown, not zero.",
+    detail: "The running software did not advertise an exact product and version. Coverage is unknown, not zero.",
     tone: "outline",
   },
   unavailable: {
     label: "Database unreachable",
-    detail: "The vulnerability database did not respond, so what you see is incomplete rather than empty.",
+    detail: "The vulnerability database did not respond — incomplete, not empty.",
     tone: "destructive",
   },
   keyword_derived: {
     label: "Keyword leads only",
-    detail: "No exact match was found, so we listed entries whose description happens to mention a detected product name. Investigate these — do not treat them as confirmed.",
+    detail: "No exact match, so entries are listed because their description mentions a detected product. Investigate — not confirmed.",
     tone: "outline",
   },
 };

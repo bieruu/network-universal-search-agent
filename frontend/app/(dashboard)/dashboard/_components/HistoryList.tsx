@@ -78,7 +78,7 @@ export default function HistoryList({
       <CardHeader>
         <CardTitle>History</CardTitle>
         <CardDescription>
-          Your last {limit} {plural(limit, "scan", "scans")}. Select one to reopen the results it saved.
+          Your last {limit} {plural(limit, "scan", "scans")}. Select one to reopen it.
         </CardDescription>
       </CardHeader>
       <CardContent>

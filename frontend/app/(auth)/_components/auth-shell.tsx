@@ -111,9 +111,8 @@ export function AuthShell({
         <div className="absolute inset-x-12 bottom-8">
           <p className="font-mono text-xs uppercase tracking-widest text-accent">NUSA project</p>
           <p className="mt-2 max-w-[40ch] text-sm text-slate-600 dark:text-neutral-400">
-            Search a domain or IP address for open ports, subdomains and known
-            vulnerabilities. Nothing is probed — every result comes from public
-            records.
+            Search a domain or IP for open ports, subdomains and known
+            vulnerabilities. Every result comes from public records.
           </p>
         </div>
       </div>

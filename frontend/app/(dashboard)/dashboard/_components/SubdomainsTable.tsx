@@ -31,9 +31,9 @@ const VALIDITY_BADGE: Record<SubdomainValidity, { variant: "default" | "outline"
 
 const VALIDITY_TITLE: Record<SubdomainFilter, string> = {
   all: "Every name the certificate log returned for this domain.",
-  active: "Names whose certificate is inside its validity window now.",
-  expired: "Names whose certificate has passed its expiry date. Shown with a label, never hidden.",
-  unknown: "Names whose validity dates could not be read, or whose certificate has not started yet.",
+  active: "Certificates inside their validity window now.",
+  expired: "Certificates past expiry. Shown with a label, never hidden.",
+  unknown: "Dates unreadable, or certificate not yet valid.",
 };
 
 function countsFor(view: { unique: number; active: number; expired: number; unknown: number }, filter: SubdomainFilter): number {
@@ -77,8 +77,8 @@ export default function SubdomainsTable({
         <CardTitle>{TERM.subdomains.label}</CardTitle>
         <CardDescription>
           {view.unique === 0
-            ? "Names found in the public log of certificates issued for this domain (crt.sh)."
-            : `${view.reported.toLocaleString("en-US")} ${plural(view.reported, "entry", "entries")} in the certificate log reduced to ${view.unique.toLocaleString("en-US")} ${plural(view.unique, "name", "names")}: ${view.active.toLocaleString("en-US")} active, ${view.expired.toLocaleString("en-US")} expired, ${view.unknown.toLocaleString("en-US")} with dates we could not read.`}
+            ? "Names from the public certificate log for this domain (crt.sh)."
+            : `${view.reported.toLocaleString("en-US")} ${plural(view.reported, "entry", "entries")} in the log reduced to ${view.unique.toLocaleString("en-US")} ${plural(view.unique, "name", "names")}: ${view.active.toLocaleString("en-US")} active, ${view.expired.toLocaleString("en-US")} expired, ${view.unknown.toLocaleString("en-US")} with unreadable dates.`}
         </CardDescription>
       </CardHeader>
       <CardContent>
@@ -87,7 +87,7 @@ export default function SubdomainsTable({
         ) : view.unique === 0 ? (
           <p className="text-sm text-slate-500 dark:text-neutral-500">
             {scan?.errors.some((e) => e.source === "crtsh")
-              ? "We could not search the certificate logs, so we have nothing here — not a confirmation that there are none. See the source error above."
+              ? "The certificate log could not be searched — not a confirmation there are none. See the source error above."
               : "No subdomains found."}
           </p>
         ) : (

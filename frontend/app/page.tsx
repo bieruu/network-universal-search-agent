@@ -17,7 +17,7 @@ import StackStrip from "./_components/landing/StackStrip";
 export const metadata: Metadata = {
   title: "NUSA project — see what a domain exposes",
   description:
-    "Search a domain or IP and read its open ports, subdomain names, registration details, and a risk score in one place.",
+    "Search a domain or IP; read its open ports, subdomains, registration details and risk score.",
 };
 
 // A signed-in visitor gets their own most recent scan rendered into the HTML

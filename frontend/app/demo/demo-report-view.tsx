@@ -68,9 +68,7 @@ export default function DemoReportView() {
         </Badge>
       </div>
       <p className="max-w-[65ch] text-base leading-relaxed text-slate-600 dark:text-neutral-400">
-        One finished report, laid out the way the dashboard lays out a real one — built from the
-        sample fixtures this site ships. Switching targets just swaps which fixture is on screen;
-        nothing is fetched.
+        One finished report, built from the site&apos;s sample fixtures — nothing is fetched.
       </p>
 
       {/* 2 — the notice. Border-accent because everything below is simulated. */}
@@ -88,12 +86,10 @@ export default function DemoReportView() {
           <p className="font-mono text-sm text-slate-700 dark:text-neutral-300">{DEMO_NOTICE}</p>
           <ul className="list-disc space-y-1.5 pl-5 text-sm text-slate-600 dark:text-neutral-400">
             <li>
-              Every figure comes from the site's own fixtures or is labelled illustrative — no
-              scan ran to produce this page.
+              Every figure comes from the site&apos;s fixtures or is labelled illustrative — no scan ran.
             </li>
             <li>
-              Where the fixture has no number — dates, individual ports, a score — the report
-              says so instead of inventing one.
+              Missing numbers — dates, ports, a score — are stated missing, never invented.
             </li>
             <li>
               In a real report, a failed source leaves gaps, not answers: rows are
@@ -196,8 +192,7 @@ function ReportHeader({ report }: { report: DemoReport }) {
               {report.errors.map((e) => `${e.source}: ${e.message}`).join(" ")}
             </p>
             <p className="text-xs text-slate-600 dark:text-neutral-400">
-              Anything missing below was not checked, not confirmed absent. This failure is
-              scripted for the demo so the partial state is visible.
+              Anything missing below was not checked, not confirmed absent — scripted for the demo.
             </p>
           </div>
         ) : (
@@ -290,8 +285,7 @@ function PortsCard({ report }: { report: DemoReport }) {
               <span className="font-mono">{report.target}</span>.
             </p>
             <p className="text-sm text-slate-500 dark:text-neutral-500">
-              The fixture does not say which ports, and this demo invents no port numbers to
-              fill the table.
+              The fixture does not say which ports, and the demo invents no port numbers.
             </p>
           </>
         )}
@@ -375,7 +369,7 @@ function DetailsCard({ report }: { report: DemoReport }) {
           <div>
             <dt className="inline text-slate-500 dark:text-neutral-500">Expires: </dt>
             <dd className="text-slate-500 dark:text-neutral-500">
-              Not in the demo fixture — and no date is invented for it.
+              Not in the demo fixture — none invented.
             </dd>
           </div>
           <div>
@@ -395,7 +389,7 @@ function DetailsCard({ report }: { report: DemoReport }) {
         </dl>
         {report.nameServers.length > 0 && (
           <p className="mt-2 text-xs text-slate-600 dark:text-neutral-400">
-            Hostnames here are illustrative demo data; only the count comes from the fixture.
+            Hostnames are illustrative; only the count comes from the fixture.
           </p>
         )}
       </CardContent>
@@ -416,8 +410,7 @@ function VulnerabilitiesCard({ report }: { report: DemoReport }) {
       <CardHeader>
         <CardTitle>{TERM.cves.label}</CardTitle>
         <CardDescription title={termNote("nvd")}>
-          What a real scan checks detected products against ({TERM.nvd.short}). This fixture
-          carries no rows.
+          What a scan checks detected products against ({TERM.nvd.short}). This fixture has no rows.
         </CardDescription>
       </CardHeader>
       <CardContent className="space-y-2">
@@ -431,13 +424,12 @@ function VulnerabilitiesCard({ report }: { report: DemoReport }) {
           </div>
         ) : (
           <p className="text-sm text-slate-500 dark:text-neutral-500">
-            No vulnerability rows in this demo fixture — the sample lines never carried any. That
-            is absence of data, not a clean result.
+            No vulnerability rows in this fixture — absence of data, not a clean result.
           </p>
         )}
         <p className="text-xs text-slate-600 dark:text-neutral-400">
           An empty answer (<span className="font-mono">no_match</span>) means no catalogue entry
-          matched that exact product and version — not proof the target is safe.
+          matched the exact product — not proof the target is safe.
         </p>
       </CardContent>
     </Card>
@@ -456,8 +448,7 @@ function RiskCard({ report }: { report: DemoReport }) {
       <CardContent className="space-y-2">
         <p className="font-mono text-2xl font-bold">{report.riskStatus ?? "not recorded"}</p>
         <p className="text-sm text-slate-600 dark:text-neutral-400">
-          The fixture has a status word and no numeric score, so none is shown here — a real
-          report puts its score beside this word.
+          The fixture carries a status word, no score — a real report shows the score beside it.
         </p>
       </CardContent>
     </Card>

@@ -51,9 +51,9 @@ export interface DemoTarget {
  * a blank row in the list.
  */
 const BLURBS: Record<string, string> = {
-  "example.com": "The reserved example domain. Small, and honest about it.",
+  "example.com": "The reserved example domain. Honest about being small.",
   "api.acme.co": "A deeper subdomain, so the certificate list gets longer.",
-  "portal.nova.io": "A second registrable domain, with a different registrar.",
+  "portal.nova.io": "A second registrable domain, different registrar.",
 };
 
 export const DEMO_TARGETS: readonly DemoTarget[] = DEMO_SCANS.map((scan) => ({
@@ -77,11 +77,11 @@ export function findDemoTarget(input: string): DemoTarget | null {
 }
 
 /** Printed immediately above any simulated output. Keep it under about 70 characters. */
-export const DEMO_NOTICE = "Simulated output from static fixtures. Not a live scan.";
+export const DEMO_NOTICE = "Simulated output — not a live scan.";
 
 /** Printed at the bottom of `list`. */
 export const DEMO_LIST_NOTICE =
-  "Simulated fixtures. Sign in to run real scans on any domain.";
+  "Simulated output. Sign in to scan any domain for real.";
 
 /** Appended when a signed-out visitor asks for a target outside the demo list. */
-export const DEMO_SIGN_IN_HINT = "Sign in to run a real scan against any domain.";
+export const DEMO_SIGN_IN_HINT = "Sign in to scan any domain for real.";

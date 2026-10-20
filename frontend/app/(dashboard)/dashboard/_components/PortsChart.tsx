@@ -17,8 +17,8 @@ export default function PortsChart({ scan }: { scan: ScanResult | null }) {
         <CardTitle>Ports distribution</CardTitle>
         <CardDescription>
           {scan
-            ? `${count} open ${plural(count, "port", "ports")} found${ip ? ` on ${ip}` : ""}, grouped by the service running behind each one.`
-            : "Once you scan a target, its open ports appear here, grouped by the service running behind each one."}
+            ? `${count} open ${plural(count, "port", "ports")}${ip ? ` on ${ip}` : ""}, grouped by service.`
+            : "Open ports of a scanned target appear here, grouped by service."}
         </CardDescription>
       </CardHeader>
       <CardContent className="relative flex-1">

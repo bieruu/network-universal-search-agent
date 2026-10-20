@@ -20,24 +20,24 @@ export const GUEST_SCAN_LIMIT_PER_DAY = 2;
 export const GUEST_BANNER_TITLE = "Guest mode";
 
 export const GUEST_BANNER_DESCRIPTION =
-  `You are scanning without an account: ${GUEST_SCAN_LIMIT_PER_DAY} scans per day, ` +
-  "and they are not saved to your history. Sign in to keep results and scan without the daily limit.";
+  `Scanning without an account: ${GUEST_SCAN_LIMIT_PER_DAY} scans a day, not saved to history. ` +
+  "Sign in to keep results and scan without the limit.";
 
 /** Rendered instead of the 429 sentence from lib/user-errors.ts. */
 export function guestQuotaMessage(): string {
   return (
-    `You have used today's ${GUEST_SCAN_LIMIT_PER_DAY} guest scans. ` +
-    "Sign in to keep going, or come back after the quota resets."
+    `Today's ${GUEST_SCAN_LIMIT_PER_DAY} guest scans are used. ` +
+    "Sign in to keep going, or come back tomorrow."
   );
 }
 
 /** Replaces the History card for a guest: the endpoint is account-only. */
 export const GUEST_HISTORY_LOCKED =
-  "History is saved for accounts — a guest scan shows above and is gone when you leave. Sign in to keep your scans and reopen them later.";
+  "History is saved for accounts. Sign in to keep your scans and reopen them later.";
 
 /** Replaces the risk-trend card for a guest: trend rows come from saved scans. */
 export const GUEST_TREND_LOCKED =
-  "The risk trend reads from your saved scans, and guests have none yet. Sign in to see it for this target.";
+  "The risk trend reads saved scans, and a guest has none. Sign in to see it.";
 
 /**
  * True once Better Auth has ANSWERED with no session.

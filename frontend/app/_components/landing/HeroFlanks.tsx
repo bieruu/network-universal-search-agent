@@ -175,8 +175,7 @@ export default function HeroFlanks({
           /* Resting state: the invitation. Same surface as the active panel
              so selecting does not shift the band's composition. */
           <p className="rounded-xl border border-neutral-200 bg-background/85 p-3 text-xs leading-relaxed text-slate-600 dark:border-neutral-800 dark:text-neutral-400">
-            Pick a target on the left to preview its simulated report here —
-            the globe lights up its point.
+            Pick a target on the left to preview its simulated report here.
           </p>
         )}
       </section>

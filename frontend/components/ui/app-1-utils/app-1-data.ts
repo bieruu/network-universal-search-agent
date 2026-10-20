@@ -17,9 +17,9 @@ export const NAV_ITEMS = [
 ] as const;
 
 export const SOURCE_MONOGRAMS = [
-  { label: "Shodan", short: "SH", provenance: "Public index of internet-wide scans" },
-  { label: "crt.sh", short: "CT", provenance: "Public log of every TLS certificate issued" },
-  { label: "WHOIS", short: "WO", provenance: "The public domain registration record" },
+  { label: "Shodan", short: "SH", provenance: "Open ports anyone on the internet can see" },
+  { label: "crt.sh", short: "CT", provenance: "Every public TLS certificate ever issued" },
+  { label: "WHOIS", short: "WO", provenance: "Who holds the domain, and since when" },
 ] as const;
 
 export function statsFromScan(scan: ScanResult | null): StatItem[] {

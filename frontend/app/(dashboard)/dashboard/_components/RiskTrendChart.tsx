@@ -13,14 +13,14 @@ export default function RiskTrendChart({ target }: { target: string | null }) {
         <CardTitle>Risk trend{target ? ` — ${target}` : ""}</CardTitle>
         <CardDescription>
           {target
-            ? "How the risk score has moved across the scans we have saved for this target."
-            : "Scan a target to see how its risk score changes over time."}
+            ? "Risk score across the scans saved for this target."
+            : "Run a scan to see how the risk score moves over time."}
         </CardDescription>
       </CardHeader>
       <CardContent className="relative flex-1">
         {!target ? (
           <p className="flex h-[240px] items-center justify-center text-sm text-slate-500 dark:text-neutral-500">
-            Nothing to chart yet — run a scan and come back after a few more.
+            Nothing to chart yet — a few scans of the target are needed.
           </p>
         ) : (
           <RiskTrendChartInner target={target} />

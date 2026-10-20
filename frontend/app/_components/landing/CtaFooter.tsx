@@ -13,7 +13,7 @@ export default function CtaFooter() {
               Scan your first target today
             </h2>
             <p className="mx-auto mt-3 max-w-[65ch] text-slate-600 dark:text-neutral-400">
-              Sign in, enter a domain, and see its open ports, subdomain names, and registration details together.
+              Sign in, enter a domain, and read the full report.
             </p>
             <Link
               href="/dashboard"
@@ -26,7 +26,7 @@ export default function CtaFooter() {
       </section>
       <footer className="border-t border-neutral-200 dark:border-neutral-800/80">
         <div className="mx-auto flex max-w-7xl flex-col items-center justify-between gap-3 px-4 py-6 font-mono text-xs text-slate-500 dark:text-neutral-500 sm:flex-row sm:px-6">
-          <p>Public records only · no packets to your target&apos;s host · DNS queries reach its nameservers</p>
+          <p>© 2026 NUSA project</p>
           <div className="flex gap-5">
             <Link href="/dashboard" className="transition-colors hover:text-accent">
               Dashboard

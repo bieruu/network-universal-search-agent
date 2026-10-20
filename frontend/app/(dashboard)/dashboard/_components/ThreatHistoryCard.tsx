@@ -47,7 +47,7 @@ export function ThreatHistoryCard({
       <Card className="flex flex-col">
         <CardHeader>
           <CardTitle>Threat &amp; incident history</CardTitle>
-          <CardDescription>Past incidents and threat activity recorded for this target.</CardDescription>
+          <CardDescription>Past incidents and threat activity for this target.</CardDescription>
         </CardHeader>
         <CardContent>
           <Skeleton className="h-24" />
@@ -68,8 +68,8 @@ export function ThreatHistoryCard({
         <CardTitle>Threat &amp; incident history</CardTitle>
         <CardDescription>
           {summary.findingCount > 0
-            ? `${summary.findingCount.toLocaleString("en-US")} ${summary.findingCount === 1 ? "record" : "records"} across the sources below, for this target.`
-            : "Past incidents and threat activity recorded for this target."}
+            ? `${summary.findingCount.toLocaleString("en-US")} ${summary.findingCount === 1 ? "record" : "records"} across the sources below.`
+            : "Past incidents and threat activity for this target."}
         </CardDescription>
       </CardHeader>
       <CardContent>

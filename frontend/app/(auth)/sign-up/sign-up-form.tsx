@@ -33,8 +33,6 @@ const signUpSchema = z.object({
   message: "Passwords do not match",
 });
 
-const PASSWORD_HELP = "Use 8 to 128 characters. A long passphrase is harder to guess than a short complicated word.";
-
 export default function SignUpForm({ restricted = false }: { restricted?: boolean }) {
   const router = useRouter();
   const [name, setName] = useState("");
@@ -95,7 +93,7 @@ export default function SignUpForm({ restricted = false }: { restricted?: boolea
   }
 
   return (
-    <AuthShell title="Create account" description="Search a domain or IP address for exposed services and known vulnerabilities.">
+    <AuthShell title="Create account" description="Search a domain or IP for exposed services and vulnerabilities.">
       {restricted && (
         <p className="mt-4 rounded-2xl border border-amber-200 bg-amber-50 p-3 text-xs text-amber-800 dark:border-amber-900/60 dark:bg-amber-950/30 dark:text-amber-200">
           {SIGNUP_RESTRICTED_BODY}
@@ -117,14 +115,9 @@ export default function SignUpForm({ restricted = false }: { restricted?: boolea
             name="password"
             type="password"
             autoComplete="new-password"
-            placeholder="Minimum 8 characters"
-            aria-describedby="sign-up-password-help"
             value={password}
             onChange={(event) => setPassword(event.target.value)}
           />
-          <p id="sign-up-password-help" className="text-xs text-slate-500 dark:text-neutral-500">
-            {PASSWORD_HELP}
-          </p>
         </div>
         <div className="flex flex-col gap-2">
           <Label htmlFor="confirm-password">Confirm password</Label>
@@ -134,7 +127,6 @@ export default function SignUpForm({ restricted = false }: { restricted?: boolea
             type="password"
             autoComplete="new-password"
             placeholder="Type it again"
-            aria-describedby="sign-up-password-help"
             value={confirmPassword}
             onChange={(event) => setConfirmPassword(event.target.value)}
           />

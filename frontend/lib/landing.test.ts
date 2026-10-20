@@ -493,26 +493,14 @@ test("looping motion: staggered blips, bobs and sweeps — all motion-safe", () 
   assert.ok(hero.includes("phaseDelay("), "traffic dots take their stagger from the shared table");
   // The eyebrow asserts the benefit, and asserts the jargon is GONE: "OSINT"
   // and "PASSIVE" were both mechanism words on a visitor-facing surface.
+  // Honesty-disclosure rules (DESIGN.md, 2026-10-18): the eyebrow is short —
+  // "PUBLIC RECORDS ONLY" — and the DNS nameserver note lives ONCE, in the
+  // hero paragraph, in plain words. The old footer/eyebrow repeats are gone.
   assert.ok(hero.includes("PUBLIC RECORDS ONLY"), "eyebrow keeps its copy");
-  assert.ok(!/PASSIVE OSINT/i.test(hero), "eyebrow no longer leaks OSINT jargon");
-  assert.ok(!/\bpassive\b/i.test(hero), "hero does not describe the collection method");
-  // DNS became a scan source on 2026-10-14, and it broke the old absolute:
-  // the backend resolves DNS itself, so the target's authoritative
-  // nameservers see the queries. Nothing touches the target HOST — that part
-  // stayed true — but "nothing on your target is contacted" did not. The
-  // eyebrow and the paragraph must state both halves, or the landing claims
-  // something the product no longer does.
+  assert.ok(!/no packets/i.test(hero), "the packet mechanism line left the eyebrow");
   assert.ok(
-    hero.includes("NO PACKETS TO YOUR TARGET&apos;S HOST"),
-    "eyebrow claims only what is true: the target host itself is never contacted"
-  );
-  assert.ok(
-    hero.includes("visible to the target&apos;s authoritative nameservers"),
-    "the hero must disclose that DNS queries are visible to the target's nameservers"
-  );
-  assert.ok(
-    !/nothing on your target is contacted/i.test(hero),
-    "the old absolute claim must not come back now that the backend resolves DNS"
+    /only DNS lookups reach\s+the target&apos;s nameservers/.test(hero),
+    "the hero must disclose, once and in plain words, that DNS queries are visible to the target's nameservers"
   );
   assert.ok(hero.includes("animate-[ping_"), "eyebrow carries a radar ping");
   assert.ok(hero.includes("motion-safe:animate-breathe"), "hero CTA halo breathes smoothly (no ping)");

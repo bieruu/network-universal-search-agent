@@ -32,7 +32,7 @@ export default function WhoisCard({
           <Skeleton className="h-24" />
         ) : !w ? (
           <p className="text-sm text-slate-500 dark:text-neutral-500">
-            No registration details were returned for this target. That is not the same as there being none.
+            No registration details returned for this target — that is not the same as none.
           </p>
         ) : (
           <dl className="space-y-1.5 text-sm">

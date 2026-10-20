@@ -88,7 +88,7 @@ export default function SignInForm() {
   return (
     <AuthShell
       title="Sign in"
-      description="Search a domain or IP address for exposed services and known vulnerabilities."
+      description="Search a domain or IP for exposed services and vulnerabilities."
     >
       {justReset && (
         <p

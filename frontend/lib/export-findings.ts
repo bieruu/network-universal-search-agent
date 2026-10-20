@@ -179,7 +179,7 @@ export interface ExportReport {
 
 /** Shown on the export card so the button and the file promise the same thing. */
 export const EXPORT_CAVEAT_SUMMARY =
-  "Every file carries the same caveats as this screen: no match is not proof of safety, missing data is unknown rather than zero, and the sources that failed are listed.";
+  "Every file carries the screen's caveats: no match is not proof of safety, missing data is unknown, and failed sources are listed.";
 
 const PROVENANCE = [
   "Generated in your browser from the scan you were reading on the dashboard. Nothing was uploaded, and no copy was stored by us.",
@@ -247,7 +247,7 @@ export function buildExportReport(scan: ScanResult | null | undefined, now: Date
     banner: blockText(s?.banner, BANNER_MAX_CHARS),
   }));
   const portSummary = shodan
-    ? `${services.length} ${plural(services.length, "service", "services")} found${shodan.ip ? ` on ${oneLine(shodan.ip, 64).text}` : ""}, read from Shodan's public index of internet-wide scans. Nothing was probed on the target.`
+    ? `${services.length} ${plural(services.length, "service", "services")} found${shodan.ip ? ` on ${oneLine(shodan.ip, 64).text}` : ""}, read from Shodan's public scan records. The target host itself was not contacted.`
     : "No host was resolved, so there are no services to report. That is unknown, not none.";
 
   // Known vulnerabilities. The two backend shapes (`cve_rows`, legacy `cves`)

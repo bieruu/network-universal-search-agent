@@ -23,8 +23,6 @@ const passwordSchema = z.object({
   message: "The two passwords do not match",
 });
 
-const PASSWORD_HELP = "Use 8 to 128 characters. A long passphrase is harder to guess than a short complicated word.";
-
 export function ResetPasswordForm({ token, error }: { token?: string; error?: string }) {
   const router = useRouter();
   const [password, setPassword] = useState("");
@@ -81,7 +79,7 @@ export function ResetPasswordForm({ token, error }: { token?: string; error?: st
   return (
     <AuthShell
       title="Set a new password"
-      description="Choose a new password for your account. You will sign in with it straight away."
+      description="Choose a new password. You will sign in with it right after."
     >
       <form
         onSubmit={handleSubmit}
@@ -104,7 +102,7 @@ export function ResetPasswordForm({ token, error }: { token?: string; error?: st
             aria-describedby="new-password-help"
           />
           <p id="new-password-help" className="text-xs text-slate-500 dark:text-neutral-500">
-            {PASSWORD_HELP}
+            Use 8 to 128 characters.
           </p>
         </div>
         <div className="flex flex-col gap-2">
@@ -117,7 +115,6 @@ export function ResetPasswordForm({ token, error }: { token?: string; error?: st
             placeholder="Type it again"
             value={confirmPassword}
             onChange={(event) => setConfirmPassword(event.target.value)}
-            aria-describedby="new-password-help"
           />
         </div>
         {errorField && (

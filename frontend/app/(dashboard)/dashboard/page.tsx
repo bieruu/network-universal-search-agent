@@ -157,7 +157,7 @@ export default function DashboardPage() {
             <div>
               <CardTitle>New scan</CardTitle>
               <CardDescription>
-                Reads public records only: no packets reach your target&apos;s host. DNS lookups come from our servers, so they show in the target&apos;s nameserver logs.
+                Reads public records about your target, never the target itself — DNS lookups show in its nameserver logs.
               </CardDescription>
             </div>
             {target && (
@@ -291,7 +291,7 @@ export default function DashboardPage() {
             <CardDescription>
             {scan
               ? `${scan.target} · ${scanStatusLabel(scan.status)}`
-              : "Once you scan a target, its headline findings appear here."}
+              : "Headline findings of your latest scan appear here."}
           </CardDescription>
           </CardHeader>
           <CardContent className="relative">

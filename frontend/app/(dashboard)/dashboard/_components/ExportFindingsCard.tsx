@@ -36,15 +36,18 @@ import {
 
 /** Label, and how long the button stays busy while the file is built. */
 const FORMATS: Array<{ format: ExportFormat; label: string; hint: string }> = [
-  { format: "json", label: "JSON", hint: "Machine-readable — every field the dashboard printed, with plain-text values." },
-  { format: "markdown", label: "Markdown", hint: "Readable in any editor — external text is escaped and banners stay verbatim." },
-  { format: "pdf", label: "PDF", hint: "A paginated monospace report, built in your browser." },
+  { format: "json", label: "JSON", hint: "Every field from this screen, in one file." },
+  { format: "markdown", label: "Markdown", hint: "Readable anywhere — plain, safe text." },
+  { format: "pdf", label: "PDF", hint: "A formatted report, built in your browser." },
 ];
 
+/**
+ * Copy rule: no inner plumbing and no raw error text on screen. Whatever the
+ * browser's own Error objects carry is logged for the console instead.
+ */
 function failureMessage(format: ExportFormat, error: unknown): string {
-  const detail = error instanceof Error && error.message ? error.message : "";
-  const where = format === "pdf" ? "the PDF generator" : "the file builder";
-  return `We could not build the ${format.toUpperCase()} file — ${where} failed in your browser.${detail ? ` (${detail})` : ""} Nothing was downloaded; try again.`;
+  if (error instanceof Error) console.error(`Export (${format}) failed`, error);
+  return `We could not create the ${format.toUpperCase()} file. Nothing was downloaded — try again.`;
 }
 
 export default function ExportFindingsCard({
@@ -120,15 +123,14 @@ export default function ExportFindingsCard({
             {failedSources > 0 && (
               <p className="mt-3 text-xs text-warning">
                 {failedSources} {failedSources === 1 ? "source did" : "sources did"} not answer this scan. The export
-                lists {failedSources === 1 ? "it" : "each one"} with its message instead of leaving a gap, and reports
-                the result as incomplete.
+                lists {failedSources === 1 ? "it" : "each"} with its message and reports the result as incomplete.
               </p>
             )}
 
             <ul className="mt-3 flex flex-col gap-1 text-xs opacity-60">
-              <li>Built in your browser from this page&apos;s result — nothing is uploaded and no copy is kept.</li>
-              <li>External text is written as plain text, banners are cut short, and every cut is stated in the file.</li>
-              <li>Only what this screen showed you is included; no new fields are collected.</li>
+              <li>Built in your browser — nothing uploaded, no copy kept.</li>
+              <li>External text stays plain text; shortened text is marked in the file.</li>
+              <li>Only fields shown on this screen are included.</li>
             </ul>
 
             {built && (

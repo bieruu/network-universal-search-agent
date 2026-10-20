@@ -350,7 +350,7 @@ export default function PlaygroundTerminal({
           .filter((t): t is string => typeof t === "string" && t.length > 0)
           .slice(0, MAX_HISTORY_ROWS);
       } catch {
-        push("muted", "your history could not be loaded — any domain still works.");
+        push("muted", "history could not load — any domain still works.");
       }
       const unique = Array.from(new Set(rows));
       if (unique.length) {
@@ -506,8 +506,8 @@ export default function PlaygroundTerminal({
       ? "Your last search"
       : "Sample output — click the terminal to try it"
     : mode === "demo"
-      ? "Demo — simulated output for three fixed targets"
-      : "Live — your scans run against the real API";
+      ? "Demo — simulated output, fixed targets"
+      : "Live — scans run against the real API";
 
   return (
     <div
@@ -603,7 +603,7 @@ export default function PlaygroundTerminal({
                 className="flex w-full items-center gap-2"
               >
                 <label htmlFor="playground-prompt" className="sr-only">
-                  Search command. Use the up arrow for commands you ran before.
+                  Search command. Up arrow recalls previous commands.
                 </label>
                 <span aria-hidden="true" className="text-accent">
                   $

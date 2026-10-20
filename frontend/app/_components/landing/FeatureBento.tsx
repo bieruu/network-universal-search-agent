@@ -7,31 +7,31 @@ const CELLS = [
   {
     icon: HardDrives,
     title: "See what is open, and what is running",
-    body: "Every open port, with the product and version answering on it — read from internet-wide scan data. Nothing is probed to find out.",
+    body: "Open ports with the software and version answering on each.",
     visual: "grid" as const,
   },
   {
     icon: Certificate,
     title: "Names nobody put on a page",
-    body: "Machine names under your domain, read from the public certificate log.",
+    body: "Machine names under your domain, from the public certificate log.",
     visual: "none" as const,
   },
   {
     icon: Database,
     title: "Who holds the domain, and since when",
-    body: "The public WHOIS registration record: the company holding the domain, when it was created, when it expires, and which nameservers answer for it.",
+    body: "The public WHOIS record: holder, created and expiry dates, and nameservers.",
     visual: "none" as const,
   },
   {
     icon: TrendUp,
     title: "Know where to look first",
-    body: "Every search gets a 0 to 100 risk score, and your last ten scans of the same target are charted so you can see a host getting worse over time.",
+    body: "A 0 to 100 risk score per search, and your last ten scans of the target charted over time.",
     visual: "metrics" as const,
   },
   {
     icon: LockKey,
     title: "Only you can see your searches",
-    body: "Sign-in is required, nobody outside your account can read your history, and every search is recorded so you can show what was looked up, and when.",
+    body: "Sign-in required, history visible only to your account, every search recorded with its time.",
     visual: "tint" as const,
   },
 ];
@@ -59,7 +59,7 @@ export default function FeatureBento() {
           What one search shows you
         </h2>
         <p className="mt-3 max-w-[65ch] text-slate-600 dark:text-neutral-400">
-          A slow or unreachable source never blanks the report — the rest still arrives, and the card it owns says what could not be checked.
+          A slow source never blanks the report — its card says what could not be checked.
         </p>
       </Reveal>
       <div className="mt-10 grid gap-4 sm:grid-cols-2 lg:grid-cols-3">
