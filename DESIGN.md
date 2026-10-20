@@ -194,6 +194,47 @@ Marquee (`toolchain-marquee.tsx`) — no deviation, deliberately:
 - **ThemeToggle:** Sun/Moon ghost icon-button; `localStorage['theme']` shared with the `layout.tsx` inline script; no-saved-preference defaults to **dark** in both.
 
 
+## Frontend Copywriting Rules
+
+Mandatory for every user-facing string in the frontend. Added 2026-10-18.
+
+1. **User-driven only.** Every piece of visible text must answer a user need: what they can do, why it matters to them, or what happens next.
+
+2. **Essential text only.** Remove filler, marketing fluff, repetition, and explanatory paragraphs. Prefer the shortest clear version that preserves meaning.
+
+3. **No technical language.** Do not expose implementation details, architecture, database/API terms, model names, internal states, error codes, or developer jargon in the UI.
+
+4. **Plain, human language.** Use simple words a non-technical user understands. Avoid buzzwords and abstract claims.
+
+5. **Action-oriented.** Buttons and links state the user's action clearly, e.g. "Save changes", "Start free trial", "Upload photo".
+
+6. **Meaningful empty and error states.** Tell users what happened, why it matters, and the next action. Never show raw technical errors.
+
+7. **Consistent tone.** Friendly, direct, and concise. Use sentence case for UI labels unless the product style guide says otherwise.
+
+8. **No unnecessary onboarding text.** Explain only what users cannot infer from the interface.
+
+### Text rules by component
+
+- **Headlines:** Communicate the core user benefit in one short line.
+- **Subheadlines:** Add only necessary context; max one sentence.
+- **Buttons/CTAs:** Verb-first, specific, and short.
+- **Forms:** Labels describe the input; helper text only when the requirement is not obvious.
+- **Validation messages:** Say what to fix in user terms; never expose technical causes.
+- **Toasts/alerts:** Confirm the outcome or next step; remove redundant words.
+- **Empty states:** Explain the value of the next action and provide a clear CTA.
+- **Errors:** Use a friendly message plus a recovery action; hide stack traces and internal details.
+
+
+### Honesty disclosures — stated once, in plain words (2026-10-18, operator)
+
+- **One disclosure per page, never more.** A truth disclosure (`public records only`, `nothing reaches the target`, DNS-nameserver note, demo-vs-live notice) appears at most ONCE per page, in the one place it governs. Repeating it in the eyebrow, hero body, sidebar and scan card is waste, not honesty.
+- **No redundant reassurance.** Lines like `Nothing is probed` / `No packets reach your target` are dropped unless the page gives the impression they contradict — a passive search page does not need to keep declaring its passivity on every card.
+- **Everyday language.** Source descriptions (`NVD`, Shodan, crt.sh, WHOIS rows and cards) must read as everyday words, not as technical spec: describe what the user receives, not how the data was gathered. `severity from NVD`-style provenance jargon goes unless a rule requires it.
+- **Disclosure granularity:** the page-header rule wins over longer disclosures — e.g. the hero eyebrow reads `PUBLIC RECORDS ONLY` and the DNS-nameserver note lives where the user's query is described, once.
+Scope notes:
+- Existing locked decisions stand unless copy violates these rules: one CTA label per intent (`Open dashboard`), terminal preamble-style copy, `laboratory`/mono captions in the landing's technical-mono register, and `aria-label`s for icon-only controls are user-facing copy that must also comply (plain, specific).
+- Source strings are the default language; there is no i18n catalog yet. If one is added later, these rules govern the source strings and translations must be re-reviewed.
 ## Do's and Don'ts
 
 - No emojis in UI — Phosphor (`@phosphor-icons/react`, `weight="regular"`) only; no CDN icon scripts
