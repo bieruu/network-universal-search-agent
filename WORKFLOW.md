@@ -68,7 +68,7 @@ NEXT_PUBLIC_APP_URL=http://localhost:3000
 NEXT_PUBLIC_API_URL=http://localhost:3000/api
 BETTER_AUTH_URL=http://localhost:3000
 BETTER_AUTH_SECRET=<same-random-secret-as-backend>
-DATABASE_URL=postgresql://osint:osint@localhost:5432/osint
+DATABASE_URL=postgresql://owner:<same-password-as-backend>@localhost:5432/osint
 GOOGLE_CLIENT_ID=
 GOOGLE_CLIENT_SECRET=
 GITHUB_CLIENT_ID=
@@ -80,6 +80,9 @@ SIGNUP_ENABLED=
 # Optional allowlist: user@example.com, @example.com, *@example.com, or the bare
 # example.com (whole domain). Empty = any email may register.
 SIGNUP_EMAIL_ALLOWLIST=
+# Optional reverse-proxy CIDRs that append to x-forwarded-for. Empty by default;
+# see §8.5 for why max-sign-up buckets stay shared when this is unset.
+BETTER_AUTH_TRUSTED_PROXIES=
 # Password reset (forgot-password -> reset-password). All optional; with no
 # RESEND_API_KEY the app boots and the flow still answers identically for every
 # address, it just cannot send anything (one operator warning per process).
@@ -89,11 +92,17 @@ AUTH_FROM_EMAIL=NUSA project <noreply@your-domain.com>
 RESET_EMAIL_TIMEOUT_MS=10000
 ```
 
+`frontend/.env.local.example` is the source of truth for this block; the example file ships the same names with `owner` as the database user.
+
 `backend/.env`:
 
 ```dotenv
 SHODAN_API_KEY=<key>
-DATABASE_URL=postgresql+asyncpg://osint:osint@localhost:5432/osint
+# POSTGRES_* are read by docker-compose.yml, not by the app.
+POSTGRES_DB=osint
+POSTGRES_USER=owner
+POSTGRES_PASSWORD=<pick-any-local-password>
+DATABASE_URL=postgresql+asyncpg://owner:<same-password>@localhost:5432/osint
 BETTER_AUTH_SECRET=<same-random-secret-as-frontend>
 # Optional machine-to-machine token for Authorization: Bearer. Must differ from
 # BETTER_AUTH_SECRET; leave empty to disable Bearer auth.
@@ -101,13 +110,20 @@ SERVICE_TOKEN=
 CORS_ORIGINS=http://localhost:3000
 APP_URL=http://localhost:3000
 SQLITE_PATH=./data/cache.db
-CACHE_BACKEND=sqlite
-NVD_API_KEY=                # optional — raises NVD rate limits
+CACHE_BACKEND=sqlite            # sqlite | postgres
+SCAN_TIMEOUT_SHODAN=12
+SCAN_TIMEOUT_CRTSH=15           # code default is 30; the shipped .env lowers it
+SCAN_TIMEOUT_WHOIS=10
+SCAN_TIMEOUT_DNS=10
 SCAN_TIMEOUT_NVD=12
+SOURCE_HEALTH_TTL_SECONDS=300   # GET /health/sources probe cache
+NVD_API_KEY=                # optional — raises NVD rate limits
 NVD_MAX_CPES=5
 NVD_CVES_PER_CPE=20
 NVD_PAGE_SIZE=100
 RATE_LIMIT_PER_HOUR=5
+RATE_LIMIT_DAILY_TOTAL=0        # 0 = disabled; instance-wide admitted-scan backstop
+RATE_LIMIT_MAX_KEYS=10000
 # v2 analysis capabilities that cost no Shodan credit get their own quota, so a
 # cheap endpoint can never exhaust a user's scan allowance. See backend/.env.example.
 FREE_RATE_LIMIT_PER_HOUR=20
@@ -119,8 +135,8 @@ RATE_LIMIT_EXEMPT_SUBJECTS=
 # Optional v2 sources. All blank = supported; each reports `not_configured`.
 LEAKLOOKUP_API_KEY=          # key required, free tier 10 queries/day, ToS-restricted
 URLSCAN_API_KEY=             # optional; search works keyless at 30 req/min
-VIRUSTOTAL_API_KEY=         # free key; needed for domain/IP/URL reputation
-OTX_API_KEY=                # OPTIONAL — OTX works keyless at a lower rate limit
+VIRUSTOTAL_API_KEY=          # BYOK only: no service reads this today, it just flips /capabilities
+OTX_API_KEY=                 # OPTIONAL — OTX works keyless at a lower rate limit
 ```
 
 Generate a secret with `openssl rand -base64 32` or a trusted password generator. Do not commit real secrets or filled `.env` files.
@@ -133,7 +149,7 @@ None of these are boot blockers. A missing key means the source reports `status:
 |---|---|---|---|
 | URLScan.io search | No (30 req/min/IP anonymous) | Free | Does not submit scans (that needs a key), and free-tier history is capped upstream at **30 days / 100 results per page** |
 | Leak-Lookup | **Yes — key is free but required** | Free tier: 10 queries/day | Never emits emails or password hashes; ToS restricts queries to targets you are authorised to search |
-| VirusTotal | Yes — free key | Free tier: low per-minute and per-day quota | Does not upload files on the free plan, and does not do deep/relationship analysis without a paid plan |
+| VirusTotal | Key accepted but **queries no source** | N/A today | **Not integrated** (licensing, ARCHITECTURE.md §4.3). `VIRUSTOTAL_API_KEY` only flips the `virustotal` entry in `GET /api/v1/analysis/capabilities`; no scan or analysis block is fetched from VT. *(Corrected 2026-10-25: this row previously described a working VT source and its free-tier limits. The key is read by `routers/analysis.py` for that one flag — no service module consumes it, which is what "queries no source" means here.)* |
 | AlienVault OTX | **No — works keyless** | Free; lower anonymous rate limit | A null `reputation` means *no data*, not zero — see ARCHITECTURE.md §4.3 |
 
 See §8.5 for the sign-up bucket limitation that remains open.
@@ -205,7 +221,7 @@ black --check .
 > - `prod-image-deps` — installs `backend/requirements.txt` **with `--require-hashes` into a clean venv, the same flags the Dockerfile uses**, then imports `app.main`, which builds the app and pulls in every router and service. It exists because the two files above disagree silently: `requirements-dev.txt` is a superset of `requirements.in`, so a runtime package that is only in `requirements.in` and missing from `requirements.txt` passes the entire backend job and then crash-loops the container at boot. That is not hypothetical — dnspython, pillow, phonenumbers and cryptography were all missing from the runtime file this way and only a local image build caught it.
 > - `frontend` — `npm ci`, then `npm run lint`, `npm run tsc`, `npm test`, a dependency audit that fails on moderate-and-above findings, and `npm run build`.
 > - `secrets` — a secret scan over the pushed commit range, with redacted output.
-> - Workflow-wide, and mandatory before merge: a Python dependency vulnerability scan (`pip-audit` against the pinned requirement files), so a known-CVE Python dependency fails CI instead of reaching a deploy. If a future edit to `ci.yml` drops either one, treat it as a regression and restore it.
+> - Workflow-wide, and mandatory before merge: a Python dependency vulnerability scan (`pip-audit` against the pinned requirement files), so a known-CVE Python dependency fails CI instead of reaching a deploy. *(2026-10-25: it is a step inside the `backend` job — "Audit backend dependencies", `ci.yml` lines ~64-74 — not a fifth job; the sentence above keeps its meaning because that job is a required check.)* If a future edit to `ci.yml` drops either one, treat it as a regression and restore it.
 >
 > `.github/workflows/ci.yml` is the source of truth for step names — update this list in the same PR whenever a gate changes. `npm run auth:migrate` is deliberately not a CI gate: the build does not need the Better Auth tables, and migrations run as part of the deploy runbook (§8.2).
 >
@@ -223,7 +239,9 @@ Backend tests mock upstream OSINT services. For auth, tests verify active/expire
 
 | Symptom | Fix |
 |---|---|
-| Redirected to `/sign-in` | Sign in again; check `BETTER_AUTH_URL` matches the browser origin and the session has not expired. |
+| Redirected to `/sign-in` *(superseded 2026-10-14)* | No page redirects there any more: `middleware.ts` is CSP-only and the dashboard renders in guest mode. Sign in is a choice — the links are on the guest banner and the locked History/trend cards. *(Kept because it was the pre-reversal behaviour; see ARCHITECTURE.md §6.)* |
+| Guest scan returns 401 | Guest scanning is closed: `GUEST_SCAN_LIMIT_PER_DAY=0` on the backend, or no `X-Guest-Token`/`nusa_guest` cookie reached FastAPI. Check the Next proxy and that both sides share `BETTER_AUTH_SECRET`. |
+| Guest scan returns 429 | The daily guest quota is spent (`GUEST_SCAN_LIMIT_PER_DAY`, or the instance-wide `GUEST_SCAN_DAILY_TOTAL`). Sign in for the account quota. |
 | Auth table missing | Run `npm run auth:migrate` from `frontend/` with a valid frontend `DATABASE_URL`. |
 | Scan returns 401 | Confirm frontend and backend point to the same PostgreSQL DB and that the request includes the Better Auth cookie. |
 | Scan returns 503 | Backend auth cannot use SQLite; configure its `DATABASE_URL` with the PostgreSQL `+asyncpg` URL for the shared session store. |
@@ -257,7 +275,7 @@ Self-service sign-up is **closed by default when `NODE_ENV=production`** and the
 
 ### 8.1 Connection pooler requirement (frontend auth)
 
-`frontend/lib/auth.ts:42` connects with `new Pool({ connectionString: databaseUrl })` from `pg` — a direct TCP connection, not a pooler-aware client. Vercel functions are short-lived and scale horizontally, so each concurrent invocation can open its own connection, exhaust the database's connection slots, and make sign-in and session reads hang until they time out.
+`frontend/lib/auth.ts` opens the auth database with `new Pool({ connectionString: databaseUrl })` from `pg` (currently line 101) — a direct TCP connection, not a pooler-aware client. Vercel functions are short-lived and scale horizontally, so each concurrent invocation can open its own connection, exhaust the database's connection slots, and make sign-in and session reads hang until they time out.
 
 - The frontend's production `DATABASE_URL` must be a **pooled** endpoint: Supabase pooler, Neon pooled connection string, or a PgBouncer/Supavisor instance in front of Postgres. A direct connection is not acceptable here.
 - Keep TLS on both connections. The production guard in `app/core/config.py` applies to the **backend's** URL only, and rejects a non-localhost Postgres URL carrying neither `sslmode=require` nor `ssl=require`. The frontend is not covered by that guard and needs a *different* spelling again, so do not copy one side's parameter to the other — see below.

@@ -16,7 +16,7 @@ flowchart LR
 [ Browser: Next.js App Router ] 
    │ Better Auth session + fetch via /api/* (Next proxy)
    ▼
-[ Next Route Handlers (/api/* proxy) ] ── verifies session ──▶ [ FastAPI :8000 /api/v1/* ]
+[ Next Route Handlers (/api/* proxy) ] ── forwards session / mints X-Guest-Token ──▶ [ FastAPI :8000 /api/v1/* ]
                                                                       │ asyncio.gather
                                     ┌─────────────────┬────────────────┼──────────────┐
                                     ▼                 ▼                ▼              ▼
@@ -25,11 +25,13 @@ flowchart LR
                                     └─────────────────┴────────────────┴───────────┬───────┘
                                                                               ▼
                                                               PostgreSQL (users/targets/scans/findings)
+
+  NVD enrichment runs after Shodan returns, on the CPEs it reported.
 ```
 
 Principles:
 - Secrets never leave backend. Frontend never calls external OSINT providers directly.
-- FastAPI is stateless orchestrator; Postgres is source of truth; SQLite is quota-saving cache.
+- FastAPI is stateless orchestrator; Postgres is source of truth; a TTL cache (`CACHE_BACKEND=sqlite|postgres`) saves quota.
 - Partial failure is first-class: `partial` status + per-source errors.
 - DNS is the fifth source and the only one that is NOT a public-record read:
   the backend resolves it, so the target's authoritative nameservers see the
@@ -40,49 +42,62 @@ Principles:
 
 ```
 /
-├── PRD.md ARCHITECTURE.md AGENTS.md TODO.md WORKFLOW.md
+├── PRD.md ARCHITECTURE.md AGENTS.md DESIGN.md TODO.md WORKFLOW.md
 ├── docker-compose.yml
+├── dev.ps1                          # backend + frontend in one command
 ├── frontend/                       # Next.js
+│   ├── middleware.ts               # CSP + nonce only (no auth, since 2026-10-14)
 │   ├── app/
-│   │   ├── (auth)/sign-in/page.tsx
-│   │   ├── (dashboard)/dashboard/page.tsx
-│   │   │   ├── TargetSearch.tsx     # input + validation (zod)
-│   │   │   ├── ScanStatus.tsx       # polling
+│   │   ├── page.tsx                # landing
+│   │   ├── (auth)/sign-in|sign-up|forgot-password|reset-password/page.tsx
+│   │   ├── demo/page.tsx
+│   │   ├── (dashboard)/dashboard/page.tsx    # owns the dashboard order
+│   │   │   ├── loading.tsx          # route-level skeleton
 │   │   │   └── _components/
-│   │   │       ├── OverviewCards.tsx
-│   │   │       ├── PortsTable.tsx
-│   │   │       ├── SubdomainsTable.tsx
-│   │   │       ├── WhoisCard.tsx
-│   │   │       ├── PortsChart.tsx   # doughnut + bar (chart.js)
-│   │   │       └── RiskTrendChart.tsx
-│   │   ├── api/scan/[...path]/route.ts  # proxy → FastAPI, attaches session
+│   │   │       ├── TargetSearch.tsx  # input + validation (zod)
+│   │   │       ├── ScanStatus.tsx    # polling
+│   │   │       ├── app-shell.tsx     # sidebar + sticky header + slot
+│   │   │       ├── PortsChart.tsx | RiskTrendChart.tsx   # dynamic ssr:false wrappers
+│   │   │       │   (+ PortsChartInner.tsx | RiskTrendChartInner.tsx, Chart.js)
+│   │   │       ├── PortsTable.tsx | SubdomainsTable.tsx
+│   │   │       ├── VulnerabilitiesCard.tsx | ThreatHistoryCard.tsx
+│   │   │       ├── WhoisCard.tsx | HistoryList.tsx
+│   │   │       └── ExportFindingsCard.tsx
+│   │   ├── api/{scan,history,trend,analysis,auth}/…  # proxy → FastAPI
+│   │   ├── _components/landing/    # landing sections, incl. HeroGlobe.tsx (cobe)
 │   │   ├── layout.tsx  globals.css (dark default)
-│   │   └── middleware.ts (Better Auth guard)
-│   ├── components/ui/              # shadcn/ui (button, card, table, badge, skeleton, chart wrapper)
-│   ├── lib/{auth-client.ts, api.ts, utils.ts, validators.ts}
+│   ├── components/ui/              # shadcn primitives + toolchain-marquee
+│   ├── lib/{auth-client.ts, api.ts, validators.ts, export-findings.ts,
+│   │        export-pdf.ts, guest.ts, csp.ts, …}
 │   └── .env.local.example
 └── backend/
     ├── app/
     │   ├── main.py                 # FastAPI factory, CORS, lifespan, routers
-    │   ├── core/{config.py, security.py, rate_limit.py, logging.py, cache.py}
-    │   ├── routers/{scan.py, history.py, health.py}
+    │   ├── core/{config.py, security.py, ssrf.py, rate_limit.py, logging.py, cache.py}
+    │   ├── routers/{scan.py, history.py, analysis.py, health.py}
     │   ├── services/{orchestrator.py, shodan_service.py, crtsh_service.py,
-    │   │            certspotter_service.py, subfinder_service.py,
-    │   │            whois_service.py, nvd_service.py, cpe_util.py, risk.py}
+    │   │            certspotter_service.py, subfinder_service.py, whois_service.py,
+    │   │            dns_service.py, nvd_service.py, cpe_util.py, risk.py,
+    │   │            host_enrichment_service.py, tls_service.py, http_headers_service.py,
+    │   │            redirect_service.py, sitemap_service.py, contact_service.py,
+    │   │            exif_service.py, phone_lookup_service.py, otx_service.py,
+    │   │            urlscan_service.py, leaklookup_service.py, source_health_service.py}
     │   ├── models/{target.py, scan.py, finding.py}  # SQLAlchemy 2.0
-    │   ├── schemas/{scan.py, common.py}             # Pydantic v2
+    │   ├── schemas/{scan.py, history.py, analysis.py, health.py, dns.py, common.py}
     │   └── db/{session.py, base.py}
     ├── alembic/
     ├── data/.gitkeep              # SQLite file lives here (gitignored)
+    ├── README.md                  # also the HF Space card (sdk/app_port)
+    ├── Dockerfile
     ├── requirements.txt
     └── .env.example
 ```
 
 ## 3. Frontend Design
 
-- **Routing:** App Router groups `(auth)` public, `(dashboard)` protected. `middleware.ts` checks Better Auth session.
-- **Data fetching:** Client components use SWR/poll every 2s on `GET /api/scan/{id}` until `completed|partial|failed`. Server components for history list (SSR via FastAPI `GET /history`).
-- **UI:** Tailwind dark class default (`<html class="dark">`), shadcn `Card, Table, Badge, Skeleton, Tabs`. Charts lazy-loaded (`next/dynamic ssr:false`) to avoid hydration mismatch.
+- **Routing:** App Router groups `(auth)` public, `(dashboard)` rendered for everyone. `middleware.ts` is **CSP + nonce only** (since 2026-10-14); it does no session lookup and no redirect. Authorization is the backend's (`require_user` / `require_user_or_guest`, §6).
+- **Data fetching:** Client components poll `GET /api/scan/{id}` until `completed|partial|failed`; `HistoryList` and `RiskTrendChart` fetch `/api/history` and `/api/trend` client-side, and only after Better Auth has answered (`sessionState.isPending` renders a skeleton instead), so a guest never fires an account-only request.
+- **UI:** Tailwind dark class default (`<html class="dark">`), shadcn primitives from `components/ui/` (card, table, badge, skeleton, button, input, label, progress, separator, sheet, avatar, tooltip). Charts lazy-loaded (`next/dynamic ssr:false`) to avoid hydration mismatch. Export is client-side: JSON and Markdown from `lib/export-findings.ts`, PDF through a dynamically imported `jspdf` chunk in `lib/export-pdf.ts`.
 - **Validation:** `z.object({ target: z.string().regex(/^(?:[a-z0-9-]+\.)+[a-z]{2,}$|^(?:\d{1,3}\.){3}\d{1,3}$/i) })`, block `localhost, 10/8, 192.168/16, 172.16/12`.
 
 ## 4. Backend Design (FastAPI Async)
@@ -91,14 +106,14 @@ Principles:
 
 ```
 POST /api/v1/scan            { target, force?:bool } → { scan_id, status }
-GET  /api/v1/scan/{id}       → { scan_id, target, status, risk_score, results:{shodan,crtsh,whois,dns,nvd,host,history}, errors[] }
+GET  /api/v1/scan/{id}       → { scan_id, target, status, risk_score, results:{shodan,crtsh,whois,dns,nvd,host,history,_risk_breakdown}, errors[] }
 GET  /api/v1/history?target=&page=&limit= → { items[], total }
 GET  /api/v1/target/{t}/trend → { points: [{scan_id, created_at, risk_score}] }
 GET  /health /ready /health/sources
 ```
 
 Every response model above is a Pydantic v2 model in `app/schemas/`
-(`scan.py`, `history.py`, `health.py`, `common.py`), so the generated OpenAPI
+(`scan.py`, `history.py`, `analysis.py`, `health.py`, `dns.py`, `common.py`), so the generated OpenAPI
 describes the contracts instead of showing bare `object` shapes.
 
 **Error codes** (documented in the schema, and asserted by
@@ -202,7 +217,7 @@ Matching is exact (never a prefix, so `user:service` cannot exempt `user:service
 ```python
 async def run_scan(target, force=False):
     scan_id = new_uuid(); persist(status="running")
-    if not force: check sqlite cache per source
+    if not force: check the TTL cache per source (sqlite or postgres, per CACHE_BACKEND)
     # DNS is skipped for an IP literal: an MX lookup does not apply to an
     # address, and an error there would fabricate a failure for a healthy scan.
     sh, ct, wh, dns = await asyncio.gather(
@@ -253,7 +268,7 @@ async def run_scan(target, force=False):
 
 - **DNS records (v2, fifth scan source):** `dns_service.lookup(target)` queries A, AAAA, MX, NS, TXT, CNAME, SOA through `dns.asyncresolver` (asyncio-native; the **sync** resolver is never used on the event loop). All seven types are queried concurrently against one resolver, so the worst case is one timeout rather than seven. **Per-type isolation is the core behaviour**: one type failing records an entry in `errors[]` and the other six still return. TXT is truncated to 512 chars (SPF/DKIM blobs run to several KB); record counts cap at 50/type; NXDOMAIN is reported distinctly from an empty answer, because they lead to different conclusions. The parsed result is typed by `app/schemas/dns.py` (`DnsLookupResult`) — the model runs after truncation, so it describes data that is already bounded rather than being the safety. It is reachable both through the scan path (`results.dns`, bounded by `SCAN_TIMEOUT_DNS`, skipped for an IP literal) and through `POST /api/v1/analysis/dns`.
 
-  **Honesty note, and why the landing copy changed:** this is a lookup that is *active*, not a read of a public record. No packet is sent to the target host — the backend asks the target's authoritative nameservers directly, which is what makes the DNS source passive in the SSRF taxonomy of §4.1b but visible to the target's DNS operator. That is why the source is allowed on the scan path, and why the landing copy no longer claims "nothing on your target is contacted": it now states that no packets touch the target host while DNS queries are resolved by the backend and visible to the target's authoritative nameservers.
+  **Honesty note, and why the landing copy changed:** this is a lookup that is *active*, not a read of a public record. No packet is sent to the target host — the backend asks the target's authoritative nameservers directly, which is what makes the DNS source passive in the SSRF taxonomy of §4.1b but visible to the target's DNS operator. That is why the source is allowed on the scan path, and why the landing copy no longer claims "nothing on your target is contacted": the hero subtext reads `Only DNS lookups reach its nameservers.` under a `PUBLIC RECORDS ONLY` eyebrow. *(2026-10-25: the source panel in `LogoStrip` now carries a single muted `gives` line per source and no longer describes what happens when a source fails, so it is not the place to look for this disclosure; the one partial-failure sentence left on the page is `FeatureBento`'s lead.)*
 
 - **TLS certificate detail (v2):** `tls_service.lookup(target)` performs a live handshake — the only module that opens a raw socket, and the first to use `validate_host()` instead of `SafeFetcher`. Client-side verification is deliberately **disabled** (`check_hostname=False`, `CERT_NONE`) because an OSINT scan must *report* an expired, self-signed or mismatched certificate rather than fail on it; rejecting it client-side would hide the finding the module exists to surface. The peer DER is parsed with `cryptography` (the stdlib refuses to decode it when verification is off; hand-rolling a DER walk would be worse). Note the overlap with CT: crt.sh and Cert Spotter return the same names and issuance windows, but they return *logged issuance history*, deduped per name — so their `not_after` can be a stale entry rather than the live certificate. Render validity once, from this source.
 
@@ -288,9 +303,11 @@ async def run_scan(target, force=False):
 
 - **History sources — PII discipline.** The credential-leak source returns **counts and aggregate metadata only**: per-source breach name and a match **count**, never an email address, account list, password or hash. Rows are counted without their contents ever being read, and the error path is scrubbed independently, with a test that plants a realistic leaked pair and asserts neither the address nor the hash appears anywhere in the output.
 
-- **Threat-intel sources, replacing the defacement mirror.** Zone-H was dropped: it has no API (`api.zone-h.org` is NXDOMAIN, the archive is behind an anti-scraping gate), its general RSS was **withdrawn by the operator** for abuse, and the surviving special RSS carries no banner text, has no per-domain query, and is **CC BY-NC-ND** — non-commercial, no-derivatives, which cannot back this dashboard. The gap it left (threat history when CVE data is empty) is filled by two sources with real APIs:
-  - **`virustotal_service`** — domain / IP / URL / file-hash reputation. The verdict is `last_analysis_stats` (`malicious`/`suspicious`/`undetected`/`harmless`/`timeout`/…), reduced to a single explicit `verdict` plus the **raw counts kept alongside it**: collapsing 3 engines of `undetected` into "0 malicious" would read as clean when it means the opposite. `popular_threat_classification` supplies a suggested threat label, which is a *suggestion from the community*, not a verdict, and is labelled as such.
+- **Threat-intel sources, replacing the defacement mirror.** Zone-H was dropped: it has no API (`api.zone-h.org` is NXDOMAIN, the archive is behind an anti-scraping gate), its general RSS was **withdrawn by the operator** for abuse, and the surviving special RSS carries no banner text, has no per-domain query, and is **CC BY-NC-ND** — non-commercial, no-derivatives, which cannot back this dashboard. The gap it left (threat history when CVE data is empty) is filled by three sources with real APIs, run by `_threat_history_fallback` in that order — `otx`, `urlscan`, `leaklookup`:
   - **`otx_service`** — AlienVault OTX indicator reputation and the community **pulse** list. The honesty trap here is OTX's `reputation: null`, which means **no data**, not zero; it is passed through as `null` with a note rather than coerced to `0`, because "not known to be malicious" and "known to have score 0" are different claims.
+  - **`urlscan_service`** — read-only URLScan.io search; works keyless at 30 req/min, free-tier history capped at 30 days.
+  - **`leaklookup_service`** — breach names and counts only, key required.
+  - **VirusTotal is deliberately not integrated**, and there is no `virustotal_service` in the tree. *(Corrected 2026-10-25: this bullet used to describe a `virustotal_service` with `last_analysis_stats` verdicts and `popular_threat_classification`, which does not exist. `VIRUSTOTAL_API_KEY` is only read by `routers/analysis.py` to flip the `virustotal` entry in `GET /api/v1/analysis/capabilities`; the absence is the deliberate licensing decision recorded above, not a pending task.)*
   - **Censys is deliberately not added.** It is a separate paid source, and Shodan already covers exposed services, infrastructure and banners for this product — adding a second paid key for the same fields is what the host-enrichment diff avoided.
 
   Remaining sources keep their documented behaviour: `leaklookup` needs a key (free tier 10 queries/day) and its ToS restricts queries to targets the operator is authorised to search; `urlscan` search works keyless but its free tier caps history at **30 days / 100 results per page** (verified against the live API), so nothing may promise "full history". A missing key yields `status: "not_configured"`, which the UI renders as *switched off*, deliberately distinct from *found nothing*.
@@ -349,7 +366,7 @@ CREATE TABLE IF NOT EXISTS cache(key TEXT PRIMARY KEY, payload TEXT, expires_at 
   as the source. Probes use one bounded httpx client plus
   `asyncio.wait_for` around WHOIS/DNS, against the RFC 2606 reserved name
   `example.com`, so a health check adds no third party's load.
-- JSON logs: `{ request_id, user_id, target, source, latency_ms, status }`.
+- JSON logs (`app/core/logging.py`, structlog): one line per request with `request_id`, `path`, `method`, `latency_ms`. The audit record itself is the immutable `scans` row (`user_id`, `target_id`, `status`, `risk_score`, `errors[]`, timestamps). *(Corrected 2026-10-25: this line used to claim `user_id`, `target`, `source` and `status` in the log line; the single emitter in `core/logging.py` does not bind them.)*
 - Config via `pydantic-settings`, all secrets from env, `.env.example` committed, `.env` gitignored.
 - Cache backend flag: `CACHE_BACKEND=sqlite|postgres` (`app/core/config.py`). `sqlite` = local file at `SQLITE_PATH`; `postgres` = `osint_cache` table via asyncpg (DSN derived from `DATABASE_URL`, `CREATE TABLE IF NOT EXISTS`, 2s timeout). Async entry points `cache_get_async`/`cache_set_async` in `app/core/cache.py` (orchestrator uses these; sync helpers kept for compat). Either backend failing never fails a scan — get returns `None`, set swallows.
 
@@ -363,4 +380,4 @@ CREATE TABLE IF NOT EXISTS cache(key TEXT PRIMARY KEY, payload TEXT, expires_at 
 
 - SQLAlchemy chosen over Prisma for single Python stack; Prisma viable if BFF moves to Node.
 - Polling over WebSocket for simplicity; upgrade to SSE when scan >15s common.
-- v2: scheduled monitoring, diff alerts, PDF export, org RBAC, Nuclei passive checks.
+- v2: scheduled monitoring, diff alerts, org RBAC, Nuclei passive checks. *(Corrected 2026-10-25: "PDF export" was listed here and has shipped — JSON, Markdown and PDF are built client-side by `frontend/lib/export-findings.ts` + `lib/export-pdf.ts` and offered by `ExportFindingsCard`.)*

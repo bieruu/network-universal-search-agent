@@ -3,6 +3,20 @@
 > Completed work only, newest section at the top. Open items → [TODO.md](./TODO.md) · setup → [WORKFLOW.md](./WORKFLOW.md) · requirements → [PRD.md](./PRD.md).
 > Anything finished in a push moves here from TODO.md in that same commit, newest section at the top — see AGENTS.md §9.
 
+## 2026-10-25 - Docs catch up with the tree: a user-facing README, and every claim checked against the code
+
+Documentation-only push, and no source file changed (only a comment in `frontend/.env.local.example`). `npm run lint` and `npm run tsc` were last run earlier the same day against this source tree, before the markdown edits; `npm test` was re-run after the final edit and reads **345 pass / 0 fail / 0 skipped**.
+
+**README rewritten for the person using it, not the person maintaining it.** It now opens with what one search gets you, states plainly that an empty card means "nothing in these public records" rather than "nothing is there", explains the three no-account paths (landing terminal, `/demo`, 2 guest scans a day), and gives the real limits (5 scans an hour per account, the production ceiling, plus an optional daily cap; guests 2/day per browser and a shared instance cap). The architecture diagram, the project tree and the pre-push check block were removed because WORKFLOW.md and AGENTS.md already own them. Zero em dashes, verified by counting U+2014 in the file, and every internal link and both evidence screenshots were checked to exist.
+
+**Claims that were describing a product that no longer exists.** `PRD.md` still put every `/dashboard` and `/api/*` behind Better Auth middleware, and still listed PDF export as v2 while JSON/Markdown/PDF export has shipped: FR-4.1 is rewritten around the backend gate (`require_user_or_guest()` for the two scan routes, `require_user()` for history, trend, analysis and health), FR-4.3 now says the default is 5 scans an hour rather than 10, FR-4.4 names `target_id` because there is no `target` column, and FR-5.2 describes the dashboard history card rather than a `/history` page that never existed. `AGENTS.md` used "No subdomains found" as its canonical empty state, which the 2026-10-24 honesty fix replaced; it now quotes the real copy. `ARCHITECTURE.md` had `TargetSearch.tsx` and `ScanStatus.tsx` outside `dashboard/_components/` and was missing the `*ChartInner` files. `WORKFLOW.md` env blocks now match the `.example` files (`POSTGRES_*`, database user `owner`, `BETTER_AUTH_TRUSTED_PROXIES`, `SCAN_TIMEOUT_*`, `RATE_LIMIT_DAILY_TOTAL`, `RATE_LIMIT_MAX_KEYS`) and states that `VIRUSTOTAL_API_KEY` only flips `/capabilities`.
+
+**Two design claims were simply wrong.** `DESIGN.md` described the hero as a three.js node graph; the picture is a `cobe` globe (the node graph is what it replaced), and the "dashboard sphere keeps that speed" clause belonged to a scene deleted on 2026-10-14. The sidebar heading was quoted as `Sources` when it renders `Where the data comes from`. All three are corrected with the old text kept visible under a dated note.
+
+**One example file was lying about the quota.** `frontend/.env.local.example` told operators the backend quota was 10/hour; `RATE_LIMIT_PER_HOUR` defaults to 5 and production refuses to boot above 5. The comment now says 5 and names it as the ceiling.
+
+**Left unverified on purpose.** The two Docker acceptance boxes in `PRD.md` stay unticked: a throwaway `postgres:16` container did run `alembic upgrade head` cleanly, but reopening a snapshot after a restart and a full `docker compose` boot were not exercised in this pass.
+
 ## 2026-10-25 — The source panel trims to its sentence; honest empty states and AA captions
 
 This push commits the working tree left behind after 2026-10-21 (the copy/mobile/light-mode polish pass, which was ticked in TODO.md but never swept) together with the landing and dashboard fixes done on 2026-10-24/25. Nothing was split into separate commits because the polish pass and this round touch the same files; the gates below were all run at the end, on the tree that is actually being pushed.

@@ -1,45 +1,52 @@
 # Network Universal Search Agent
 
-Secure OSINT dashboard (Next.js 15 + FastAPI). One search box → Shodan ports, crt.sh subdomains, WHOIS, DNS records (A/AAAA/MX/NS/TXT/CNAME/SOA) + CVE tiers and a transparent risk heuristic, rate-limited throughout. History, trend and analysis are session-gated; the two scan routes also admit a signed-out visitor under a guest quota (2 scans/day per guest, plus an instance-wide cap, results not saved — the 2026-10-14 reversal of "no anonymous scan path", dashboard only, never the landing playground). No packets are sent to the target host; DNS queries are resolved by the backend and are visible to the target's authoritative nameservers.
+**See what the internet already says about a domain, before you point anything at it.**
 
-![Landing hero](frontend/public/evidence/landing-hero-desktop.png)
-![Dashboard as a signed-out guest: quota banner, locked history and risk trend, no logout](frontend/public/evidence/guest-dashboard-dark.png)
+Type one domain or public IP. In a few seconds you get a single report: which ports answer and what runs on them, which names sit under the domain in the public certificate log, who registered it and when it expires, what DNS records it publishes, and which known vulnerabilities match the software we found. Every scan ends with a 0 to 100 risk score and is saved, so you can open it again later and compare it with the same domain's last result.
 
-- **Status:** v1 implemented. Open items → [TODO.md](./TODO.md).
-- **Docs map:** setup/commands → [WORKFLOW.md](./WORKFLOW.md) · system design → [ARCHITECTURE.md](./ARCHITECTURE.md) · requirements → [PRD.md](./PRD.md) · UI tokens → [DESIGN.md](./DESIGN.md) · contribution rules → [AGENTS.md](./AGENTS.md) · history → [CHANGELOG.md](./CHANGELOG.md).
+![Landing page](frontend/public/evidence/landing-hero-desktop.png)
+![Dashboard signed out: guest quota, locked history and trend](frontend/public/evidence/guest-dashboard-dark.png)
 
-## Architecture
+## What one search gives you
 
-```mermaid
-flowchart LR
-  A[Browser / Next.js] -->|session + /api/* proxy| B[Better Auth]
-  B --> C[FastAPI]
-  C -->|asyncio.gather| D[Passive sources<br/>Shodan, crt.sh, WHOIS, DNS, NVD]
-  C --> E[(PostgreSQL)]
-  C --> F[(TTL cache SQLite/Postgres)]
-  E --> G[scans / targets / findings]
-```
+- **Ports and software.** What is open, and what software and version answers on each port.
+- **Names that are not on any page.** Subdomains that appear in public certificates.
+- **Who holds the domain.** Registrar, creation date, expiry date, nameservers.
+- **DNS records.** A, AAAA, MX, NS, TXT, CNAME and SOA.
+- **Known issues.** CVEs that match the software we found, with severity.
+- **A risk score you can argue with.** 0 to 100, with the pieces that made up the number.
+- **History and trend.** Each search is kept, so you can reopen it or watch the score move.
+- **Findings you can hand over.** Export a report as JSON, Markdown or PDF.
 
-## Features
-- Aggregated scan: open ports, services, CVEs (NVD cross-checked tiers), subdomains, WHOIS, DNS records
-- Partial failure is first-class: one dead source never 500s the scan — per-source error badges
-- Better Auth sessions (email/password + optional Google/GitHub), per-user rate limit, immutable scan history
-- Dark-first UI, reduced-motion aware, Chart.js dashboards
+## It tells you what it could not check
 
-## Quickstart
+If a source is slow or unreachable, the report still arrives and the card says what was not checked. An empty card means "nothing in these public records", not "nothing is there". This tool never sends packets to the target, so it cannot promise a port is closed just because no public record mentions it.
 
-Prereqs: Node 22.18+ · Python 3.11+ · Docker · Git — per-OS install commands in [WORKFLOW.md §1](./WORKFLOW.md#1-prerequisites).
-Free Shodan key: https://account.shodan.io/
+## Try it without an account
+
+- The landing page has a working terminal. Type in it to see what a report looks like.
+- `/demo` shows a finished report for three example sites. No account, no backend, clearly labelled as sample data.
+- Signed out, you can run 2 real scans a day from the dashboard. Those results are not saved. Sign in for full history.
+
+## Good to know
+
+- Everything here is passive and public. No port scanning, no exploitation, nothing intrusive. DNS lookups do reach the domain's nameservers, so the operator of that domain can see the lookup.
+- Limits: 5 scans an hour per account by default, which is the production ceiling because one Shodan key pays for all of them. A deployment can also set a daily cap. Guests get 2 per day per browser, plus a shared daily cap for the whole instance.
+- Public targets only. Localhost, private addresses and link-local ranges are refused.
+- History, trend and analysis are per account. Nobody else can see your searches.
+
+## Run it locally
+
+You need Node 22.18 or newer, Python 3.11 or newer, Docker and Git.
 
 ```powershell
-# 1. env + database (use `cp` on macOS/Linux)
+# 1. config and database
 Copy-Item frontend\.env.local.example frontend\.env.local
-Copy-Item backend\.env.example backend\.env   # fill SHODAN_API_KEY + BETTER_AUTH_SECRET (32+)
-# POSTGRES_PASSWORD has no default in docker-compose.yml — set it before Compose starts:
+Copy-Item backend\.env.example backend\.env      # add SHODAN_API_KEY and BETTER_AUTH_SECRET (32+ chars)
 $env:POSTGRES_PASSWORD = "pick-any-local-password"
-docker compose up -d postgres   # use the same password in both DATABASE_URL values
+docker compose up -d postgres
 
-# 2. backend (terminal 1)
+# 2. backend
 cd backend
 python -m venv .venv
 .\.venv\Scripts\Activate.ps1
@@ -47,59 +54,27 @@ pip install -r requirements-dev.txt
 alembic upgrade head
 uvicorn app.main:app --reload --port 8000
 
-# 3. frontend (terminal 2)
+# 3. frontend, in a second terminal
 cd frontend
 npm install
 npm run auth:migrate
 npm run dev
 ```
 
-Windows one-liner: `.\dev.ps1` (starts both, reclaims ports, opens the sign-up page).
-Full env reference, OAuth setup, test commands, and troubleshooting → [WORKFLOW.md](./WORKFLOW.md).
+Then open http://localhost:3000, sign up, and scan `example.com`. On macOS or Linux use `cp` instead of `Copy-Item`. Windows users can run `.\dev.ps1` to start both sides at once.
 
-## Verify it works
+No valid Shodan key? The scan still completes as a partial report: the Shodan card shows an error badge while the certificate log, WHOIS and DNS cards fill in. That is designed behaviour, not a crash.
 
-Sign up at `/sign-in` → scan `example.com`. Expected: per-card skeletons → results, history saves automatically. Without a valid `SHODAN_API_KEY` the scan still lands as `partial` with an error badge on the Shodan card (crt.sh + WHOIS render) — designed behavior, not a bug.
+## Still stuck or want the details
 
-Browser only calls `/api/*` (Next proxy → FastAPI). Never call Shodan/crt.sh from the browser, never call `:8000` directly.
+- Setup, environment variables, OAuth, tests, troubleshooting: [WORKFLOW.md](./WORKFLOW.md)
+- How the system is built: [ARCHITECTURE.md](./ARCHITECTURE.md)
+- What it was specified to do: [PRD.md](./PRD.md)
+- Visual language and copy rules: [DESIGN.md](./DESIGN.md)
+- Rules for contributors: [AGENTS.md](./AGENTS.md)
+- What shipped and when: [CHANGELOG.md](./CHANGELOG.md)
+- What is still open: [TODO.md](./TODO.md)
 
-## Troubleshooting
+Built with Next.js and FastAPI, Better Auth for accounts, PostgreSQL for scan history, and a thin capture layer for the public sources it reads.
 
-See [WORKFLOW.md §7](./WORKFLOW.md#7-troubleshooting) — session redirects, 401/502/503, OAuth, private-target rejection, and the OneDrive `.next EINVAL` quirk.
-
-## Project structure
-
-```
-frontend/app/
-  page.tsx                        # public landing (dark-lock #0a0f14)
-  _components/landing/            # Nav, Hero, TerminalTyper, ambient/motion layer
-  (dashboard)/dashboard/          # TargetSearch, tables, cards, charts (ssr:false)
-  api/scan/[[...path]]/route.ts   # session proxy → FastAPI
-  api/auth/[...all]/route.ts      # Better Auth endpoints
-backend/app/
-  routers/{scan,history,health}.py
-  services/orchestrator.py + {shodan,crtsh,whois,nvd,risk}_service.py
-  core/{config,security,rate_limit,logging,cache}.py
-```
-
-## Checks (run before every PR)
-
-```bash
-# frontend/                          
-npm run lint                         
-npm run tsc                          
-npm test                             
-```
-
-```bash
-# backend/
-pytest -q
-ruff check .
-black --check .
-```
-
-Run the checks above locally before every PR. (`.github/` is intentionally git-ignored — the CI workflow exists locally but is not shipped.)
-
-## Production checklist
-
-Deploy target: frontend on Vercel, backend as a **Hugging Face Docker Space** (port 7860; `backend/README.md` carries the Space's YAML front matter). Secrets and variables go in the Space's **Settings → Variables and secrets** — secrets are encrypted there and never committed; plain variables only for non-sensitive config. Rotate: `SHODAN_API_KEY`, `BETTER_AUTH_SECRET`, `DATABASE_URL`. Set `CACHE_BACKEND=postgres` on hosts without a persistent volume (the Space disk is non-persistent), and make `APP_URL` / `CORS_ORIGINS` the exact Vercel origin. External actions (production OAuth callbacks, dependency license review) → [TODO.md](./TODO.md). License: [MIT](./LICENSE).
+License: [MIT](./LICENSE).
