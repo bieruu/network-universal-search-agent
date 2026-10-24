@@ -5,11 +5,11 @@ import { join, dirname } from "node:path";
 import { fileURLToPath } from "node:url";
 
 // The landing page crashed at "Application error: a client-side exception"
-// because Next.js App Router bundles its OWN React (next/dist/compiled/react —
+// because Next.js App Router bundles its OWN React (next/dist/compiled/react -
 // a React 19 canary) for the client layer, regardless of what react version
 // package.json declares. The manifest said react ^18.3.1 while the runtime
 // was React 19, and @react-three/fiber v8 pulled react-reconciler 0.27, which
-// reads React.__SECRET_INTERNALS_DO_NOT_USE_OR_YOU_WILL_BE_FIRED — a key React
+// reads React.__SECRET_INTERNALS_DO_NOT_USE_OR_YOU_WILL_BE_FIRED - a key React
 // 19 removed (renamed to __CLIENT_INTERNALS_...). ReactSharedInternals came
 // back undefined, and the reconciler threw on
 // `ReactSharedInternals.ReactCurrentOwner` at module init, so every chunk that
@@ -64,7 +64,7 @@ test("the lockfile carries no React-18-era react-reconciler", () => {
     const minor = Number(rec.version.split(".")[1]);
     assert.ok(
       minor >= 31,
-      `react-reconciler ${rec.version} pairs with React 18 (0.31+ is required for React 19) — it crashes on next/dist/compiled/react's missing __SECRET_INTERNALS`,
+      `react-reconciler ${rec.version} pairs with React 18 (0.31+ is required for React 19) - it crashes on next/dist/compiled/react's missing __SECRET_INTERNALS`,
     );
   }
 });

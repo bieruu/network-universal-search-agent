@@ -31,19 +31,19 @@ export type ToolchainMarqueeProps = Omit<
 };
 
 /**
- * Rows of brand marks drifting in opposite directions — one row per stack.
+ * Rows of brand marks drifting in opposite directions - one row per stack.
  *
  * This is the landing's tech-stack section: a marquee is the one place a long
  * list of tools can be shown without either truncating it or turning it into a
  * wall. What keeps it honest:
  *
  * - `stacks` decides the rows, and the row count can never exceed the number of
- *   stacks given — a marquee that pads a row out with tools the product does
+ *   stacks given - a marquee that pads a row out with tools the product does
  *   not use is a false claim about the product, not a layout choice.
  * - The duplicated groups are `aria-hidden`, so a screen reader reads ONE list
  *   of names rather than the same names for every copy that fills the viewport.
  * - Under `prefers-reduced-motion` the rows do not animate at all and collapse
- *   to a single copy that becomes horizontally scrollable — the content is
+ *   to a single copy that becomes horizontally scrollable - the content is
  *   still reachable, it just does not move.
  * - The copies are measured, not guessed: a ResizeObserver counts how many
  *   groups it takes to fill the viewport, so a wide screen never runs out of

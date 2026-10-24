@@ -7,13 +7,13 @@
  * in one section, `"0.6s"` in another, `14s` in `globals.css` and `2.4s` again
  * in the same file. Nothing was wrong with any single number. What was wrong
  * was that they were handed out independently, so nothing could keep two
- * sections from landing on the same beat — and when every loop on a page
+ * sections from landing on the same beat - and when every loop on a page
  * breathes at the same moment, the page reads as one block of motion instead
  * of several independent surfaces. It also means a "slow everything down"
  * pass is eight edits in six files.
  *
- * So: one table, and every consumer — the CSS custom properties in
- * `app/globals.css` and every `animationDelay` in the source — must derive its
+ * So: one table, and every consumer - the CSS custom properties in
+ * `app/globals.css` and every `animationDelay` in the source - must derive its
  * number from here. `phaseDeclarations()` emits the `--animate-*` lines for the
  * stylesheet, and a contract test asserts those exact lines are the ones the
  * stylesheet carries, so the two cannot drift apart the way old inline numbers
@@ -30,7 +30,7 @@
  *
  * NOTHING HERE IS A GATE
  * ----------------------
- * Reducing motion is `motion-safe:` / `useReducedMotion()` — this file only
+ * Reducing motion is `motion-safe:` / `useReducedMotion()` - this file only
  * decides how fast. A layer that must stop must still be gated at its use site.
  */
 
@@ -46,8 +46,8 @@ export const MOTION_PHASES = {
   pulse: 5,
   /**
    * Slow scene rotation: the hero globe (`HeroGlobe.tsx`). It used to also
-   * drive the ambient 3D scenes — the hero node graph and the dashboard
-   * sphere — both removed 2026-10-14 when the globe became the hero's picture.
+   * drive the ambient 3D scenes - the hero node graph and the dashboard
+   * sphere - both removed 2026-10-14 when the globe became the hero's picture.
    * The entry stays in the table because the globe still reads it, and
    * `lib/loop-contract.test.ts` pins the range: a revolution, not a spin.
    */
@@ -75,7 +75,7 @@ export const MICRO_PHASES = {
   /** Burger sheet opening: panel in from its own edge, scrim up with it. */
   sheetIn: 0.2,
   /**
-   * Burger sheet closing. Shorter than the open — leaving should feel quicker
+   * Burger sheet closing. Shorter than the open - leaving should feel quicker
    * than arriving, and an exit that lingers reads as the page hesitating.
    */
   sheetOut: 0.14,
@@ -95,7 +95,7 @@ export type PhaseName = keyof typeof PHASE_SECONDS;
 /**
  * Golden-ratio offset. Successive elements land as far from the previous ones
  * as an irrational step allows, so a list of loops spreads across its period
- * instead of clumping at a few round numbers — which is exactly the clumping
+ * instead of clumping at a few round numbers - which is exactly the clumping
  * that made sections read as one block.
  */
 const GOLDEN = 0.618033988749895;
@@ -137,7 +137,7 @@ const PHASE_CSS: readonly PhaseCss[] = [
   // `iterations: "1"` rather than the default infinite. All four share one
   // curve because panel and scrim are one event: a scrim fading on a different
   // beat from the panel in front of it reads as two unrelated things happening
-  // (AGENTS.md §6 — the overlay moves with the sheet). `cubic-bezier(0.32,0.72,0,1)`
+  // (AGENTS.md §6 - the overlay moves with the sheet). `cubic-bezier(0.32,0.72,0,1)`
   // is the drawer curve: quick off the mark, long settle.
   { property: "--animate-sheet-in", keyframes: "sheet-in", phase: "sheetIn", easing: "cubic-bezier(0.32,0.72,0,1)", iterations: "1" },
   { property: "--animate-sheet-out", keyframes: "sheet-out", phase: "sheetOut", easing: "cubic-bezier(0.32,0.72,0,1)", iterations: "1" },
@@ -149,7 +149,7 @@ const PHASE_CSS: readonly PhaseCss[] = [
  * The `--animate-*` declarations `app/globals.css` must carry, generated from
  * the table above.
  *
- * `app/globals.css` cannot import this module — it is plain CSS — so the numbers
+ * `app/globals.css` cannot import this module - it is plain CSS - so the numbers
  * live here and the stylesheet mirrors them, and
  * `lib/loop-contract.test.ts` asserts that the mirrored declarations are
  * byte-identical to what this function returns. That is the drift guard: the

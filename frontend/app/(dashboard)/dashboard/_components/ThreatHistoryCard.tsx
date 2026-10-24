@@ -82,7 +82,7 @@ export function ThreatHistoryCard({
               <Badge variant={headline.variant}>{headline.text}</Badge>
               <p className="text-sm font-medium">{parsed.headline}</p>
             </div>
-            <p className="text-sm text-slate-500 dark:text-neutral-500">{parsed.detail}</p>
+            <p className="text-sm text-fg-muted">{parsed.detail}</p>
             {caveat && <p className="text-xs opacity-60">{caveat}</p>}
           </div>
 
@@ -94,7 +94,7 @@ export function ThreatHistoryCard({
             <div className="flex flex-col gap-1.5">
               <p className="text-xs text-warning">{sourceFailureCount(parsed.errors.length)}</p>
               <p className="text-xs opacity-60">
-                Treat the sources above as partial coverage — a gap here is not a clean result.
+                Treat the sources above as partial coverage - a gap here is not a clean result.
               </p>
             </div>
           )}
@@ -113,17 +113,17 @@ function SourceSection({ source }: { source: HistorySource }) {
         <h3 className="text-sm font-medium">{source.label}</h3>
         <Badge variant={badge.variant}>{badge.text}</Badge>
         {source.windowDays !== null && (
-          <span className="text-xs text-slate-500 dark:text-neutral-500">
+          <span className="text-xs text-fg-muted">
             From the last {source.windowDays} days
           </span>
         )}
         {source.total !== null && source.total > source.rows.length && (
-          <span className="text-xs text-slate-500 dark:text-neutral-500">
+          <span className="text-xs text-fg-muted">
             {source.total.toLocaleString("en-US")} recorded in total
           </span>
         )}
       </div>
-      <p className="text-sm text-slate-500 dark:text-neutral-500">{source.message}</p>
+      <p className="text-sm text-fg-muted">{source.message}</p>
       {/*
         `source.note` is the source's own diagnostic ("HTTP 429 from …"). It stays
         on the parsed object for the console but is not shown: it is provider
@@ -134,9 +134,9 @@ function SourceSection({ source }: { source: HistorySource }) {
           href={source.screenshotUrl}
           target="_blank"
           rel="noreferrer noopener"
-          className="text-xs text-accent hover:underline"
+          className="text-xs text-accent-text hover:underline"
         >
-          See the most recent archived view of this page (urlscan.io)
+          Archived snapshot on urlscan.io
         </a>
       )}
       {source.rows.length > 0 && (
@@ -170,7 +170,7 @@ function Row({ row }: { row: HistoryRow }) {
       {row.cells.map((cell, i) => (
         <TD key={`${row.id}-${cell.label}-${i}`} className={cell.mono ? "max-w-xs font-mono text-xs" : undefined}>
           {cell.href ? (
-            <a href={cell.href} target="_blank" rel="noreferrer noopener" className="text-accent hover:underline">
+            <a href={cell.href} target="_blank" rel="noreferrer noopener" className="text-accent-text hover:underline">
               {cell.value}
             </a>
           ) : (

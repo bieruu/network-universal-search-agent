@@ -15,7 +15,7 @@
  * PRIVACY: the target is reduced with `maskTarget()` before it can reach any
  * rendered output. A signed-in analyst's targets are often internal client
  * domains and this markup lands in an HTML document a CDN is free to cache.
- * Counts, software names and the risk score are unaffected — only the
+ * Counts, software names and the risk score are unaffected - only the
  * identifying name is reduced.
  */
 

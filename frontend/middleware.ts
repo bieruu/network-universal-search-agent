@@ -3,7 +3,7 @@ import type { NextRequest } from "next/server";
 import { contentSecurityPolicy, cspHeaderName, generateNonce } from "@/lib/csp";
 
 /**
- * CSP + nonce only. This middleware used to carry three auth jobs as well —
+ * CSP + nonce only. This middleware used to carry three auth jobs as well -
  * a session lookup behind `/dashboard`, a redirect to `/sign-in` when it found
  * none, and a 503 whenever `BETTER_AUTH_URL` was unset or not https in
  * production. All three were removed on 2026-10-14 by the operator-approved
@@ -19,7 +19,7 @@ import { contentSecurityPolicy, cspHeaderName, generateNonce } from "@/lib/csp";
  *     with auth availability, so it must never be able to fail that way.
  *   * The session lookup is gone because nothing here acts on the answer.
  *
- * Authorization did not move out of the app — it is where it always belonged:
+ * Authorization did not move out of the app - it is where it always belonged:
  * the backend gates every endpoint (`require_user`, and
  * `require_user_or_guest` on the two scan routes), so a rendered shell without
  * a session can read no data it is not allowed to ask for. What is given up is
@@ -45,7 +45,7 @@ export async function middleware(req: NextRequest) {
   requestHeaders.set("content-security-policy", policy);
 
   // Response side. Every response that leaves here carries the policy, so a
-  // document is never served without one — including the documents that used
+  // document is never served without one - including the documents that used
   // to be answered by the removed 503. `x-nonce` deliberately does NOT go out:
   // it is only meaningful server-side, and echoing it to the browser would
   // advertise the value an attacker needs to forge for the next request.

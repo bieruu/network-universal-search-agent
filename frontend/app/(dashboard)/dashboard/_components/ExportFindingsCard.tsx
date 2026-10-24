@@ -28,7 +28,7 @@ import {
  *     statically; the PDF path is a dynamic `import()` so `jspdf` lands in its
  *     own chunk and only loads when someone asks for a PDF.
  *  2. A failure is a destructive Badge that says what happened, not a silent
- *     no-op — an export that quietly produces nothing is worse than one that
+ *     no-op - an export that quietly produces nothing is worse than one that
  *     fails loudly.
  *  3. The caveats travel with the button. `EXPORT_CAVEAT_SUMMARY` is rendered
  *     above the controls so the card and the file promise the same thing.
@@ -37,7 +37,7 @@ import {
 /** Label, and how long the button stays busy while the file is built. */
 const FORMATS: Array<{ format: ExportFormat; label: string; hint: string }> = [
   { format: "json", label: "JSON", hint: "Every field from this screen, in one file." },
-  { format: "markdown", label: "Markdown", hint: "Readable anywhere — plain, safe text." },
+  { format: "markdown", label: "Markdown", hint: "Readable anywhere, as plain text." },
   { format: "pdf", label: "PDF", hint: "A formatted report, built in your browser." },
 ];
 
@@ -47,7 +47,7 @@ const FORMATS: Array<{ format: ExportFormat; label: string; hint: string }> = [
  */
 function failureMessage(format: ExportFormat, error: unknown): string {
   if (error instanceof Error) console.error(`Export (${format}) failed`, error);
-  return `We could not create the ${format.toUpperCase()} file. Nothing was downloaded — try again.`;
+  return `We could not create the ${format.toUpperCase()} file. Nothing was downloaded.`;
 }
 
 export default function ExportFindingsCard({
@@ -99,8 +99,8 @@ export default function ExportFindingsCard({
         {loading ? (
           <Skeleton className="h-24" />
         ) : !scan ? (
-          <p className="text-sm text-slate-500 dark:text-neutral-500">
-            No findings to export yet — run a scan first.
+          <p className="text-sm text-fg-muted">
+            No findings to export yet. Run a scan first.
           </p>
         ) : (
           <>
@@ -122,14 +122,14 @@ export default function ExportFindingsCard({
 
             {failedSources > 0 && (
               <p className="mt-3 text-xs text-warning">
-                {failedSources} {failedSources === 1 ? "source did" : "sources did"} not answer this scan. The export
-                lists {failedSources === 1 ? "it" : "each"} with its message and reports the result as incomplete.
+                {failedSources} {failedSources === 1 ? "source did" : "sources did"} not answer. The export
+                lists {failedSources === 1 ? "it" : "each"} and marks the result incomplete.
               </p>
             )}
 
             <ul className="mt-3 flex flex-col gap-1 text-xs opacity-60">
-              <li>Built in your browser — nothing uploaded, no copy kept.</li>
-              <li>External text stays plain text; shortened text is marked in the file.</li>
+              <li>Built in your browser - nothing uploaded, no copy kept.</li>
+              <li>External text stays plain text; shortened text is marked.</li>
               <li>Only fields shown on this screen are included.</li>
             </ul>
 
@@ -153,8 +153,8 @@ export default function ExportFindingsCard({
 /**
  * Build the file for one format.
  *
- * `lib/export-findings.ts` carries no dependency of its own — it reduces the
- * scan to plain strings — so it is imported statically. The PDF path is the
+ * `lib/export-findings.ts` carries no dependency of its own - it reduces the
+ * scan to plain strings - so it is imported statically. The PDF path is the
  * only dynamic `import()` here because it is the only one that reaches for
  * `jspdf`: the library lands in its own chunk and loads when an analyst clicks
  * "PDF", which is why it does not appear in the build's First Load JS.

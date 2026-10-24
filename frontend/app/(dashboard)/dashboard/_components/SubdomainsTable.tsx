@@ -85,10 +85,10 @@ export default function SubdomainsTable({
         {loading ? (
           <Skeleton className="h-24" />
         ) : view.unique === 0 ? (
-          <p className="text-sm text-slate-500 dark:text-neutral-500">
+          <p className="text-sm text-fg-muted">
             {scan?.errors.some((e) => e.source === "crtsh")
-              ? "The certificate log could not be searched — not a confirmation there are none. See the source error above."
-              : "No subdomains found."}
+              ? "The certificate log could not be searched - not a confirmation there are none. See the source error above."
+              : "The public certificate log lists no names for this domain, which is not proof that none exist."}
           </p>
         ) : (
           <>
@@ -113,7 +113,7 @@ export default function SubdomainsTable({
             </div>
 
             {visibility.visible === 0 ? (
-              <p className="text-sm text-slate-500 dark:text-neutral-500">
+              <p className="text-sm text-fg-muted">
                 {visibility.rowNote} {visibility.honestyNote}
               </p>
             ) : (
@@ -141,8 +141,8 @@ export default function SubdomainsTable({
                                 </span>
                               )}
                             </TD>
-                            <TD>{r.issuer ?? "—"}</TD>
-                            <TD>{r.not_after ?? "—"}</TD>
+                            <TD>{r.issuer ?? "-"}</TD>
+                            <TD>{r.not_after ?? "-"}</TD>
                             <TD>
                               <Badge variant={badge.variant} className={badge.className} title={subdomainValidityNote(r.validity)}>
                                 {subdomainValidityLabel(r.validity)}

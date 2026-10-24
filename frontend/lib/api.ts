@@ -8,8 +8,8 @@ export interface SourceError {
 }
 
 // `keyword_derived` is the NVD keywordSearch FALLBACK, which runs only when the
-// exact-CPE path produced nothing. Its rows are leads — a CVE whose description
-// mentions a detected product term — so they are never `verified` and never
+// exact-CPE path produced nothing. Its rows are leads - a CVE whose description
+// mentions a detected product term - so they are never `verified` and never
 // counted toward the risk score (the backend enforces both).
 export type NvdStatus =
   | "found"
@@ -42,7 +42,7 @@ export interface NvdCveRow {
   description?: string | null;
   url?: string;
   // True when the row came from the NVD keywordSearch fallback rather than an
-  // exact-CPE match. Such a row is a LEAD — the CVE's description mentions a
+  // exact-CPE match. Such a row is a LEAD - the CVE's description mentions a
   // detected product term, which says nothing about this host. The backend
   // never scores these and never marks them `verified`.
   keyword_derived?: boolean;
@@ -119,7 +119,7 @@ export interface ScanResult {
     // Breach/defacement history. Present ONLY when official CVE data came back
     // empty, which is why the card renders nothing when it is absent. Typed as
     // unknown because the shape is validated at the point of use
-    // (lib/threat-history-shape.ts) — it is third-party data and must not be
+    // (lib/threat-history-shape.ts) - it is third-party data and must not be
     // trusted to match a compile-time shape at the call site.
     history?: unknown;
   };

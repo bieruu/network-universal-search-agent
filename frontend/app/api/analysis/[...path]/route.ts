@@ -11,7 +11,7 @@ const BACKEND = process.env.BACKEND_URL ?? "http://localhost:8000";
 // over each segment before this handler runs while re-escaping the delimiters
 // it decoded (next/dist/server/lib/router-utils/decode-path-params.js). A `+`
 // therefore arrives here as `+` and a `/` arrives as the literal `%2F`.
-// `encodeURIComponent` alone would send `%2B` (right) but `%252F` (wrong — the
+// `encodeURIComponent` alone would send `%2B` (right) but `%252F` (wrong - the
 // backend decodes one layer and receives the text `%2F`); `encodeAnalysisSegment`
 // is escape-aware, so the number survives the round trip intact.
 function backendUrl(path: string[]): string {

@@ -59,7 +59,7 @@ test("the nonce a caller supplies appears verbatim in the policy", () => {
 
 test("script-src has no 'unsafe-inline' and the policy has no 'unsafe-eval'", () => {
   const policy = contentSecurityPolicy(NONCE);
-  // 'unsafe-inline' in script-src would make the nonce decorative — with
+  // 'unsafe-inline' in script-src would make the nonce decorative - with
   // 'strict-dynamic' present the browser ignores it anyway, so it buys nothing.
   assert.ok(
     !directive(policy, "script-src").includes("'unsafe-inline'"),
@@ -70,7 +70,7 @@ test("script-src has no 'unsafe-inline' and the policy has no 'unsafe-eval'", ()
   assert.ok(directive(policy, "style-src").includes("'unsafe-inline'"));
 });
 
-test("'strict-dynamic' is present — it is what makes the browser ignore unsafe-inline", () => {
+test("'strict-dynamic' is present - it is what makes the browser ignore unsafe-inline", () => {
   assert.ok(contentSecurityPolicy(NONCE).includes("'strict-dynamic'"));
 });
 

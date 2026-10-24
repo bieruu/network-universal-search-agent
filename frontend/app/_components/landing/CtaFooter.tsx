@@ -17,7 +17,7 @@ export default function CtaFooter() {
             </p>
             <Link
               href="/dashboard"
-              className="mt-8 inline-block rounded-full bg-accent px-7 py-2.5 text-sm font-semibold text-accent-foreground transition-all duration-200 hover:-translate-y-0.5 hover:bg-accent-hover hover:shadow-lg hover:shadow-accent/25 active:translate-y-0 motion-reduce:transition-colors motion-reduce:hover:translate-y-0"
+              className="relative mt-8 inline-flex h-9 items-center rounded-full bg-accent px-4 text-sm font-semibold text-accent-foreground ring-1 ring-accent/30 transition-colors duration-200 after:absolute after:-inset-1.5 after:content-[''] hover:bg-accent-hover sm:mt-10 sm:hover:-translate-y-0.5 sm:hover:shadow-lg sm:hover:shadow-accent/25 sm:active:translate-y-0 sm:motion-reduce:hover:translate-y-0"
             >
               Open dashboard
             </Link>
@@ -28,13 +28,13 @@ export default function CtaFooter() {
         <div className="mx-auto flex max-w-7xl flex-col items-center justify-between gap-3 px-4 py-6 font-mono text-xs text-slate-500 dark:text-neutral-500 sm:flex-row sm:px-6">
           <p>© 2026 NUSA project</p>
           <div className="flex gap-5">
-            <Link href="/dashboard" className="transition-colors hover:text-accent">
+            <Link href="/dashboard" className="transition-colors hover:text-accent-text">
               Dashboard
             </Link>
-            <Link href="/sign-in" className="transition-colors hover:text-accent">
+            <Link href="/sign-in" className="transition-colors hover:text-accent-text">
               Sign in
             </Link>
-            <Link href="/demo" className="transition-colors hover:text-accent">
+            <Link href="/demo" className="transition-colors hover:text-accent-text">
               Demo report
             </Link>
           </div>

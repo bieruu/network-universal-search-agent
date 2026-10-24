@@ -7,7 +7,7 @@
 //      `unknown` into a `ThreatHistory | null` and never throws, so the card can
 //      render nothing for a missing/malformed block instead of crashing.
 //   2. Every attacker-influenced string (breach names, community pulse names
-//      and descriptions, upstream notes) is reduced to PLAIN TEXT here — control characters
+//      and descriptions, upstream notes) is reduced to PLAIN TEXT here - control characters
 //      stripped, never markup. The card renders these values as text children,
 //      so React escapes them; no helper may return a field the caller is
 //      tempted to inject as HTML.
@@ -170,7 +170,14 @@ export function isRecord(value: unknown): value is Record<string, unknown> {
  */
 export function asPlainText(value: unknown): string {
   if (typeof value !== "string") return "";
-  return value.replace(CONTROL_CHARS, " ").replace(/\s+/g, " ").trim();
+  // Upstream text (banner-like names, issuer strings, CVE copy) can contain an
+  // em dash; every display path in this app goes through here, so it is
+  // normalised to a hyphen at the same door.
+  return value
+    .replace(/\u2014/g, "-")
+    .replace(CONTROL_CHARS, " ")
+    .replace(/\s+/g, " ")
+    .trim();
 }
 
 /** Plain text clipped to `max` characters, with an explicit truncation flag. */
@@ -191,14 +198,14 @@ export function formatList(value: unknown, maxItems = 8): { text: string; trunca
 
 /** Thousands-separated integer, or an em dash when the source sent nothing usable. */
 export function formatCount(value: unknown): string {
-  if (typeof value !== "number" || !Number.isFinite(value)) return "—";
+  if (typeof value !== "number" || !Number.isFinite(value)) return "-";
   return value.toLocaleString("en-US");
 }
 
 export function formatBool(value: unknown): string {
   if (value === true) return "yes";
   if (value === false) return "no";
-  return "—";
+  return "-";
 }
 
 /**
@@ -264,7 +271,7 @@ export function statusBadge(outcome: SourceOutcome): StatusBadge {
 /**
  * Badge for the whole block.
  *
- * `no_records` is the normal healthy outcome and stays muted — a red badge here
+ * `no_records` is the normal healthy outcome and stays muted - a red badge here
  * would tell the operator a clean sweep went wrong. `incomplete` is red because
  * coverage was partial and "no records found" would be an overstatement.
  */
@@ -285,7 +292,7 @@ function urlscanRows(rows: Record<string, unknown>[]): HistoryRow[] {
     return {
       id: `urlscan-${i}`,
       cells: [
-        { label: "Verdict", value: asPlainText(f.verdict) || "—" },
+        { label: "Verdict", value: asPlainText(f.verdict) || "-" },
         {
           label: "Scanned page",
           value: page.text,
@@ -312,19 +319,19 @@ function otxRows(rows: Record<string, unknown>[]): HistoryRow[] {
       cells: [
         {
           label: "Pulse",
-          value: restricted ? "withheld (TLP restricted)" : name.text || "—",
+          value: restricted ? "withheld (TLP restricted)" : name.text || "-",
           truncated: !restricted && name.truncated,
         },
         {
           label: "Description",
-          value: restricted ? "withheld (TLP restricted)" : description.text || "—",
+          value: restricted ? "withheld (TLP restricted)" : description.text || "-",
           truncated: !restricted && description.truncated,
         },
-        { label: "Created", value: asPlainText(f.created) || "—" },
-        { label: "TLP", value: asPlainText(f.tlp) || "—" },
-        { label: "Author", value: clipText(f.author, 60).text || "—" },
-        { label: "Malware", value: formatList(f.malware_families, 4).text || "—" },
-        { label: "Adversary", value: clipText(f.adversary, 60).text || "—" },
+        { label: "Created", value: asPlainText(f.created) || "-" },
+        { label: "TLP", value: asPlainText(f.tlp) || "-" },
+        { label: "Author", value: clipText(f.author, 60).text || "-" },
+        { label: "Malware", value: formatList(f.malware_families, 4).text || "-" },
+        { label: "Adversary", value: clipText(f.adversary, 60).text || "-" },
       ],
     };
   });
@@ -336,8 +343,8 @@ function leaklookupRows(rows: Record<string, unknown>[]): HistoryRow[] {
     return {
       id: `leaklookup-${i}`,
       cells: [
-        { label: "Breach", value: name.text || "—", truncated: name.truncated },
-        { label: "Breach date", value: asPlainText(f.date) || "—" },
+        { label: "Breach", value: name.text || "-", truncated: name.truncated },
+        { label: "Breach date", value: asPlainText(f.date) || "-" },
         { label: "Records", value: formatCount(f.matches) },
       ],
     };
@@ -353,7 +360,7 @@ const ROW_BUILDERS: Record<HistorySourceKey, (rows: Record<string, unknown>[]) =
 /**
  * Classify one source and build its rows.
  *
- * `count: 0` with `status: "ok"` is "no records found" — the healthy outcome,
+ * `count: 0` with `status: "ok"` is "no records found" - the healthy outcome,
  * and never an error. `not_configured` is an operator state, distinct from
  * `unavailable` (the source failed). An unrecognised status is treated as
  * untrustworthy rather than clean.
@@ -421,9 +428,9 @@ export function buildSource(key: HistorySourceKey, value: unknown): HistorySourc
 /**
  * Aggregate outcome for the whole block.
  *
- *   findings   — at least one record; show the rows.
- *   no_records — every source that was supposed to run answered, and all said zero.
- *   incomplete — something was unreachable, unrecognised, or missing entirely,
+ *   findings   - at least one record; show the rows.
+ *   no_records - every source that was supposed to run answered, and all said zero.
+ *   incomplete - something was unreachable, unrecognised, or missing entirely,
  *                so "no records found" would be an overstatement.
  */
 export function summarize(sources: HistorySource[]): HistorySummary {
@@ -443,10 +450,10 @@ export function summarize(sources: HistorySource[]): HistorySummary {
     headline =
       sources.length === 0
         ? "No history source returned a result, so this target is unknown."
-        : "No history source answered, so this target is unknown — not clean.";
+        : "No history source answered, so this target is unknown - not clean.";
   } else if (failedSources > 0) {
     outcome = "incomplete";
-    headline = `No records from the ${okSources} source${okSources === 1 ? "" : "s"} that answered — ${failedSources} could not be checked.`;
+    headline = `No records from the ${okSources} source${okSources === 1 ? "" : "s"} that answered - ${failedSources} could not be checked.`;
   } else {
     outcome = "no_records";
     headline = "No threat records found.";
@@ -470,7 +477,7 @@ export function summarize(sources: HistorySource[]): HistorySummary {
  * Narrow an unknown `results.history` value.
  *
  * Returns null (render nothing) when the block is absent, null, not an object,
- * explicitly not triggered, or has no `blocks` object — in every one of those
+ * explicitly not triggered, or has no `blocks` object - in every one of those
  * cases we cannot tell whether the sources ran, and guessing would be a lie.
  * An empty `blocks: {}` IS valid and renders the empty state.
  */

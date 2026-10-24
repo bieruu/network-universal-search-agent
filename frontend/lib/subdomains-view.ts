@@ -4,15 +4,15 @@
  * The certificate log returns one entry per (name, certificate) pair, so the
  * same subdomain shows up once per certificate ever issued for it, and every
  * entry carries validity dates that are frequently in the past. Two changes are
- * needed — merge the duplicates, and mark which names are served by a
- * certificate that has already expired — and both have the same failure mode:
+ * needed - merge the duplicates, and mark which names are served by a
+ * certificate that has already expired - and both have the same failure mode:
  * if a merged or relabelled row is dropped quietly, the table stops being a
  * record of what the source said. So this module never drops and never hides:
  *
  *  - duplicates are merged into the first appearance of the name, and the count
  *    of merged entries travels with the view;
  *  - expired names keep their row and carry an "Expired" label;
- *  - a name whose dates cannot be read is `unknown` — never "active", because
+ *  - a name whose dates cannot be read is `unknown` - never "active", because
  *    an unreadable date is not evidence that a certificate is current;
  *  - pagination is a page, not a cap, and every view states how many names are
  *    not on the screen.
@@ -57,7 +57,7 @@ export interface SubdomainsView {
   unknown: number;
 }
 
-/** Rows per page. A page, not a cap — the hidden count is always stated. */
+/** Rows per page. A page, not a cap - the hidden count is always stated. */
 export const MAX_ROWS = 50;
 
 const SUBDOMAIN_FILTER_LABELS: Record<SubdomainFilter, string> = {
@@ -87,11 +87,11 @@ export function subdomainValidityLabel(validity: SubdomainValidity): string {
 export function subdomainValidityNote(validity: SubdomainValidity): string {
   switch (validity) {
     case "active":
-      return "A certificate for this name is inside its validity window as of the time this report was generated.";
+      return "A certificate for this name is inside its validity window right now.";
     case "expired":
-      return "The certificate issued for this name has passed its expiry date. The name still exists in the certificate log and is shown here on purpose.";
+      return "The certificate has expired, but the name is still in the log, so it is shown.";
     default:
-      return "The certificate's validity dates are missing or could not be read, so this name's status is unknown — not expired, and not confirmed active.";
+      return "Dates are missing or unreadable, so this name is unknown - not expired or confirmed active.";
   }
 }
 
@@ -107,7 +107,7 @@ function parseDate(value: unknown): number | null {
  * Active / expired from the certificate's own dates.
  *
  * `unknown` is the honest answer for a date that cannot be read, and also for a
- * certificate whose validity window has not started yet — neither of those is
+ * certificate whose validity window has not started yet - neither of those is
  * evidence that a certificate is current, which is what "active" would claim.
  */
 export function classifyValidity(row: { not_before?: string; not_after?: string }, now: Date): SubdomainValidity {
@@ -244,7 +244,7 @@ export interface SubdomainsVisibility {
  * Everything the table has to say about its own coverage.
  *
  * `rowNote` never lets a filtered or paged list read as the whole result, and
- * `honestyNote` is `subdomainsCountsNote` with the filter's effect added — an
+ * `honestyNote` is `subdomainsCountsNote` with the filter's effect added - an
  * expired name that the current filter hides must say so, because "Expired:
  * 15" next to zero visible expired rows is a lie either way.
  */
@@ -268,13 +268,13 @@ export function subdomainsVisibility(
     rowNote =
       filter === "all"
         ? ""
-        : `No names match this filter — ${hiddenByFilter.toLocaleString("en-US")} of ${view.unique.toLocaleString("en-US")} ${plural(view.unique, "name", "names")} ${plural(view.unique, "is", "are")} hidden by it.`;
+        : `No names match this filter. ${hiddenByFilter.toLocaleString("en-US")} of ${view.unique.toLocaleString("en-US")} ${plural(view.unique, "name", "names")} ${plural(view.unique, "is", "are")} hidden by it.`;
   } else if (pages === 1) {
     rowNote = `All ${filtered.length.toLocaleString("en-US")} matching ${plural(filtered.length, "name", "names")} are shown.`;
   } else if (page === 0) {
-    rowNote = `Showing the first ${shown.length.toLocaleString("en-US")} of ${filtered.length.toLocaleString("en-US")} ${plural(filtered.length, "name", "names")} — ${hiddenByPage.toLocaleString("en-US")} hidden on ${pages - 1} more ${plural(pages - 1, "page", "pages")}.`;
+    rowNote = `Showing 1 to ${shown.length.toLocaleString("en-US")} of ${filtered.length.toLocaleString("en-US")} names. ${hiddenByPage.toLocaleString("en-US")} more on ${pages - 1} ${plural(pages - 1, "page", "pages")}.`;
   } else {
-    rowNote = `Showing ${start + 1}–${(start + shown.length).toLocaleString("en-US")} of ${filtered.length.toLocaleString("en-US")} ${plural(filtered.length, "name", "names")} — ${hiddenByPage.toLocaleString("en-US")} hidden on other pages.`;
+    rowNote = `Showing ${start + 1} to ${(start + shown.length).toLocaleString("en-US")} of ${filtered.length.toLocaleString("en-US")} names. ${hiddenByPage.toLocaleString("en-US")} more on other pages.`;
   }
 
   const honestyParts: string[] = [];
@@ -282,11 +282,8 @@ export function subdomainsVisibility(
   if (counts) honestyParts.push(counts);
   if (hiddenByFilter > 0) {
     honestyParts.push(
-      `The "${label}" filter is hiding ${hiddenByFilter.toLocaleString("en-US")} of ${view.unique.toLocaleString("en-US")} ${plural(view.unique, "name", "names")}; choose all names to see every one.`,
+      `The "${label}" filter hides ${hiddenByFilter.toLocaleString("en-US")} of ${view.unique.toLocaleString("en-US")} ${plural(view.unique, "name", "names")}. Choose all names to see every one.`,
     );
-  }
-  if (filtered.length === 0 && filter !== "all") {
-    honestyParts.push(`Nothing was removed from the scan — this filter simply matches none of the ${view.unique.toLocaleString("en-US")} names.`);
   }
 
   return {

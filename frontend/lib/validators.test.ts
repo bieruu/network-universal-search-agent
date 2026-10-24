@@ -41,7 +41,7 @@ test("blocks localhost and private ranges", () => {
       assert.match(r.error.issues[0].message, /blocked/i);
     }
   }
-  // "localhost" has no dot so it fails the format check first — still rejected.
+  // "localhost" has no dot so it fails the format check first - still rejected.
   assert.equal(targetSchema.safeParse("localhost").success, false);
 });
 

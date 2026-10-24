@@ -27,22 +27,22 @@ export const TERM = {
   ports: {
     label: "Open ports",
     short: "open ports",
-    note: "A port is a numbered door into a computer. A port is 'open' when something answers on it from the internet.",
+    note: "A numbered door into a computer, open when something answers from the internet.",
   },
   services: {
     label: "Services",
     short: "services",
-    note: "The software running behind each open port, with its version number when it is advertised.",
+    note: "The software behind each open port, with its version when advertised.",
   },
   banner: {
     label: "Service response",
     short: "banner",
-    note: "The short text a server sends back when you connect, before you log in. It often reveals the product and version.",
+    note: "The first text a server sends back, often naming its product and version.",
   },
   subdomains: {
     label: "Subdomains",
     short: "subdomains",
-    note: "Names under your root domain, such as api.example.com. Each one is a machine that can be reachable on its own.",
+    note: "Names under your domain, such as api.example.com, each possibly reachable on its own.",
   },
   issuer: {
     label: "Certificate issuer",
@@ -52,7 +52,7 @@ export const TERM = {
   whois: {
     label: "Domain details",
     short: "WHOIS",
-    note: "The public registration record for a domain: who registered it, when it was created, when it expires, and which nameservers answer for it.",
+    note: "Who registered the domain, and when it expires.",
   },
   registrant: {
     label: "Registered with",
@@ -67,7 +67,7 @@ export const TERM = {
   risk: {
     label: "Risk score",
     short: "heuristic",
-    note: "A 0-100 summary built from the findings above. It is a sorting aid for where to look first, not a verdict on whether the host is safe.",
+    note: "A 0 to 100 sorting aid for where to look first, not a verdict on safety.",
   },
   cves: {
     label: "Known vulnerabilities",
@@ -82,12 +82,12 @@ export const TERM = {
   cpe: {
     label: "Detected product",
     short: "CPE",
-    note: "The standard identifier for a specific product and version. It is how we check a running service against the vulnerability catalogue.",
+    note: "The standard identifier for a product and version, used to check known issues.",
   },
   nvd: {
     label: "Vulnerability database",
     short: "NVD",
-    note: "The NIST National Vulnerability Database, the public source we check detected products against.",
+    note: "The NIST National Vulnerability Database, the public source we check against.",
   },
   tlp: {
     label: "Sharing restriction",

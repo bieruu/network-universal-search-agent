@@ -135,7 +135,7 @@ test("a multi-hop chain resolves once trustedProxies names the proxy hops", () =
   // Naming the wrong hops does not fall back to the client: the walk stops at
   // the first untrusted hop from the right, so a misconfigured list keys every
   // caller behind that proxy by the *proxy's* address. Still one shared bucket,
-  // but a stable one — it is not spoofable, so a bad list fails toward today's
+  // but a stable one - it is not spoofable, so a bad list fails toward today's
   // behaviour rather than toward "anyone can mint a bucket".
   assert.equal(getIPFromHeader(chain, { trustedProxies: ["10.0.0.0/8"] }), "70.41.3.18");
   assert.equal(
@@ -174,7 +174,7 @@ test("syntactically invalid entries are rejected rather than passed through", ()
 });
 
 test("a range covering every address is rejected: it would trust the spoofable leftmost token", () => {
-  // Better Auth ACCEPTS these — that is the danger. `matchesCIDR` with prefix 0
+  // Better Auth ACCEPTS these - that is the danger. `matchesCIDR` with prefix 0
   // returns true for every address, so the chain is walked all the way left to
   // the client-supplied token and a forged `x-forwarded-for` mints a fresh
   // bucket per request.
@@ -190,7 +190,7 @@ test("a range covering every address is rejected: it would trust the spoofable l
 test("our stricter validator never accepts something Better Auth itself rejects", () => {
   // The asymmetry we rely on: Better Auth silently drops entries it cannot parse,
   // so anything we accept that it rejects is a no-op, and anything it accepts
-  // that we reject leaves the bucket shared. Neither is a hole — but drift
+  // that we reject leaves the bucket shared. Neither is a hole - but drift
   // should be noticed.
   const candidates = [
     "10.0.0.1",

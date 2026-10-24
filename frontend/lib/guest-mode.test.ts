@@ -74,7 +74,7 @@ test("the proxy mints a signed token only when a scan starts", () => {
   assert.ok(proxy.includes("SameSite=Lax"), "the guest cookie must not ride cross-site");
   assert.ok(
     proxy.includes('req.method === "POST" && path.length === 0'),
-    "minting must be limited to the call that starts a scan — a poll must not create identities",
+    "minting must be limited to the call that starts a scan - a poll must not create identities",
   );
   assert.ok(
     proxy.includes('const GUEST_COOKIE = "nusa_guest"'),
@@ -125,7 +125,7 @@ test("the mirrored guest quota equals the backend's default", () => {
   assert.equal(
     String(GUEST_SCAN_LIMIT_PER_DAY),
     mirror[1],
-    "lib/guest.ts quotes a number the backend no longer defaults to — the backend is authoritative, update the mirror",
+    "lib/guest.ts quotes a number the backend no longer defaults to - the backend is authoritative, update the mirror",
   );
   // The hard bound is the one a cookie cannot reset; it must exist and ship on.
   const cap = backendConfig.match(/guest_scan_daily_total\s*:\s*int\s*=\s*Field\(default=(\d+)/);
@@ -150,7 +150,7 @@ test("the dashboard explains guest mode instead of hiding the limits", () => {
   assert.ok(page.includes("GUEST_BANNER_TITLE"), "the guest banner must render");
   assert.ok(page.includes('aria-label="guest mode"'), "the banner must be labelled");
   assert.ok(page.includes("Sign in"), "every limit must come with its way out");
-  // The quota 429 replaces lib/user-errors.ts account copy — a guest has no
+  // The quota 429 replaces lib/user-errors.ts account copy - a guest has no
   // account, so "search limit for your account" would be false.
   assert.ok(page.includes("guestQuotaMessage()"), "a guest 429 must use guest copy");
   assert.ok(
@@ -166,7 +166,7 @@ test("the dashboard explains guest mode instead of hiding the limits", () => {
 test("account-only surfaces show the reason, not a failing request", () => {
   // /api/history and /api/trend stay require_user() on the backend. Rendering
   // them anyway would answer a 401 badge (history) or an empty chart (trend)
-  // right next to a scan the guest CAN see — the "empty account" bug the copy
+  // right next to a scan the guest CAN see - the "empty account" bug the copy
   // audit already fixed once.
   assert.ok(page.includes("GUEST_HISTORY_LOCKED"), "the history card must explain itself to guests");
   assert.ok(page.includes("GUEST_TREND_LOCKED"), "the trend card must explain itself to guests");

@@ -13,7 +13,7 @@ import { DEMO_SCANS } from "./playground-samples";
 // is on; full text is also SSR'd (see Hero fallback).
 //
 // The samples themselves live in `playground-samples.ts` because the same three
-// are what a signed-out visitor gets from the playground's `scan` command — two
+// are what a signed-out visitor gets from the playground's `scan` command - two
 // copies of the same data is a drift trap.
 const SCANS = DEMO_SCANS;
 
@@ -28,12 +28,12 @@ const CLEAR_STAGGER_S = 0.045; // top-to-bottom cascade between cleared lines
 
 // `sample` is the signed-in case: the one real scan for this analyst. It has
 // the exact same shape as an entry in SCANS, so nothing below branches on
-// which mode it is — only on whether there is anything to rotate to. A real
+// which mode it is - only on whether there is anything to rotate to. A real
 // result is never cleared and replayed: it types once and stays.
 // `suppressCaret` exists for the one place this component is no longer the only
 // thing on screen. On the landing page the hero terminal became interactive:
 // `PlaygroundTerminal` renders this attract loop ABOVE a real prompt the visitor
-// types into. Two blinking blocks then read as two inputs — one of them not
+// types into. Two blinking blocks then read as two inputs - one of them not
 // accepting anything. So the interactive host suppresses this one and lets the
 // real prompt own the caret. Default is unchanged, so every other caller keeps
 // exactly the motion this file documents. What is NOT suppressed is the caret's
@@ -52,7 +52,7 @@ export default function TerminalTyper({
    * Reports exactly what is on screen right now.
    *
    * The interactive host needs this because the attract loop's output is this
-   * component's own internal state, not the host's transcript entries — so on
+   * component's own internal state, not the host's transcript entries - so on
    * the first click the host had nothing to animate away and the window simply
    * went blank. Reporting the visible lines lets the host seed them as ordinary
    * entries and wipe the text the visitor was actually looking at.
@@ -128,7 +128,7 @@ export default function TerminalTyper({
   // The interactive host needs this because the attract output is this
   // component's internal state, not the host's transcript. Without it the host
   // had nothing to animate away on the first click and the window simply went
-  // blank — the visitor saw the text vanish rather than be cleared. The loop
+  // blank - the visitor saw the text vanish rather than be cleared. The loop
   // keeps running underneath; the host only needs the current lines.
   useEffect(() => {
     if (!onSnapshot) return;
@@ -164,7 +164,7 @@ export default function TerminalTyper({
   return (
     <div aria-live="polite" className="space-y-1.5">
       {/* On `clear` the live lines wipe out (staggered, top-to-bottom) instead
-          of vanishing instantly — the terminal "scrolls itself" clean. */}
+          of vanishing instantly - the terminal "scrolls itself" clean. */}
       <AnimatePresence>
         {!blank && (
           <motion.p

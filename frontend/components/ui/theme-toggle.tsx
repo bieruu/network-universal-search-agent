@@ -25,7 +25,7 @@ export function ThemeToggle({ className }: { className?: string }) {
     try {
       window.localStorage.setItem("theme", next ? "dark" : "light");
     } catch {
-      // storage unavailable — theme still applies for the current session
+      // storage unavailable - theme still applies for the current session
     }
   }
 

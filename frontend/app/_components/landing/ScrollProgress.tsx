@@ -9,7 +9,7 @@ import { motion, useReducedMotion, useScroll, useSpring } from "motion/react";
 // HYDRATION (same fix as ParallaxField, 2026-10-14). `useReducedMotion()`
 // answers `null` on the server but `true` on a reduced-motion client at first
 // render, so `if (reduce) return null` rendered the bar in the server HTML and
-// nothing on the client — a hydration mismatch that fired in reduce mode only
+// nothing on the client - a hydration mismatch that fired in reduce mode only
 // (it became visible only after ParallaxField's identical bug was fixed; both
 // were the same defect). The gate is now `mounted`: server and pre-mount client
 // both render `null` (identical trees), and only after hydration does the real

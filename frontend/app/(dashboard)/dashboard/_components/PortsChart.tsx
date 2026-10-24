@@ -23,7 +23,7 @@ export default function PortsChart({ scan }: { scan: ScanResult | null }) {
       </CardHeader>
       <CardContent className="relative flex-1">
         {!scan?.results.shodan?.ports?.length ? (
-          <p className="flex h-[240px] items-center justify-center text-sm text-slate-500 dark:text-neutral-500">
+          <p className="flex h-[240px] items-center justify-center text-sm text-fg-muted">
             No port data to chart.
           </p>
         ) : (

@@ -19,7 +19,7 @@
  *     backslash-escaped; multi-line values go into a fenced block whose fence
  *     is longer than any backtick run in the content, so a banner containing
  *     ``` closes nothing and injects nothing.
- *  3. PII is minimized. The export is derived from what the user just saw — no
+ *  3. PII is minimized. The export is derived from what the user just saw - no
  *     scan identifier, no extra fields, no second copy anywhere.
  *  4. The caveats travel with the data. "No match" is not proof of safety,
  *     missing data is unknown rather than zero, and every source in `errors[]`
@@ -58,7 +58,14 @@ export interface PlainText {
 
 function stripControls(value: unknown): string {
   if (typeof value !== "string") return "";
-  return value.replace(/\r\n?/g, "\n").replace(CONTROL_CHARS, " ").trim();
+  // Third-party text (banners, WHOIS, CVE descriptions) may carry an em dash.
+  // It becomes a plain hyphen here, at the one door every displayed/exported
+  // string passes through, so neither the screen nor the file can show one.
+  return value
+    .replace(/\r\n?/g, "\n")
+    .replace(/\u2014/g, "-")
+    .replace(CONTROL_CHARS, " ")
+    .trim();
 }
 
 /** Single-line plain text: control characters gone, whitespace collapsed. */
@@ -79,11 +86,11 @@ function blockText(value: unknown, max: number = BANNER_MAX_CHARS): PlainText {
 }
 
 function dash(text: string): string {
-  return text.length > 0 ? text : "—";
+  return text.length > 0 ? text : "-";
 }
 
 function numberOrDash(value: number | null | undefined): string {
-  return typeof value === "number" && Number.isFinite(value) ? String(value) : "—";
+  return typeof value === "number" && Number.isFinite(value) ? String(value) : "-";
 }
 
 /* ------------------------------------------------------------------ *
@@ -179,11 +186,11 @@ export interface ExportReport {
 
 /** Shown on the export card so the button and the file promise the same thing. */
 export const EXPORT_CAVEAT_SUMMARY =
-  "Every file carries the screen's caveats: no match is not proof of safety, missing data is unknown, and failed sources are listed.";
+  "Download what this screen shows. Nothing is uploaded.";
 
 const PROVENANCE = [
-  "Generated in your browser from the scan you were reading on the dashboard. Nothing was uploaded, and no copy was stored by us.",
-  "This file carries only what that screen showed you — nothing was added and nothing was checked again.",
+  "Built in your browser from the scan on screen. Nothing was uploaded.",
+  "This file carries only what that screen showed. Nothing was checked again.",
 ];
 
 const BASE_CAVEATS = [
@@ -199,7 +206,7 @@ function capList<T>(items: T[]): { items: T[]; hidden: number } {
 /** Build the normalized, truncated report every format renders from. */
 export function buildExportReport(scan: ScanResult | null | undefined, now: Date = new Date()): ExportReport {
   const empty: ExportReport = {
-    title: "Findings export — no scan",
+    title: "Findings export - no scan",
     target: "",
     status: { label: "Unknown", detail: "" },
     generatedAt: now.toISOString(),
@@ -220,7 +227,7 @@ export function buildExportReport(scan: ScanResult | null | undefined, now: Date
   const target = oneLine(scan.target, 253).text;
   const caveats = [...BASE_CAVEATS];
 
-  // errors[] — a source that failed is stated, never dropped.
+  // errors[] - a source that failed is stated, never dropped.
   const sourceErrors: ExportSourceError[] = (Array.isArray(scan.errors) ? scan.errors : [])
     .filter((e) => e && typeof e === "object")
     .map((e) => ({
@@ -233,7 +240,7 @@ export function buildExportReport(scan: ScanResult | null | undefined, now: Date
     );
   }
 
-  // Risk score — the same caveat the dashboard's glossary carries.
+  // Risk score - the same caveat the dashboard's glossary carries.
   if (typeof scan.risk_score === "number") caveats.push(`${TERM.risk.label}: ${TERM.risk.note}`);
 
   // Ports & services.
@@ -242,8 +249,8 @@ export function buildExportReport(scan: ScanResult | null | undefined, now: Date
   const cappedServices = capList(services);
   const serviceRows: ExportServiceRow[] = cappedServices.items.map((s) => ({
     port: numberOrDash(s?.port),
-    product: oneLine(s?.product, 200).text || "—",
-    version: oneLine(s?.version, 100).text || "—",
+    product: oneLine(s?.product, 200).text || "-",
+    version: oneLine(s?.version, 100).text || "-",
     banner: blockText(s?.banner, BANNER_MAX_CHARS),
   }));
   const portSummary = shodan
@@ -274,7 +281,7 @@ export function buildExportReport(scan: ScanResult | null | undefined, now: Date
   const cveNotes: string[] = [];
   if (cappedCves.hidden > 0) {
     cveNotes.push(
-      `Only the first ${LIST_MAX_ITEMS.toLocaleString("en-US")} of ${cveSource.length.toLocaleString("en-US")} entries are listed — ${cappedCves.hidden.toLocaleString("en-US")} more ${plural(cappedCves.hidden, "entry", "entries")} ${plural(cappedCves.hidden, "is", "are")} not in this file.`,
+      `Only the first ${LIST_MAX_ITEMS.toLocaleString("en-US")} of ${cveSource.length.toLocaleString("en-US")} entries are listed - ${cappedCves.hidden.toLocaleString("en-US")} more ${plural(cappedCves.hidden, "entry", "entries")} ${plural(cappedCves.hidden, "is", "are")} not in this file.`,
     );
   }
   if (nvd?.truncated) cveNotes.push("The vulnerability database reported a truncated result set, so more entries exist than it returned.");
@@ -291,13 +298,13 @@ export function buildExportReport(scan: ScanResult | null | undefined, now: Date
     cveNotes.push(nvdView.detail);
   }
 
-  // Subdomains — the same cleansed view the table renders.
+  // Subdomains - the same cleansed view the table renders.
   const subdomains = normalizeSubdomains(scan.results);
   const cappedSubdomains = capList(subdomains.rows);
   const subNotes = [subdomainsCountsNote(subdomains)].filter(Boolean);
   if (cappedSubdomains.hidden > 0) {
     subNotes.push(
-      `Only the first ${LIST_MAX_ITEMS.toLocaleString("en-US")} of ${subdomains.unique.toLocaleString("en-US")} names are listed — ${cappedSubdomains.hidden.toLocaleString("en-US")} more ${plural(cappedSubdomains.hidden, "name", "names")} ${plural(cappedSubdomains.hidden, "is", "are")} not in this file.`,
+      `Only the first ${LIST_MAX_ITEMS.toLocaleString("en-US")} of ${subdomains.unique.toLocaleString("en-US")} names are listed - ${cappedSubdomains.hidden.toLocaleString("en-US")} more ${plural(cappedSubdomains.hidden, "name", "names")} ${plural(cappedSubdomains.hidden, "is", "are")} not in this file.`,
     );
   }
 
@@ -317,7 +324,7 @@ export function buildExportReport(scan: ScanResult | null | undefined, now: Date
   const history = parseThreatHistory(scan.results.history);
 
   return {
-    title: `Findings export — ${target || "unknown target"}`,
+    title: `Findings export - ${target || "unknown target"}`,
     target,
     status,
     generatedAt: now.toISOString(),
@@ -336,13 +343,13 @@ export function buildExportReport(scan: ScanResult | null | undefined, now: Date
           statusLabel: nvdView.label,
           statusDetail: nvdView.detail,
           rows: cappedCves.items.map((c) => ({
-            id: oneLine(c?.id, 64).text || "—",
+            id: oneLine(c?.id, 64).text || "-",
             confidence: tierLabel(c?.tier),
             confidenceDetail: tierDetail(c?.tier),
-            severity: oneLine(c?.severity, 40).text || "—",
-            cvss: typeof c?.cvss === "number" && Number.isFinite(c.cvss) ? `${c.cvss}/10` : "—",
-            product: oneLine(c?.evidence_cpe, 300).text || "—",
-            source: oneLine(c?.source, 100).text || "—",
+            severity: oneLine(c?.severity, 40).text || "-",
+            cvss: typeof c?.cvss === "number" && Number.isFinite(c.cvss) ? `${c.cvss}/10` : "-",
+            product: oneLine(c?.evidence_cpe, 300).text || "-",
+            source: oneLine(c?.source, 100).text || "-",
             url: cveUrl(c?.id, c?.url),
           })),
           hidden: cappedCves.hidden,
@@ -414,11 +421,11 @@ export function buildExportReport(scan: ScanResult | null | undefined, now: Date
 function nameserverRows(value: unknown): Array<{ label: string; value: string }> {
   const items = Array.isArray(value) ? value : [];
   const capped = capList(items);
-  const rows = capped.items.map((ns) => ({ label: TERM.nameservers.label, value: oneLine(ns, 253).text || "—" }));
+  const rows = capped.items.map((ns) => ({ label: TERM.nameservers.label, value: oneLine(ns, 253).text || "-" }));
   if (capped.hidden > 0) {
     rows.push({
       label: TERM.nameservers.label,
-      value: `${capped.hidden.toLocaleString("en-US")} more ${plural(capped.hidden, "nameserver", "nameservers")} are not listed — the list was cut at ${LIST_MAX_ITEMS}.`,
+      value: `${capped.hidden.toLocaleString("en-US")} more ${plural(capped.hidden, "nameserver", "nameservers")} are not listed - the list was cut at ${LIST_MAX_ITEMS}.`,
     });
   }
   if (rows.length === 0) rows.push({ label: TERM.nameservers.label, value: "Not published" });
@@ -435,7 +442,7 @@ function tierLabel(tier: unknown): string {
 function tierDetail(tier: unknown): string {
   const text = asPlainText(tier);
   if (text === "verified") return "Matches the exact product and version running on this host.";
-  if (text === "rejected") return "The catalogue vendor marked this entry as rejected or disputed. Shown for completeness — never counted.";
+  if (text === "rejected") return "The catalogue vendor marked this entry as rejected or disputed. Shown for completeness - never counted.";
   return "A public index reported this vulnerability for this host, but it could not be confirmed against the exact product and version.";
 }
 
@@ -457,7 +464,7 @@ function scanStatusLabelAndDetail(status: ScanResult["status"] | string): { labe
     partial: {
       label: "Partly answered",
       detail:
-        "At least one source failed, so this result is incomplete. Missing items were not checked — treat them as unknown, not as absent.",
+        "At least one source failed, so this result is incomplete. Missing items were not checked - treat them as unknown, not as absent.",
     },
     failed: { label: "Failed", detail: "No source returned a result for this target." },
   };
@@ -508,7 +515,7 @@ export function fenceBlock(text: string): string {
   return `${ticks}\n${text}\n${ticks}`;
 }
 
-/** "text (cut short at N characters)" — the disclosure that follows a cut. */
+/** "text (cut short at N characters)" - the disclosure that follows a cut. */
 function cutNote(max: number): string {
   return `(cut short at ${max.toLocaleString("en-US")} characters)`;
 }
@@ -519,7 +526,7 @@ export function buildMarkdownExport(scan: ScanResult | null | undefined, now: Da
 
   lines.push(`# ${escapeMarkdown(r.title)}`, "");
   lines.push(`- **Target:** \`${escapeMarkdown(r.target)}\``);
-  lines.push(`- **Status:** ${escapeMarkdown(r.status.label)} — ${escapeMarkdown(r.status.detail)}`);
+  lines.push(`- **Status:** ${escapeMarkdown(r.status.label)} - ${escapeMarkdown(r.status.detail)}`);
   lines.push(`- **Generated:** ${escapeMarkdown(r.generatedAt)}`);
   lines.push(`- **${escapeMarkdown(TERM.risk.label)}:** ${r.riskScore == null ? "not computed" : `${r.riskScore}/100`}`);
   lines.push("");
@@ -536,7 +543,7 @@ export function buildMarkdownExport(scan: ScanResult | null | undefined, now: Da
     lines.push("- Every source answered, so nothing is missing from this report.");
   } else {
     for (const e of r.sourceErrors) {
-      lines.push(`- \`${escapeMarkdown(e.source)}\` — ${escapeMarkdown(e.message.text)}`);
+      lines.push(`- \`${escapeMarkdown(e.source)}\` - ${escapeMarkdown(e.message.text)}`);
       if (e.message.truncated) lines.push(`  ${escapeMarkdown(cutNote(ERROR_MAX_CHARS))}`);
     }
   }
@@ -548,8 +555,8 @@ export function buildMarkdownExport(scan: ScanResult | null | undefined, now: Da
   } else {
     lines.push(escapeMarkdown(r.ports.summary), "");
     for (const s of r.ports.services) {
-      const name = [s.product, s.version].filter((v) => v !== "—").join(" ");
-      lines.push(`- Port ${escapeMarkdown(s.port)}${name ? ` — ${escapeMarkdown(name)}` : ""}`);
+      const name = [s.product, s.version].filter((v) => v !== "-").join(" ");
+      lines.push(`- Port ${escapeMarkdown(s.port)}${name ? ` - ${escapeMarkdown(name)}` : ""}`);
       if (s.banner.text) {
         lines.push("");
         lines.push(escapeMarkdown(`${TERM.banner.label}${s.banner.truncated ? ` ${cutNote(BANNER_MAX_CHARS)}` : ""}:`));
@@ -560,7 +567,7 @@ export function buildMarkdownExport(scan: ScanResult | null | undefined, now: Da
     }
     if (r.ports.hidden > 0) {
       lines.push(
-        `Only the first ${LIST_MAX_ITEMS.toLocaleString("en-US")} services are listed — ${r.ports.hidden.toLocaleString("en-US")} more ${plural(r.ports.hidden, "service", "services")} ${plural(r.ports.hidden, "is", "are")} not in this file.`,
+        `Only the first ${LIST_MAX_ITEMS.toLocaleString("en-US")} services are listed - ${r.ports.hidden.toLocaleString("en-US")} more ${plural(r.ports.hidden, "service", "services")} ${plural(r.ports.hidden, "is", "are")} not in this file.`,
         "",
       );
     }
@@ -570,13 +577,13 @@ export function buildMarkdownExport(scan: ScanResult | null | undefined, now: Da
   if (!r.vulnerabilities) {
     lines.push("_This target was not checked against the vulnerability catalogue. That is unknown, not none._", "");
   } else {
-    lines.push(`**${escapeMarkdown(r.vulnerabilities.statusLabel)}** — ${escapeMarkdown(r.vulnerabilities.statusDetail)}`, "");
+    lines.push(`**${escapeMarkdown(r.vulnerabilities.statusLabel)}** - ${escapeMarkdown(r.vulnerabilities.statusDetail)}`, "");
     if (r.vulnerabilities.rows.length === 0) {
       lines.push("_No entries matched the product and version detected here. Coverage beyond this check is still unknown._", "");
     } else {
       for (const c of r.vulnerabilities.rows) {
         const link = c.url ? `[${escapeMarkdown(c.id)}](<${c.url}>)` : `\`${escapeMarkdown(c.id)}\``;
-        lines.push(`- ${link} — ${escapeMarkdown(c.confidence)}; ${escapeMarkdown(c.severity)}; ${escapeMarkdown(c.cvss)}; product: \`${escapeMarkdown(c.product)}\`; source: ${escapeMarkdown(c.source)}`);
+        lines.push(`- ${link} - ${escapeMarkdown(c.confidence)}; ${escapeMarkdown(c.severity)}; ${escapeMarkdown(c.cvss)}; product: \`${escapeMarkdown(c.product)}\`; source: ${escapeMarkdown(c.source)}`);
         lines.push(`  ${escapeMarkdown(c.confidenceDetail)}`);
       }
     }
@@ -596,7 +603,7 @@ export function buildMarkdownExport(scan: ScanResult | null | undefined, now: Da
     for (const row of s.rows) {
       const parts = [`${escapeMarkdown(row.issuer ?? "issuer unknown")}`, `valid until ${escapeMarkdown(row.not_after ?? "unknown")}`, subdomainValidityWord(row.validity)];
       if (row.merged > 1) parts.push(`${row.merged} log entries merged`);
-      lines.push(`- \`${escapeMarkdown(row.subdomain)}\` — ${parts.join("; ")}`);
+      lines.push(`- \`${escapeMarkdown(row.subdomain)}\` - ${parts.join("; ")}`);
     }
     for (const n of s.notes) lines.push("", escapeMarkdown(n));
     lines.push("");
@@ -615,15 +622,15 @@ export function buildMarkdownExport(scan: ScanResult | null | undefined, now: Da
   if (!r.history) {
     lines.push("_No history sources ran for this scan, so there is nothing to report here._", "");
   } else {
-    lines.push(`**${escapeMarkdown(r.history.headline)}** — ${escapeMarkdown(r.history.detail)}`, "");
+    lines.push(`**${escapeMarkdown(r.history.headline)}** - ${escapeMarkdown(r.history.detail)}`, "");
     for (const s of r.history.sources) {
-      lines.push(`- ${escapeMarkdown(s.label)} — ${escapeMarkdown(s.outcome)}; ${s.count.toLocaleString("en-US")} ${plural(s.count, "record", "records")}`);
+      lines.push(`- ${escapeMarkdown(s.label)} - ${escapeMarkdown(s.outcome)}; ${s.count.toLocaleString("en-US")} ${plural(s.count, "record", "records")}`);
       if (s.message) lines.push(`  ${escapeMarkdown(s.message)}`);
       if (s.note) lines.push(`  ${escapeMarkdown(s.note)}`);
       if (s.truncationNote) lines.push(`  ${escapeMarkdown(s.truncationNote)}`);
-      for (const row of s.rows) lines.push(`  - ${escapeMarkdown(row.cells.join(" — "))}`);
+      for (const row of s.rows) lines.push(`  - ${escapeMarkdown(row.cells.join(" - "))}`);
       if (s.hidden > 0) {
-        lines.push(`  ${s.hidden.toLocaleString("en-US")} more ${plural(s.hidden, "record", "records")} ${plural(s.hidden, "is", "are")} not listed — the list was cut at ${LIST_MAX_ITEMS}.`);
+        lines.push(`  ${s.hidden.toLocaleString("en-US")} more ${plural(s.hidden, "record", "records")} ${plural(s.hidden, "is", "are")} not listed - the list was cut at ${LIST_MAX_ITEMS}.`);
       }
     }
     for (const n of r.history.notes) lines.push("", escapeMarkdown(n));
@@ -657,7 +664,7 @@ export function buildPdfLines(scan: ScanResult | null | undefined, now: Date = n
 
   lines.push(r.title, "");
   lines.push(`Target: ${r.target || "unknown target"}`);
-  lines.push(`Status: ${r.status.label} — ${r.status.detail}`);
+  lines.push(`Status: ${r.status.label} - ${r.status.detail}`);
   lines.push(`Generated: ${r.generatedAt}`);
   lines.push(`${TERM.risk.label}: ${r.riskScore == null ? "not computed" : `${r.riskScore}/100`}`, "");
 
@@ -684,15 +691,15 @@ export function buildPdfLines(scan: ScanResult | null | undefined, now: Date = n
   } else {
     lines.push(r.ports.summary, "");
     for (const s of r.ports.services) {
-      const name = [s.product, s.version].filter((v) => v !== "—").join(" ");
-      lines.push(`- Port ${s.port}${name ? ` — ${name}` : ""}`);
+      const name = [s.product, s.version].filter((v) => v !== "-").join(" ");
+      lines.push(`- Port ${s.port}${name ? ` - ${name}` : ""}`);
       if (s.banner.text) {
         for (const l of s.banner.text.split("\n")) lines.push(`    ${l}`);
         if (s.banner.truncated) lines.push(`    (cut short at ${BANNER_MAX_CHARS} characters)`);
       }
     }
     if (r.ports.hidden > 0) {
-      lines.push(`Only the first ${LIST_MAX_ITEMS} services are listed — ${r.ports.hidden} more ${plural(r.ports.hidden, "service", "services")} ${plural(r.ports.hidden, "is", "are")} not in this file.`);
+      lines.push(`Only the first ${LIST_MAX_ITEMS} services are listed - ${r.ports.hidden} more ${plural(r.ports.hidden, "service", "services")} ${plural(r.ports.hidden, "is", "are")} not in this file.`);
     }
   }
   lines.push("");
@@ -701,9 +708,9 @@ export function buildPdfLines(scan: ScanResult | null | undefined, now: Date = n
   if (!r.vulnerabilities) {
     lines.push("This target was not checked against the vulnerability catalogue. That is unknown, not none.");
   } else {
-    lines.push(`${r.vulnerabilities.statusLabel} — ${r.vulnerabilities.statusDetail}`, "");
+    lines.push(`${r.vulnerabilities.statusLabel} - ${r.vulnerabilities.statusDetail}`, "");
     for (const c of r.vulnerabilities.rows) {
-      lines.push(`- ${c.id} — ${c.confidence}; ${c.severity}; ${c.cvss}; product: ${c.product}; source: ${c.source}`);
+      lines.push(`- ${c.id} - ${c.confidence}; ${c.severity}; ${c.cvss}; product: ${c.product}; source: ${c.source}`);
       if (c.url) lines.push(`  ${c.url}`);
       lines.push(`  ${c.confidenceDetail}`);
     }
@@ -725,7 +732,7 @@ export function buildPdfLines(scan: ScanResult | null | undefined, now: Date = n
     );
     for (const row of s.rows) {
       lines.push(
-        `- ${row.subdomain} — ${row.issuer ?? "issuer unknown"}; valid until ${row.not_after ?? "unknown"}; ${subdomainValidityWord(row.validity)}${row.merged > 1 ? `; ${row.merged} log entries merged` : ""}`,
+        `- ${row.subdomain} - ${row.issuer ?? "issuer unknown"}; valid until ${row.not_after ?? "unknown"}; ${subdomainValidityWord(row.validity)}${row.merged > 1 ? `; ${row.merged} log entries merged` : ""}`,
       );
     }
     for (const n of s.notes) lines.push("", n);
@@ -745,14 +752,14 @@ export function buildPdfLines(scan: ScanResult | null | undefined, now: Date = n
   if (!r.history) {
     lines.push("No history sources ran for this scan, so there is nothing to report here.");
   } else {
-    lines.push(`${r.history.headline} — ${r.history.detail}`, "");
+    lines.push(`${r.history.headline} - ${r.history.detail}`, "");
     for (const s of r.history.sources) {
-      lines.push(`- ${s.label} — ${s.outcome}; ${s.count} records`);
+      lines.push(`- ${s.label} - ${s.outcome}; ${s.count} records`);
       if (s.message) lines.push(`  ${s.message}`);
       if (s.note) lines.push(`  ${s.note}`);
       if (s.truncationNote) lines.push(`  ${s.truncationNote}`);
-      for (const row of s.rows) lines.push(`  - ${row.cells.join(" — ")}`);
-      if (s.hidden > 0) lines.push(`  ${s.hidden} more ${plural(s.hidden, "record", "records")} ${plural(s.hidden, "is", "are")} not listed — the list was cut at ${LIST_MAX_ITEMS}.`);
+      for (const row of s.rows) lines.push(`  - ${row.cells.join(" - ")}`);
+      if (s.hidden > 0) lines.push(`  ${s.hidden} more ${plural(s.hidden, "record", "records")} ${plural(s.hidden, "is", "are")} not listed - the list was cut at ${LIST_MAX_ITEMS}.`);
     }
     for (const n of r.history.notes) lines.push("", n);
   }

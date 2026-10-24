@@ -29,7 +29,7 @@ export function buttonClasses(
   if (variant === "ghost") return cn(base, sizes, "hover:bg-accent/10 hover:text-foreground");
   if (variant === "secondary") return cn(base, sizes, "bg-slate-100 text-slate-900 hover:bg-accent/15 dark:bg-neutral-800 dark:text-neutral-100 dark:hover:bg-accent/15");
   if (variant === "destructive") return cn(base, sizes, "border border-red-200 bg-red-100 text-red-700 hover:bg-red-200 dark:border-red-800 dark:bg-red-950 dark:text-red-200 dark:hover:bg-red-900");
-  if (variant === "link") return cn(base, sizes, "text-accent underline-offset-4 hover:underline px-0");
+  if (variant === "link") return cn(base, sizes, "text-accent-text underline-offset-4 hover:underline px-0");
   if (variant === "accent") return cn(base, sizes, "bg-accent text-accent-foreground hover:bg-accent-hover");
   return cn(base, sizes, "bg-slate-900 text-white hover:bg-slate-800 dark:bg-white dark:text-black dark:hover:bg-neutral-200");
 }

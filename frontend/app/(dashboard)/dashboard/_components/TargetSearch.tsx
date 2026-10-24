@@ -50,12 +50,8 @@ export default function TargetSearch({
       <div className="flex flex-col gap-1">
         <label className="flex items-center gap-2 text-xs opacity-70">
           <input type="checkbox" checked={force} onChange={(e) => setForce(e.target.checked)} />
-          Ask every source again, even if we already have recent results
+          Fetch fresh data instead of recent results
         </label>
-        <p className="text-xs opacity-60">
-          Leave this off to reuse the results we already hold. Turn it on when you want the latest data for a
-          target you have scanned before.
-        </p>
       </div>
       {error && <p className="text-xs text-danger">{error}</p>}
     </form>

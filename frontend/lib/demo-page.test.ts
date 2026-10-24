@@ -5,7 +5,7 @@ import { join, dirname } from "node:path";
 import { fileURLToPath } from "node:url";
 
 /**
- * `/demo` — the pre-scanned demo target (TODO item Public/Guest Demo Sandbox,
+ * `/demo` - the pre-scanned demo target (TODO item Public/Guest Demo Sandbox,
  * part a). The route shows a full report to a signed-out visitor with ZERO
  * backend requests, so the three properties that make it acceptable are
  * pinned here as source contracts, in the style of `landing.test.ts`:
@@ -13,7 +13,7 @@ import { fileURLToPath } from "node:url";
  *   1. the page announces itself as a simulation (notice + caption, in
  *      metadata and on screen),
  *   2. nothing on the route can reach the network,
- *   3. every figure comes from the shared fixtures — the illustrative detail
+ *   3. every figure comes from the shared fixtures - the illustrative detail
  *      is marked, and no measurement (score, date, CVE) is invented.
  *
  * The fixture builder itself is imported at RUNTIME (node type-stripping), so
@@ -36,7 +36,7 @@ const demoSources: Array<[string, string]> = [
   ["app/demo/demo-report.ts", fixture],
 ];
 // JSX wraps prose across lines, so sentence assertions run against a
-// single-line copy — otherwise every long sentence fails at the fold.
+// single-line copy - otherwise every long sentence fails at the fold.
 const flatView = view.replace(/\s+/g, " ");
 
 /** Prose comments often QUOTE the very tokens these tests look for. */
@@ -44,22 +44,22 @@ const code = (src: string) =>
   src.replace(/\/\*[\s\S]*?\*\//g, "").replace(/^\s*\/\/.*$/gm, "");
 
 test("the demo page announces itself as a simulation", () => {
-  // On screen: the shared notice (imported, never re-worded) plus the caption
-  // declared once and printed in three places — heading, under the switcher,
-  // and in the footer strip.
+  // On screen: the shared notice (imported, never re-worded) plus ONE caption,
+  // beside the heading. DESIGN.md allows one disclosure per page - the earlier
+  // three-printing version was the repetition the copy audit flagged.
   assert.ok(
     view.includes('from "../_components/landing/playground-demo"'),
     "the notice must come from the shared playground demo, not a copy",
   );
   assert.ok(view.includes("DEMO_NOTICE"), "the shared notice must print on the page");
   assert.ok(
-    view.includes('const DEMO_CAPTION = "Demo — simulated output"'),
-    "the caption carries the exact wording the playground uses",
+    view.includes('const DEMO_CAPTION = "Demo: sample data"'),
+    "the caption carries the same wording the playground uses",
   );
   const captions = view.match(/\{DEMO_CAPTION\}/g) ?? [];
-  assert.ok(captions.length >= 3, `the caption must print in at least three places, found ${captions.length}`);
+  assert.equal(captions.length, 1, `one disclosure per page, found ${captions.length}`);
   // In metadata: the title and description promise simulation, not a scan.
-  assert.ok(page.includes('"Demo report — simulated output, no live scan"'), "title must say simulated, no live scan");
+  assert.ok(page.includes('"Demo report: sample data, no live scan"'), "title must say sample data, no live scan");
   assert.ok(page.includes("no source is contacted and no request is made"), "description must deny any request");
   assert.ok(page.includes("robots: { index: false"), "a fabricated report must not be indexed");
   // The honesty lines the brief requires: no_match is not proof of safety,
@@ -79,7 +79,7 @@ test("the demo route makes zero backend requests and reads no session", () => {
   // The middleware is CSP-only since the guest reversal; if a redirect ever
   // comes back, a signed-out visitor could lose the demo route silently.
   assert.ok(!middleware.includes("NextResponse.redirect"), "middleware must not redirect /demo");
-  // The view is client only to switch module data — no JS-driven motion, so
+  // The view is client only to switch module data - no JS-driven motion, so
   // no reduced-motion gate is needed and no hydration can depend on it.
   assert.ok(!view.includes('from "motion/react"'), "the demo view animates nothing from JS");
 });
@@ -103,16 +103,16 @@ test("demo reports are assembled from the shared fixtures at runtime", async () 
       assert.ok(sample.output[j].includes(line.says), "the split keeps the text");
     }
     assert.deepEqual(report.metrics, sampleMetrics(sample), "counts come from the shared parser");
-    // The stats strip is a rendering of those counts — no second number set.
+    // The stats strip is a rendering of those counts - no second number set.
     const stats = demoStats(report);
     assert.equal(
       stats[0].value,
-      String(sampleMetrics(sample).ports ?? "—"),
+      String(sampleMetrics(sample).ports ?? "-"),
       "ports stat equals the fixture line",
     );
     assert.equal(
       stats[1].value,
-      String(sampleMetrics(sample).certNames ?? "—"),
+      String(sampleMetrics(sample).certNames ?? "-"),
       "names stat equals the fixture line",
     );
   }
@@ -139,7 +139,7 @@ test("illustrative detail is marked and invents no measurements", async () => {
     }
   }
   // The view marks the illustrative cards and states the truncation honestly.
-  assert.ok(flatView.includes("Illustrative — demo data"), "the names card carries its mark");
+  assert.ok(flatView.includes("Illustrative - demo data"), "the names card carries its mark");
   const acme = DEMO_REPORTS.find((r) => r.target === "api.acme.co");
   assert.ok(acme, "the deeper sample must exist");
   assert.ok(nameListNote(acme).includes("4 of the 12"), "the list must say how much it hides");
@@ -166,7 +166,7 @@ test("the scripted source failure renders the partial state", async () => {
 });
 
 test("every card keeps an honest empty state and a11y contract", () => {
-  // Loading/error/empty per AGENTS.md §6 — here the "loading" state cannot
+  // Loading/error/empty per AGENTS.md §6 - here the "loading" state cannot
   // exist (nothing loads), so what must exist is the empty state for each
   // field the fixture lacks, plus a spoken name on the interactive parts.
   assert.ok(flatView.includes("Not in the demo fixture"), "missing dates say so");
@@ -199,10 +199,10 @@ test("every card keeps an honest empty state and a11y contract", () => {
 
 test("the landing links into the demo from the playground and the footer", () => {
   assert.ok(hero.includes('href="/demo"'), "the hero terminal links to the full demo report");
-  assert.ok(hero.includes("Open the full demo report"), "the link names what it opens");
+  assert.ok(hero.includes("See a sample report"), "the link names what it opens");
   assert.ok(cta.includes('href="/demo"'), "the footer links to the demo too");
   assert.ok(cta.includes("Demo report"), "the footer label stays short like its siblings");
-  // Same intent, one label per intent — and the banned CTA variants stay out.
+  // Same intent, one label per intent - and the banned CTA variants stay out.
   for (const banned of ["Get started", "Try free", "Learn more", "Sign up"]) {
     assert.ok(!hero.includes(banned) && !cta.includes(banned), `banned CTA variant: ${banned}`);
   }

@@ -7,15 +7,15 @@ import { phaseDelay } from "@/lib/motion-phases";
  *
  * WHY THE DASHBOARD HAS ONE AT ALL
  * --------------------------------
- * This route used to be contractually motionless — `lib/dashboard.test.ts`
- * carried a test named `dashboard data surfaces stay static — ambient motion is
+ * This route used to be contractually motionless - `lib/dashboard.test.ts`
+ * carried a test named `dashboard data surfaces stay static - ambient motion is
  * landing/auth only`, and DESIGN.md recorded the reason: *"a moving row next to
  * a result being read is a row that cannot be trusted to hold still"*.
  *
  * That reason was right and still is, which is why this layer obeys it exactly:
  * it is **behind** everything (`-z-10`), decorative (`aria-hidden`,
  * `pointer-events-none`), and it animates only the plane the content sits on.
- * Nothing that carries a value moves — not a table row, not a number, not a
+ * Nothing that carries a value moves - not a table row, not a number, not a
  * banner. The lock was reversed on 2026-10-12 because a console whose whole
  * surface is dead reads as a page that failed to load, not as a page that is
  * resting; and it was reversed *without* dropping the rule that motivated it.
@@ -40,11 +40,11 @@ export default function AmbientLayer() {
       className="pointer-events-none absolute inset-0 -z-10 overflow-hidden [mask-image:linear-gradient(to_bottom,black_62%,transparent)]"
     >
       <div
-        className="absolute inset-0 bg-[radial-gradient(circle_at_50%_0%,rgba(0,229,155,0.08),transparent_58%)] motion-safe:animate-ambient-pulse dark:bg-[radial-gradient(circle_at_50%_0%,rgba(0,229,155,0.11),transparent_58%)]"
+        className="absolute inset-0 bg-[radial-gradient(circle_at_50%_0%,hsl(var(--accent)/0.09),transparent_58%)] motion-safe:animate-ambient-pulse"
         style={{ animationDelay: phaseDelay(0, "pulse") }}
       />
       <div
-        className="absolute inset-0 bg-[linear-gradient(to_right,rgba(15,23,42,0.045)_1px,transparent_1px),linear-gradient(to_bottom,rgba(15,23,42,0.045)_1px,transparent_1px)] [background-size:56px_56px] motion-safe:animate-ambient-drift dark:bg-[linear-gradient(to_right,rgba(255,255,255,0.04)_1px,transparent_1px),linear-gradient(to_bottom,rgba(255,255,255,0.04)_1px,transparent_1px)]"
+        className="absolute inset-0 bg-[linear-gradient(to_right,hsl(var(--foreground)/0.05)_1px,transparent_1px),linear-gradient(to_bottom,hsl(var(--foreground)/0.05)_1px,transparent_1px)] [background-size:56px_56px] motion-safe:animate-ambient-drift"
         style={{ animationDelay: phaseDelay(1, "grid") }}
       />
     </div>

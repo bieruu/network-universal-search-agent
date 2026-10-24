@@ -86,16 +86,55 @@ test("mobile sheet sidebar stays visible below md", () => {
   );
 });
 
+// Operator report, 2026-10-21 (mobile /dashboard): the Log out button sat below
+// the fold inside the burger sheet - the panel scrolled as one block, so the
+// footer was only reachable after scrolling past the sources block, and the
+// sheet's own padding could scroll the header away too. The fix is layout, not
+// copy: header fixed, body the only scroller, footer pinned. These assertions
+// pin that division of labour; they cannot measure pixels.
+test("burger sheet: header and Log out stay pinned, only the body scrolls", () => {
+  const raw = readFileSync(join(here, "..", "components", "ui", "sheet.tsx"), "utf8");
+  const sheet = raw.replace(/\/\*[\s\S]*?\*\//g, "").replace(/^\s*\/\/.*$/gm, "");
+  // The panel is a fixed column: if it scrolls, everything inside scrolls with it.
+  assert.ok(sheet.includes("overflow-hidden"), "the sheet panel must not scroll as a whole");
+  assert.ok(sheet.includes("flex-col"), "the sheet panel is a column, not a block");
+
+  // The embedded sidebar has to be allowed to shrink, or its own scroller
+  // measures against content height and nothing ever overflows.
+  assert.ok(
+    /className="[^"]*flex min-h-0 w-full flex-1/.test(shell),
+    "the sheet's sidebar takes the leftover height and may shrink",
+  );
+  assert.ok(shell.includes('<SheetHeader className="shrink-0">'), "the sheet header never compresses or scrolls");
+
+  // In the sidebar: one scroller (nav + sources), one pinned footer.
+  assert.ok(
+    /<div className="flex min-h-0 flex-1 flex-col gap-6 overflow-y-auto/.test(sidebar),
+    "the sidebar body is the only scroll container",
+  );
+  assert.ok(
+    sidebar.includes('<div className="shrink-0 border-t border-btn-border pt-3">'),
+    "the Log out footer is pinned outside the scroller",
+  );
+  const scrollerAt = sidebar.indexOf("overflow-y-auto");
+  const footerAt = sidebar.indexOf('aria-label="Log out"');
+  assert.ok(scrollerAt !== -1 && footerAt > scrollerAt, "the footer renders after the scroller, not inside it");
+
+  // Desktop: the aside is its own viewport-height column, footer at the bottom.
+  assert.ok(/sticky top-0 hidden w-60 shrink-0 flex-col/.test(sidebar), "the desktop aside is a sticky column");
+  assert.ok(sidebar.includes("md:h-dvh"), "the desktop aside is one viewport tall, so the footer sits at its bottom");
+});
+
 // Two contracts the burger sheet learned from a live report rather than a
 // review (operator, 2026-10-16, mobile /dashboard):
 //
-// 1. The surface must be a theme TOKEN. It was `bg-neutral-950` — the same near
-//    black in both themes — while the sheet embeds App1Sidebar, which paints
+// 1. The surface must be a theme TOKEN. It was `bg-neutral-950` - the same near
+//    black in both themes - while the sheet embeds App1Sidebar, which paints
 //    bg-background. The sheet's own p-4 padding, gap-4 and header band show
 //    through around that panel, so in light mode the navigation opened framed
 //    in solid black: the reported "outline hitam di luar NUSA project utama"
 //    (measured at 390px as black pixel runs x=0-15, x=271-288, y=0-51).
-// 2. Open AND close must animate, gated, on BOTH panel and scrim — a scrim that
+// 2. Open AND close must animate, gated, on BOTH panel and scrim - a scrim that
 //    snaps while the panel glides is two unrelated events. These classes are
 //    variant-stacked (`motion-safe:data-[state=...]:animate-*`), which
 //    lib/loop-contract.test.ts's floor 1 does not tokenize, so the gate and the
@@ -107,14 +146,14 @@ test("burger sheet: theme surface, gated open/close on panel and scrim", () => {
   const sheet = raw.replace(/\/\*[\s\S]*?\*\//g, "").replace(/^\s*\/\/.*$/gm, "");
   assert.ok(sheet.includes("bg-background"), "the sheet surface follows the theme token");
   // The panel is autofocused on open, so its UA focus ring is a full-panel
-  // outline: black in light, near-white in dark — the reported outline itself.
+  // outline: black in light, near-white in dark - the reported outline itself.
   assert.ok(
     sheet.includes("focus:outline-hidden"),
     "the autofocused panel must not paint a UA focus ring around itself",
   );
   assert.ok(
     !sheet.includes("bg-neutral-950"),
-    "no hard-coded near-black surface — it framed the light-mode sheet in black",
+    "no hard-coded near-black surface - it framed the light-mode sheet in black",
   );
   for (const marker of [
     "motion-safe:data-[state=open]:animate-sheet-in",
@@ -130,7 +169,7 @@ test("burger sheet: theme surface, gated open/close on panel and scrim", () => {
   assert.ok(phases.includes("sheetOut"), "the close period comes from the phase table");
 });
 
-// The old contract read `dashboard data surfaces stay static — ambient motion is
+// The old contract read `dashboard data surfaces stay static - ambient motion is
 // landing/auth only`, and it was reversed on 2026-10-12 (see DESIGN.md for the
 // dated reversal note and the reason). What the reversal KEPT is the reason the
 // lock existed in the first place, so the test now asserts that instead:
@@ -152,7 +191,7 @@ test("ambient layer is allowed, gated, and never moves a row", () => {
   assert.ok(wash.includes("motion-safe:animate-ambient-pulse"), "the card wash is the shared keyframe, gated");
   assert.ok(!wash.includes("animate-["), "the card wash introduces no bespoke keyframe");
 
-  // A status loop reports state, so it is tied to polling — never to the badge
+  // A status loop reports state, so it is tied to polling - never to the badge
   // merely existing. A dot that keeps blinking after a scan has finished is the
   // dashboard claiming to be busy when it is not.
   assert.ok(status.includes("polling"), "the status badge knows whether a scan is polling");
@@ -160,7 +199,7 @@ test("ambient layer is allowed, gated, and never moves a row", () => {
 
   // Floor #2, the half that cannot be gated: no data surface may move. The
   // tables and the history list are what an analyst reads line by line, so they
-  // carry no loop at all — a row that reflows every frame cannot be read.
+  // carry no loop at all - a row that reflows every frame cannot be read.
   for (const f of ["PortsTable.tsx", "SubdomainsTable.tsx", "WhoisCard.tsx", "VulnerabilitiesCard.tsx", "ThreatHistoryCard.tsx", "HistoryList.tsx"]) {
     const src = readFileSync(join(here, "..", "app", "(dashboard)", "dashboard", "_components", f), "utf8");
     assert.ok(!src.includes("animate-"), `${f}: a readable row must never move`);
@@ -175,7 +214,7 @@ test("the dashboard shell keeps the sidebar and the content side by side", () =>
   // top-left, the content stacked underneath it in the same 240px column, and
   // the sticky `h-dvh` sidebar then stayed pinned across the content on scroll.
   //
-  // The bug was shipped with every gate green — lint, tsc, 261/261 tests and a
+  // The bug was shipped with every gate green - lint, tsc, 261/261 tests and a
   // production build all pass on a layout that is unusable, because none of them
   // render anything. Measured in Chrome against the production CSS: sidebar.x = 0,
   // main.x = 0, intrusion 240px; at 390px the content column collapsed to 91px.
@@ -189,9 +228,9 @@ test("the dashboard shell keeps the sidebar and the content side by side", () =>
   // Comments are stripped first: the guard's own explanation names the broken
   // markup, and a prose `<div>` is not a wrapper. (Same technique landing.test.ts
   // already uses when copy and code collide.) Indices are taken from the STRIPPED
-  // source, so they must be found on it too — mixing the two silently slices the
+  // source, so they must be found on it too - mixing the two silently slices the
   // wrong span.
-  // The invariant that was broken is not "no wrapper" — the ambient layer needs
+  // The invariant that was broken is not "no wrapper" - the ambient layer needs
   // one. It is: THE wrapper that directly holds the sidebar and the inset must be
   // the flex row, and the sidebar must be its direct child (no second nesting).
   const code = shell.replace(/\/\*[\s\S]*?\*\//g, "").replace(/^\s*\/\/.*$/gm, "");
@@ -202,7 +241,7 @@ test("the dashboard shell keeps the sidebar and the content side by side", () =>
   assert.ok(wrapper, "the shell must have one wrapper holding both the sidebar and the content");
   assert.ok(
     /(^|\s)flex(\s|$)/.test(wrapper[1]),
-    `the wrapper holding the sidebar and the content must be the flex row (got "${wrapper[1]}") — a plain block puts them in normal flow`,
+    `the wrapper holding the sidebar and the content must be the flex row (got "${wrapper[1]}") - a plain block puts them in normal flow`,
   );
   const afterWrapper = code.slice(codeOpen + (wrapper.index ?? 0) + wrapper[0].length, codeAside);
   assert.ok(!/<div/.test(afterWrapper), "the sidebar must be a direct child of the flex row, with no nested wrapper between them");

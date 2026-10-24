@@ -8,8 +8,8 @@
  * not carry it.
  *
  * The drawing itself is deliberately dumb. `buildPdfLines` (lib/export-findings.ts)
- * has already reduced the scan to plain text — control characters stripped,
- * banners cut, lists capped — so all that is left here is wrapping, page breaks
+ * has already reduced the scan to plain text - control characters stripped,
+ * banners cut, lists capped - so all that is left here is wrapping, page breaks
  * and a monospace font. No value is interpreted, and there is no markup in this
  * path at all: a PDF has no HTML sink to inject into.
  */
@@ -26,7 +26,7 @@ const CONTENT_WIDTH = PAGE.width - MARGIN.left - MARGIN.right;
 
 export interface PdfResult {
   blob: Blob;
-  /** How many pages were laid out — asserted in the tests. */
+  /** How many pages were laid out - asserted in the tests. */
   pages: number;
 }
 

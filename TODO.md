@@ -28,4 +28,4 @@
 - [ ] PDF/CSV export, webhooks
 - [ ] Org RBAC, Redis cache, SSE instead of polling
 
-> Sweep terakhir: 2026-10-21 - semua item selesai 2026-10-14..2026-10-21 pindah ke [CHANGELOG.md](./CHANGELOG.md) entri 2026-10-21; yang tersisa di atas semuanya masih terbuka.
+> Sweep terakhir: 2026-10-25 - item polish 2026-10-21 yang bertanda `[x]` sudah dipindah ke [CHANGELOG.md](./CHANGELOG.md) entri 2026-10-25 dan dihapus dari sini; yang tersisa di atas semuanya masih terbuka dan belum dikerjakan.

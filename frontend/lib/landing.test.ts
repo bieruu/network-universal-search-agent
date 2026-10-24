@@ -53,7 +53,7 @@ test("single CTA label per intent", () => {
 test("no fake precision stats or testimonials", () => {
   // Strip gradient color-stop percentages (e.g. `transparent_62%`, `at_50%_30%`)
   // and the CDN emerald param before looking for marketing claims. Also strip
-  // bracket-wrapped geometry percentages (`[-72%]`, `[95%]`, `[124%]`) —
+  // bracket-wrapped geometry percentages (`[-72%]`, `[95%]`, `[124%]`) -
   // Tailwind arbitrary sizing in the hero band decoration (2026-10-16). Those
   // are layout tokens inside class brackets, not copy: a claim would read
   // "98% faster", unbracketed, and still fails this assertion.
@@ -102,7 +102,7 @@ test("playground: one prompt, one caret, no layout jump", () => {
   // on underneath. A real <input> in its own bordered strip made the window
   // read as "a terminal" sitting next to "a search box" instead of one
   // terminal, so the prompt now renders as the final line, same styling.
-  // The attract loop keeps its caret and its typed `clear` — there is no real
+  // The attract loop keeps its caret and its typed `clear` - there is no real
   // prompt to collide with until a session starts, and hiding it left a
   // dead-looking window.
   assert.ok(
@@ -188,7 +188,7 @@ test("playground: list is required before scan, and demo output is labelled", ()
   assert.ok(playground.includes("DEMO_NOTICE"), "simulated output must print its notice");
   assert.ok(playground.includes("DEMO_LIST_NOTICE"), "the target list must say it is simulated");
   assert.ok(playground.includes("DEMO_SIGN_IN_HINT"), "out-of-list targets must say what unlocks real scans");
-  assert.ok(playground.includes("Demo — simulated output"), "the visible caption must name the demo state");
+  assert.ok(playground.includes("Demo: sample data"), "the visible caption must name the demo state");
   // Signed-out scans must never reach the network; a fetch here is allowed only
   // on the signed-in branch, which is asserted above by construction.
   assert.ok(playground.includes("if (signedIn) await runLiveScan"), "only signed-in sessions run a real scan");
@@ -222,16 +222,16 @@ test("ambient backdrop is decorative-only and motion-safe", () => {
   assert.ok(!backdrop.includes("addEventListener"), "CSS-only ambient, no JS scroll listeners");
   const hero = sources["Hero.tsx"];
   // The ambient layer lives at page level (full-bleed behind nav + hero),
-  // not inside the centered max-w section — so it never shows hard edges.
+  // not inside the centered max-w section - so it never shows hard edges.
   assert.ok(page.includes("AmbientBackdrop"), "page-level layer must render the ambient backdrop");
   assert.ok(page.includes("-z-10"), "ambient layer must sit behind content");
   assert.ok(page.includes("[mask-image:"), "ambient layer must fade out, not end in a hard cut");
   assert.ok(page.includes('aria-hidden="true"'), "page-level layer is decorative-only");
-  assert.ok(!hero.includes("AmbientBackdrop"), "Hero keeps content only — no boxed-in backdrop");
+  assert.ok(!hero.includes("AmbientBackdrop"), "Hero keeps content only - no boxed-in backdrop");
 });
 
 // Rewritten 2026-10-14: the node-graph scene this test used to pin
-// (`Ambient3DInner.tsx`) is gone with the hero revision — the hero's picture is
+// (`Ambient3DInner.tsx`) is gone with the hero revision - the hero's picture is
 // now the cobe globe (`HeroGlobe.tsx`), and every floor this test defended
 // moved with it.
 test("hero globe: token colours, shared rotation period, masked below the copy", () => {
@@ -243,7 +243,7 @@ test("hero globe: token colours, shared rotation period, masked below the copy",
   assert.ok(!/#[0-9a-fA-F]{3,8}/.test(globe), "the hero globe declares no colour literal");
   assert.ok(globe.includes('from "@/lib/ambient-colors"'), "colours are read from the design tokens");
   assert.ok(globe.includes("MutationObserver"), "the tokens are re-read when the theme flips");
-  // Rotation is measured in seconds, from the shared table — never in frames,
+  // Rotation is measured in seconds, from the shared table - never in frames,
   // which made the same scene turn at a different speed on every display.
   assert.ok(globe.includes("PHASE_SECONDS.globe"), "rotation speed comes from the shared table");
   assert.ok(globe.includes("Math.min((now - last)"), "rotation advances by elapsed time, not by frame count");
@@ -254,7 +254,7 @@ test("hero globe: token colours, shared rotation period, masked below the copy",
   assert.ok(globe.includes("[mask-image:"), "the globe sits below the copy instead of on top of it");
   assert.ok(globe.includes("removeEventListener"), "the globe's own listeners are cleaned up");
   // Rewritten 2026-10-16: the exact-string pin `<HeroGlobe />` could not
-  // survive the interactive-flanks revision — the call now carries the lifted
+  // survive the interactive-flanks revision - the call now carries the lifted
   // selection props (`<HeroGlobe selected={selected} onSelect={setSelected} />`),
   // which is the whole point of the change. What stays pinned is the same
   // thing the old string asserted: the hero renders the globe. The prop
@@ -269,43 +269,70 @@ test("the hero globe keeps an sr-only honesty line and its example-website marke
   const globe = sources["HeroGlobe.tsx"];
   assert.ok(globe, "HeroGlobe.tsx must exist");
   // The old globe section shipped as a heading, a stub line and the caption
-  // printed twice — with the whole section aria-hidden, so a screen reader got
+  // printed twice - with the whole section aria-hidden, so a screen reader got
   // nothing at all. The hero globe is decoration inside the hero, so the
-  // rule is: only the canvas is hidden from AT, and the honesty line stays in the accessibility tree (sr-only — the operator removed the visible caption, 2026-10-15).
+  // rule is: only the canvas is hidden from AT, and the honesty line stays in the accessibility tree (sr-only - the operator removed the visible caption, 2026-10-15).
+  // 2026-10-21: the globe gained two decorative caret glyphs inside its tilt
+  // buttons. What must still hold is that the CANVAS is the picture and stays
+  // out of the accessibility tree, while the controls around it are labelled.
   const hidden = globe.match(/aria-hidden="true"/g) ?? [];
-  assert.equal(hidden.length, 1, "only the canvas is hidden from AT");
+  assert.equal(hidden.length, 3, "canvas and the two caret glyphs are the only hidden nodes");
   assert.ok(
     /<canvas\s+ref=\{canvasRef\}\s+aria-hidden=/.test(globe),
     "the picture stays decorative",
   );
-  const captions = globe.match(/Illustrative — not scan data/g) ?? [];
-  assert.equal(captions.length, 1, "one honesty line, sr-only — not one per surface");
+  const glyphs = globe.match(/<Caret(?:Up|Down) size=\{\d+\} weight="bold" aria-hidden="true" \/>/g) ?? [];
+  assert.equal(glyphs.length, 2, "both tilt glyphs are decoration, their buttons carry the name");
+  const captions = globe.match(/Illustrative - not scan data/g) ?? [];
+  assert.equal(captions.length, 1, "one honesty line, sr-only - not one per surface");
   // JSX wraps prose across lines, so copy assertions run against a single-line
-  // version of the file — otherwise every sentence is split at the fold.
+  // version of the file - otherwise every sentence is split at the fold.
   const flat = globe.replace(/\s+/g, " ");
   assert.ok(
     flat.includes("example website points at arbitrary positions"),
     "the caption names the markers for what they are: arbitrary illustrative points, not locations",
   );
   assert.ok(globe.includes('className="sr-only"'), "the visible caption is gone; the honesty line is screen-reader-only (operator, 2026-10-15)");
-  assert.ok(/<p className="sr-only">\s*Illustrative — not scan data/.test(globe), "the sr-only line carries the honesty text");
+  assert.ok(/<p className="sr-only">\s*Illustrative - not scan data/.test(globe), "the sr-only line carries the honesty text");
   assert.ok(!globe.includes("drag to spin"), "the visible drag hint is deleted; the grab cursor carries the affordance");
   // The markers are the site's own reserved-name demo targets, positioned by
-  // a deterministic hash of the name — never a fabricated city list.
+  // a deterministic hash of the name - never a fabricated city list.
   assert.ok(globe.includes("DEMO_SCANS"), "the markers are the site's own example targets");
   assert.ok(globe.includes("mulberry32"), "marker positions are deterministic, not re-rolled per mount");
   assert.ok(globe.includes("readScene()"), "colours are re-sampled on every theme flip, not once at mount");
   assert.ok(globe.includes("Math.min((now - last)"), "rotation advances by elapsed time, not by frame count");
 });
 
+// 2026-10-21: on touch the canvas keeps `pan-y` so the page can scroll, which
+// leaves the drag horizontal-only. These buttons are the vertical axis for a
+// thumb - not decoration, so they carry a real 44px target and a real label.
+test("hero globe: touch tilt buttons with 44px targets and clamped travel", () => {
+  const globe = sources["HeroGlobe.tsx"];
+  assert.ok(globe, "HeroGlobe.tsx must exist");
+  for (const label of ["Tilt globe up", "Tilt globe down"]) {
+    assert.ok(globe.includes(`aria-label="${label}"`), `${label} must be a labelled control`);
+  }
+  const targets = globe.match(/pointer-events-auto flex h-11 w-11/g) ?? [];
+  assert.equal(targets.length, 2, "both tilt buttons are 44x44 and opt into the pointer");
+  assert.ok(globe.includes("lg:hidden"), "the buttons are for touch widths only - lg+ has the drag");
+  assert.ok(globe.includes("tiltRef.current(-0.12)"), "up tilts by one step");
+  assert.ok(globe.includes("tiltRef.current(0.12)"), "down tilts by one step");
+  assert.ok(
+    globe.includes("Math.min(TILT_MAX, Math.max(TILT_MIN, thetaRef.current + delta))"),
+    "button travel is clamped to the same range as the drag",
+  );
+  assert.ok(globe.includes("useRef<(delta: number) => void>"), "the buttons drive the scene through a ref, not a re-render");
+  assert.ok(globe.includes("[touch-action:pan-y]"), "the canvas keeps pan-y - the buttons exist because of it");
+});
+
 // Operator, 2026-10-16: the band's lg+ flanks were "too empty" even after the
-// passive decoration landed — the ask was an INTERACTIVE component, not more
+// passive decoration landed - the ask was an INTERACTIVE component, not more
 // washes. What must stay true now that `HeroFlanks.tsx` exists:
 //   - one selection, owned by Hero, forwarded to the globe AND the chips;
 //   - the chips are the shared demo targets, single-select with toggle-off,
 //     announced via aria-pressed, keyboard reachable, hover via colour only;
 //   - the readout's facts come from the /demo fixtures by IMPORT (one source
-//     of truth — the nvd failure scripted for api.acme.co must not be copied
+//     of truth - the nvd failure scripted for api.acme.co must not be copied
 //     by hand into a second table);
 //   - lg+ only, token colours only, no keyframe loops, no pointer theft.
 test("hero flanks: interactive example-target panels beside the globe", () => {
@@ -326,7 +353,7 @@ test("hero flanks: interactive example-target panels beside the globe", () => {
     globe.includes("<HeroFlanks selected={selected} onSelect={onSelect} />"),
     "the band renders the flanks with the same lifted state",
   );
-  // Placement: lg+ only — below lg the sphere fills the band and there is no
+  // Placement: lg+ only - below lg the sphere fills the band and there is no
   // side space for a panel.
   assert.ok(flanks.includes("hidden lg:block"), "the flanks render at lg and up only");
   // Chips: the shared targets, announced toggle semantics, toggle-off, keys.
@@ -349,20 +376,20 @@ test("hero flanks: interactive example-target panels beside the globe", () => {
   assert.ok(globe.includes("pointer-events-none"), "the band root keeps pointer-events-none");
   assert.ok(
     !/<(?:section|div|ul|li|p)[^>]*onClick/.test(flanks),
-    "only the chip buttons and the links are controls — no layout element handles clicks",
+    "only the chip buttons and the links are controls - no layout element handles clicks",
   );
   assert.ok(
     flanks.includes("pointer-events-auto"),
     "the real controls opt into the pointer explicitly",
   );
-  // Readout honesty: fixture facts by import, the demo caption, the two links.
+  // Readout honesty: fixture facts by import, the sample badge, the two links.
   assert.ok(
     flanks.includes('from "../../demo/demo-report"'),
-    "the readout reads the /demo fixtures by import — no second hand-written fact table",
+    "the readout reads the /demo fixtures by import - no second hand-written fact table",
   );
   assert.ok(
-    flanks.includes("Demo — simulated output"),
-    "the readout stays labelled as simulated, same spirit as /demo",
+    /<span[^>]*>\s*Sample\s*<\/span>/.test(flanks),
+    "the readout is labelled as a sample, one short badge (DESIGN.md: one disclosure per page)",
   );
   assert.ok(
     flanks.includes('href="/demo"') && flanks.includes('href="/dashboard"'),
@@ -373,7 +400,7 @@ test("hero flanks: interactive example-target panels beside the globe", () => {
   assert.ok(globe.includes("target === selected"), "the selected target's label is emphasised");
   assert.ok(globe.includes("positionAnchor"), "the labels keep their CSS-anchor binding");
   assert.ok(globe.includes("transition-colors"), "the label emphasis is a colour transition");
-  // Token colours only — zero hex literals across landing sources.
+  // Token colours only - zero hex literals across landing sources.
   assert.ok(!/#[0-9a-fA-F]{3,8}/.test(flanks), "the flanks declare no colour literal");
 });
 
@@ -412,7 +439,7 @@ test("full motion layer: scroll progress, parallax, bento visuals, risk meter", 
     "server and client must agree before mount",
   );
   assert.ok(!parallaxCode.includes("if (reduce) return null"), "the pre-mount mismatching gate must not come back");
-  assert.ok(!parallax.includes("blur"), "no blur filters — transform-only parallax");
+  assert.ok(!parallax.includes("blur"), "no blur filters - transform-only parallax");
   const hero = sources["Hero.tsx"];
   assert.ok(page.includes("ParallaxField"), "page-level layer must render the parallax field");
   assert.ok(!hero.includes("ParallaxField"), "parallax is not boxed into the hero section");
@@ -445,23 +472,46 @@ test("CTA and card hovers lift with motion-reduce fallback", () => {
   assert.ok(bento.includes("motion-reduce:hover:translate-y-0"), "card lift disabled on reduced motion");
 });
 
-test("how-it-works shows the partial-failure story, not a painted skeleton", () => {
+test("how-it-works names the report's parts, not a painted skeleton", () => {
   const how = sources["HowItWorks.tsx"];
-  // The right-hand panel used to be three empty pills — rounded bars with a
+  // The right-hand panel used to be three empty pills - rounded bars with a
   // looping pulse, standing in for a list nobody had written. A div that looks
   // like content and carries none is the one template tell that actually
   // deceives, because it implies a screenshot of a real result.
+  // Renamed 2026-10-24: these rows no longer carry the partial-failure story
+  // (the strip's failure sentence was removed at the operator's request). The
+  // landing page's one failure disclosure is `FeatureBento`'s lead, so a test
+  // that named this panel as the disclosure was pinning a claim it stopped
+  // making - the assertions below never checked failure copy.
   assert.ok(!how.includes("rounded-full bg-accent/40"), "the fake content pills must not come back");
   // Real sentences, one per data source, from the one place they are declared.
   assert.ok(how.includes('from "./source-copy"'), "the panel reads the shared source copy");
-  assert.ok(how.includes("s.whenSlow"), "every row says what happens when that source fails");
-  assert.ok(how.includes("s.gives"), "every row says what that source contributes");
+  assert.ok(how.includes("s.result"), "every row names the part of the report it fills");
+  assert.ok(how.includes("s.outcome"), "every row says what the visitor gets from that part");
   // Four sources are declared, so four rows render. One per source, no extras.
   const rows = how.match(/<li key=\{s\.mark\}/g) ?? [];
   assert.ok(rows.length === 1, "exactly one row template, rendered per source");
   const sourceCopy = readFileSync(join(here, "..", "app", "_components", "landing", "source-copy.ts"), "utf8");
   const marks = sourceCopy.match(/mark: "/g) ?? [];
   assert.ok(marks.length === 4, "the shared copy declares one entry per data source");
+});
+
+test("the bento lead is still the page's one partial-failure disclosure", () => {
+  // The strip and the how-it-works rows lost their failure sentence on
+  // 2026-10-24, which leaves this lead as the page's only statement about a
+  // source that does not answer. It has to keep both halves: the report still
+  // renders with the failed check named, AND an empty result is not an
+  // all-clear. A rewrite that drops either half removes the disclosure
+  // silently, because nothing else on the page says it.
+  const bento = sources["FeatureBento.tsx"];
+  assert.ok(
+    bento.includes("A slow source never blanks the report."),
+    "the bento lead still says a slow source does not blank the report",
+  );
+  assert.ok(
+    bento.toLowerCase().includes("a gap is never good news"),
+    "the bento lead still says a gap is not proof of safety",
+  );
 });
 
 test("bento visuals read the shared sample figures, not a second set of numbers", () => {
@@ -475,7 +525,7 @@ test("bento visuals read the shared sample figures, not a second set of numbers"
   assert.ok(samples.includes("demoSampleMetrics"), "the samples export their figures to consumers");
 });
 
-test("looping motion: staggered blips, bobs and sweeps — all motion-safe", () => {
+test("looping motion: staggered blips, bobs and sweeps - all motion-safe", () => {
   const css = readFileSync(join(here, "..", "app", "globals.css"), "utf8");
   for (const key of ["sweep", "blip", "eq", "breathe"]) {
     assert.ok(css.includes(`--animate-${key}:`), `globals.css must define --animate-${key}`);
@@ -487,23 +537,23 @@ test("looping motion: staggered blips, bobs and sweeps — all motion-safe", () 
   assert.ok(hero.includes("motion-safe:animate-blip"), "terminal traffic dots blip in a loop");
   // The stagger comes from the shared period table rather than from numbers
   // typed out per file. There used to be a literal `"0.6s"` here, `"1.5s"` in
-  // how-it-works and `"0.18"` in the bento — three independent guesses at a
+  // how-it-works and `"0.18"` in the bento - three independent guesses at a
   // spread that nothing kept from collapsing into one beat.
   assert.ok(hero.includes('from "@/lib/motion-phases"'), "the hero reads the shared period table");
   assert.ok(hero.includes("phaseDelay("), "traffic dots take their stagger from the shared table");
   // The eyebrow asserts the benefit, and asserts the jargon is GONE: "OSINT"
   // and "PASSIVE" were both mechanism words on a visitor-facing surface.
-  // Honesty-disclosure rules (DESIGN.md, 2026-10-18): the eyebrow is short —
-  // "PUBLIC RECORDS ONLY" — and the DNS nameserver note lives ONCE, in the
+  // Honesty-disclosure rules (DESIGN.md, 2026-10-18): the eyebrow is short -
+  // "PUBLIC RECORDS ONLY" - and the DNS nameserver note lives ONCE, in the
   // hero paragraph, in plain words. The old footer/eyebrow repeats are gone.
   assert.ok(hero.includes("PUBLIC RECORDS ONLY"), "eyebrow keeps its copy");
   assert.ok(!/no packets/i.test(hero), "the packet mechanism line left the eyebrow");
   assert.ok(
-    /only DNS lookups reach\s+the target&apos;s nameservers/.test(hero),
+    /Only DNS lookups reach\s+its nameservers/.test(hero),
     "the hero must disclose, once and in plain words, that DNS queries are visible to the target's nameservers"
   );
   assert.ok(hero.includes("animate-[ping_"), "eyebrow carries a radar ping");
-  assert.ok(hero.includes("motion-safe:animate-breathe"), "hero CTA halo breathes smoothly (no ping)");
+  assert.ok(!hero.includes("animate-breathe"), "the CTA halo is gone - the button no longer breathes");
   assert.ok(hero.includes("animate-[spin_"), "terminal corner carries a rotating dial");
   const nav = sources["Nav.tsx"];
   assert.ok(nav.includes("motion-safe:animate-breathe"), "nav monogram breathes smoothly (no ping)");
@@ -511,8 +561,8 @@ test("looping motion: staggered blips, bobs and sweeps — all motion-safe", () 
   const logos = sources["LogoStrip.tsx"];
   // The bob loop is gone: a perpetual up/down drift said "decoration" about
   // the records the product's evidence base is built from. The strip sits
-  // still and answers when asked — click a source, get what it contributes
-  // and what the result looks like when it is slow (2026-10-10).
+  // still and answers when asked - click a source, get what it contributes
+  // (2026-10-10; the when-slow half left the panel 2026-10-24).
   assert.ok(!logos.includes("animate-bob"), "the logo strip no longer bobs in a loop");
   assert.ok(!logos.includes("animationDelay"), "no staggered loop delay remains");
   assert.ok(logos.includes("useState"), "each source is selectable, so the strip is interactive");
@@ -528,9 +578,10 @@ test("looping motion: staggered blips, bobs and sweeps — all motion-safe", () 
   assert.ok(security.includes("hover:border-accent"), "security rows give hover feedback instead of a loop");
   assert.ok(security.includes("motion-reduce:group-hover:translate-y-0"), "hover lift disabled on reduced motion");
   const how = sources["HowItWorks.tsx"];
-  assert.ok(how.includes("motion-safe:animate-blip"), "how-it-works live dot blips");
-  assert.ok(how.includes("animate-[ping_"), "how-it-works live dot pings");
-  assert.ok(how.includes("motion-safe:animate-ambient-pulse"), "ops skeleton bars breathe in a loop");
+  // The live dot and its ping left with the fake ops skeleton; the panel's own
+  // wash still breathes, gated, and nothing in the rows moves.
+  assert.ok(!how.includes("animate-blip"), "the retired live dot must not come back");
+  assert.ok(how.includes("motion-safe:animate-ambient-pulse"), "the panel wash pulses, gated");
   const meter = sources["RiskMeter.tsx"];
   assert.ok(meter.includes("motion-safe:animate-sweep"), "risk meter carries a looping shimmer");
   const parallax = sources["ParallaxField.tsx"];
@@ -538,14 +589,17 @@ test("looping motion: staggered blips, bobs and sweeps — all motion-safe", () 
   // Two washes that breathe on the same beat read as one moving surface, so each
   // takes a different phase from the shared table.
   assert.ok(parallax.includes("phaseDelay("), "parallax washes are offset against each other");
-  // Washes must be clearly visible, not near-invisible ghosts.
+  // Washes must be clearly visible, not near-invisible ghosts, and must be
+  // built from tokens so they follow the theme (2026-10-21: the old literal
+  // rgba washes stayed black in light mode).
   const backdrop = sources["AmbientBackdrop.tsx"];
-  assert.ok(backdrop.includes("0.11") && backdrop.includes("0.14"), "hero wash opacity is visibly boosted");
+  assert.ok(backdrop.includes("hsl(var(--accent)/0.11)"), "hero wash opacity is visibly boosted");
+  assert.ok(backdrop.includes("hsl(var(--foreground)/0.06)"), "the grid reads as a surface in both themes");
 
   // One period table, every consumer. `lib/motion-phases.ts` is the only place a
   // duration or a delay may be invented; the CSS declarations it generates are
   // the ones `globals.css` carries, asserted in lib/loop-contract.test.ts.
-  // What is asserted here is that the sections actually read from it — a table
+  // What is asserted here is that the sections actually read from it - a table
   // nobody imports is a table that has already drifted.
   const phases = readFileSync(join(here, "..", "lib", "motion-phases.ts"), "utf8");
   assert.ok(phases.includes("MOTION_PHASES"), "the shared period table exists");
@@ -556,7 +610,7 @@ test("looping motion: staggered blips, bobs and sweeps — all motion-safe", () 
     );
   }
   // The grid drift is the rearmost layer of the page-level stack, behind the
-  // wash and the parallax washes — it is the plane the content sits on.
+  // wash and the parallax washes - it is the plane the content sits on.
   const grid = sources["GridDrift.tsx"];
   assert.ok(grid, "GridDrift.tsx must exist");
   assert.ok(grid.includes('aria-hidden="true"'), "the grid is decorative-only");
@@ -612,7 +666,7 @@ test("tech stack: two named marquee rows, every name a real dependency", () => {
 
   // Every claimed name is a dependency this repo really has. A tech-stack
   // section that invents a tool to fill a row is a false claim about the
-  // product, and it is the one bug here that a designer cannot fix later — so
+  // product, and it is the one bug here that a designer cannot fix later - so
   // the mapping is checked against the manifest files themselves rather than
   // trusted from the source array.
   const pkg = JSON.parse(readFileSync(join(here, "..", "package.json"), "utf8")) as {
@@ -677,17 +731,17 @@ test("tech stack: two named marquee rows, every name a real dependency", () => {
   const marquee = readFileSync(join(here, "..", "components", "ui", "toolchain-marquee.tsx"), "utf8");
   assert.ok(
     marquee.includes("Math.min(rowCount, resolvedStacks.length)"),
-    "the row count can never exceed the number of stacks — no padded rows",
+    "the row count can never exceed the number of stacks - no padded rows",
   );
   assert.ok(
     /resolvedStacks\.length === 0\) return null/.test(marquee),
     "no content must render nothing, not a placeholder row",
   );
   // The drift is driven per frame from a measured width, so the motion-safe
-  // gate cannot be a `motion-safe:` class — it has to be the hook.
+  // gate cannot be a `motion-safe:` class - it has to be the hook.
   assert.ok(
     /const reduceMotion = Boolean\(useReducedMotion\(\)\) && mounted/.test(marquee),
-    "the reduced-motion gate is the hook, not a class — and it applies only after mount (hydration)",
+    "the reduced-motion gate is the hook, not a class - and it applies only after mount (hydration)",
   );
   assert.ok(marquee.includes("useAnimationFrame"), "the distance travelled comes from a measurement");
   // One readable list of names: the duplicate groups exist only to fill the
@@ -703,15 +757,15 @@ test("tech stack: two named marquee rows, every name a real dependency", () => {
 
   // The module holds the component's own surfaces and nothing else. Vendor
   // colour is declared once, in globals.css, beside every other page token and
-  // its `.dark` override — not in the module, because CSS Modules rejects
+  // its `.dark` override - not in the module, because CSS Modules rejects
   // `:root`/`.dark` as impure selectors and the whole sheet fails to compile
   // if they are put there.
   const css = readFileSync(
     join(here, "..", "components", "ui", "toolchain-marquee-utils", "toolchain-marquee.module.css"),
     "utf8",
   );
-  assert.ok(!/:root\s*\{/.test(css), "a CSS module cannot declare :root — the sheet would not compile");
-  assert.ok(!/^[^\S\n]*\.dark\s*\{/m.test(css), "a CSS module cannot declare .dark — the sheet would not compile");
+  assert.ok(!/:root\s*\{/.test(css), "a CSS module cannot declare :root - the sheet would not compile");
+  assert.ok(!/^[^\S\n]*\.dark\s*\{/m.test(css), "a CSS module cannot declare .dark - the sheet would not compile");
   for (const templateToken of ["--bg:", "--text:", "--muted:", "--surface:"]) {
     assert.ok(!css.includes(templateToken), `no second palette: the template's ${templateToken} must not be redeclared`);
   }

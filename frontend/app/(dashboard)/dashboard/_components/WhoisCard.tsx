@@ -9,7 +9,7 @@ import { TERM, termNote } from "@/lib/terms";
  * analyst nothing about who withheld them or why, and read like the value
  * itself. Spell out the cause instead.
  */
-const WITHHELD = "Not published — the registry hides this to protect the registrant.";
+const WITHHELD = "The registry hides this to protect the registrant.";
 
 export default function WhoisCard({
   scan,
@@ -24,40 +24,40 @@ export default function WhoisCard({
       <CardHeader>
         <CardTitle>{TERM.whois.label}</CardTitle>
         <CardDescription>
-          {scan ? `The public registration record for ${scan.target}.` : termNote("whois")}
+          {scan ? `Registration details for ${scan.target}.` : termNote("whois")}
         </CardDescription>
       </CardHeader>
       <CardContent>
         {loading ? (
           <Skeleton className="h-24" />
         ) : !w ? (
-          <p className="text-sm text-slate-500 dark:text-neutral-500">
-            No registration details returned for this target — that is not the same as none.
+          <p className="text-sm text-fg-muted">
+            No registration details came back for this target. That is not the same as none.
           </p>
         ) : (
           <dl className="space-y-1.5 text-sm">
             <div>
-              <dt className="inline text-slate-500 dark:text-neutral-500" title={termNote("registrant")}>
+              <dt className="inline text-fg-muted" title={termNote("registrant")}>
                 {TERM.registrant.label}:{" "}
               </dt>
               <dd className="inline">{w.registrar ?? "Not published"}</dd>
             </div>
             <div>
-              <dt className="inline text-slate-500 dark:text-neutral-500">First registered: </dt>
+              <dt className="inline text-fg-muted">First registered: </dt>
               <dd className="inline">{w.creation_date ?? "Not published"}</dd>
             </div>
             <div>
-              <dt className="inline text-slate-500 dark:text-neutral-500">Expires: </dt>
+              <dt className="inline text-fg-muted">Expires: </dt>
               <dd className="inline">{w.expiration_date ?? "Not published"}</dd>
             </div>
             <div>
-              <dt className="inline text-slate-500 dark:text-neutral-500" title={termNote("nameservers")}>
+              <dt className="inline text-fg-muted" title={termNote("nameservers")}>
                 {TERM.nameservers.label}:{" "}
               </dt>
               <dd className="inline">{w.name_servers?.join(", ") ?? "Not published"}</dd>
             </div>
             <div>
-              <dt className="inline text-slate-500 dark:text-neutral-500">Contact addresses: </dt>
+              <dt className="inline text-fg-muted">Contact addresses: </dt>
               <dd className="inline">{w.emails ?? WITHHELD}</dd>
             </div>
           </dl>

@@ -7,7 +7,7 @@ import type { NvdCveRow, ScanResult } from "@/lib/api";
 import { cveTierView, nvdStatusView } from "@/lib/scan-status";
 import { TERM, termNote } from "@/lib/terms";
 
-/** Display cap. Applied visibly — the count of what was hidden is stated. */
+/** Display cap. Applied visibly - the count of what was hidden is stated. */
 const MAX_ROWS = 100;
 
 export default function VulnerabilitiesCard({
@@ -44,9 +44,9 @@ export default function VulnerabilitiesCard({
         {loading ? (
           <Skeleton className="h-24" />
         ) : !scan ? (
-          <p className="text-sm text-slate-500 dark:text-neutral-500">Run a scan to see matching vulnerabilities.</p>
+          <p className="text-sm text-fg-muted">Run a scan to see matching vulnerabilities.</p>
         ) : !nvd ? (
-          <p className="text-sm text-slate-500 dark:text-neutral-500">
+          <p className="text-sm text-fg-muted">
             We did not check this target against the vulnerability catalogue. That means unknown, not none.
           </p>
         ) : (
@@ -59,12 +59,12 @@ export default function VulnerabilitiesCard({
                 </span>
               )}
             </div>
-            <p className="text-sm text-slate-500 dark:text-neutral-500">{view.detail}</p>
+            <p className="text-sm text-fg-muted">{view.detail}</p>
 
             {rows.length === 0 ? (
-              <p className="text-sm text-slate-500 dark:text-neutral-500">
+              <p className="text-sm text-fg-muted">
                 {keywordLeads
-                  ? "Nothing in the catalogue mentions the product names we detected here. That covers only entries whose text happens to match — it is not a clean result."
+                  ? "Nothing in the catalogue mentions the products we detected. That is a wording match only, not a clean result."
                   : "No published entry matched the product and version we detected here. Coverage beyond this check is still unknown."}
               </p>
             ) : (
@@ -90,7 +90,7 @@ export default function VulnerabilitiesCard({
                               href={c.url ?? `https://nvd.nist.gov/vuln/detail/${c.id}`}
                               target="_blank"
                               rel="noreferrer noopener"
-                              className="text-accent hover:underline"
+                              className="text-accent-text hover:underline"
                             >
                               {c.id}
                             </a>
@@ -100,15 +100,15 @@ export default function VulnerabilitiesCard({
                               {tier.label}
                             </Badge>
                           </TD>
-                          <TD>{c.severity ?? "—"}</TD>
-                          <TD className="font-mono">{c.cvss != null ? `${c.cvss}/10` : "—"}</TD>
+                          <TD>{c.severity ?? "-"}</TD>
+                          <TD className="font-mono">{c.cvss != null ? `${c.cvss}/10` : "-"}</TD>
                           <TD
                             className="max-w-xs truncate font-mono text-xs"
                             title={c.evidence_cpe ?? (c.keyword_derived ? "Matched on wording in a description" : "")}
                           >
-                            {c.evidence_cpe ?? (c.keyword_derived ? "Wording match only" : "—")}
+                            {c.evidence_cpe ?? (c.keyword_derived ? "Wording match only" : "-")}
                           </TD>
-                          <TD className="text-xs">{c.source ?? "—"}</TD>
+                          <TD className="text-xs">{c.source ?? "-"}</TD>
                         </TRow>
                       );
                     })}
@@ -133,27 +133,28 @@ export default function VulnerabilitiesCard({
               <summary className="cursor-pointer select-none">What do these labels mean?</summary>
               <div className="mt-2 flex flex-col gap-1.5">
                 <p>
-                  <strong>Confidence</strong> says how sure we are that an entry applies to this host, not how
-                  dangerous it is. <strong>Confirmed match</strong> means the running product and version match the
-                  entry exactly. <strong>Reported, unconfirmed</strong> means a public index reported it for this
-                  host but we could not confirm it against the exact version.{" "}
-                  <strong>Rejected by the publisher</strong> means the catalogue vendor marked the entry as
-                  rejected or disputed — we show it so you know it exists, and it is never counted.
+                  <strong>Confidence</strong> is how sure we are an entry applies, not how dangerous it is.
                 </p>
                 <p>
-                  <strong>{TERM.cvss.label}</strong> is the {TERM.cvss.short} score from 0 (harmless) to 10
-                  (critical). <strong>{TERM.cpe.label}</strong> is the {TERM.cpe.short} identifier for the
-                  product and version we matched against. Entries come from the {TERM.nvd.label} ({TERM.nvd.short}).
+                  <strong>Confirmed match</strong> means the running product and version match the entry exactly.
                 </p>
                 <p>
-                  Not finding a match is never proof that a host is safe: it only means nothing in the catalogue
-                  matched what this host advertises, and a missing measurement is unknown, not zero.
+                  <strong>Reported, unconfirmed</strong> means an index reported it but we could not confirm the
+                  version.
                 </p>
+                <p>
+                  <strong>Rejected</strong> means the vendor marked the entry rejected or disputed, and we never
+                  count it.
+                </p>
+                <p>
+                  <strong>{TERM.cvss.label}</strong> is the {TERM.cvss.short} severity score, 0 to 10;{" "}
+                  <strong>{TERM.cpe.label}</strong> is the {TERM.cpe.short} identifier we matched.
+                </p>
+                <p>No match is not proof of safety: unknown is not zero.</p>
                 {keywordLeads && (
                   <p>
-                    These rows are leads to investigate, not findings. Their product was picked up because the
-                    wording of the description mentions a name we detected — that is not confirmation this host is
-                    affected. None of them count toward the {TERM.risk.label.toLowerCase()}.
+                    These rows are leads, not findings, and none count toward the{" "}
+                    {TERM.risk.label.toLowerCase()}.
                   </p>
                 )}
               </div>

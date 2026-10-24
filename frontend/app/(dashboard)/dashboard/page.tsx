@@ -34,7 +34,7 @@ import AppShell from "./_components/app-shell";
 
 /**
  * `errors[]` reaches the browser as `{source, message}` straight from the
- * providers — "shodan: timeout". Those badges told the analyst nothing they
+ * providers - "shodan: timeout". Those badges told the analyst nothing they
  * could act on and handed them an exception string from a third party. We name
  * the source in words and say what the gap means for their results; the detail
  * stays in the console.
@@ -63,13 +63,13 @@ export default function DashboardPage() {
   // Read from the client, after the shell has rendered: the guest banner must
   // not be server-rendered into cacheable HTML either way, and `isPending` (not
   // the absence of `data`) is what keeps it off-screen until Better Auth has
-  // actually answered — `data` is null while the check is in flight too.
+  // actually answered - `data` is null while the check is in flight too.
   const sessionState = authClient.useSession();
   const guest = isGuestSession(sessionState);
   // While Better Auth has not answered, nobody is "not a guest" yet: rendering
   // the account-only cards now would fire /api/history (and /api/trend once a
   // target is set) on behalf of a visitor who is about to be told they have no
-  // history — one wasted request plus an error badge flash. Pending = skeleton.
+  // history - one wasted request plus an error badge flash. Pending = skeleton.
   const authPending = sessionState.isPending;
 
   const run = useCallback(async (t: string, force: boolean) => {
@@ -110,7 +110,7 @@ export default function DashboardPage() {
       setError(
         e instanceof Error && e.message
           ? e.message
-          : "We could not open that saved scan. It may have been removed — try again in a moment.",
+          : "We could not open that saved scan. It may have been removed. Try again in a moment.",
       );
     } finally {
       setLoading(false);
@@ -123,7 +123,7 @@ export default function DashboardPage() {
 
   return (
     <AppShell target={target}>
-      {/* 0 — Guest banner. Above everything because it explains the two limits
+      {/* 0 - Guest banner. Above everything because it explains the two limits
           the visitor is about to meet: the daily quota and the absent history.
           Rendered only once Better Auth has said there is no session, so a
           signed-in analyst never sees it flash. */}
@@ -150,14 +150,14 @@ export default function DashboardPage() {
         </Card>
       )}
 
-      {/* 1 — Search */}
+      {/* 1 - Search */}
       <Card>
         <CardHeader>
           <div className="flex items-center justify-between gap-2">
             <div>
               <CardTitle>New scan</CardTitle>
               <CardDescription>
-                Reads public records about your target, never the target itself — DNS lookups show in its nameserver logs.
+                Check public records for a domain or IP. We never scan the target directly.
               </CardDescription>
             </div>
             {target && (
@@ -187,18 +187,16 @@ export default function DashboardPage() {
                   </li>
                 ))}
               </ul>
-              <p className="text-xs opacity-60">
-                Anything missing below was not checked, not confirmed absent. Run the scan again to retry.
-              </p>
+              <p className="text-xs text-fg-muted">Anything missing was not checked, not confirmed absent.</p>
             </div>
           )}
         </CardContent>
       </Card>
 
-      {/* 2 — Stats: one instrument strip, not four gradient cards. The strip is
+      {/* 2 - Stats: one instrument strip, not four gradient cards. The strip is
           divided by hairlines (gap-px over a bordered surface) rather than by
           four separate card borders, and it carries no icon chips and no hover
-          state — three of the four old cards advertised a hover they could not
+          state - three of the four old cards advertised a hover they could not
           honour. `tabular-nums` stays: these numbers change in place, and
           proportional figures would jitter the whole strip as they did. */}
       <div
@@ -214,14 +212,14 @@ export default function DashboardPage() {
                 <CardWash index={i} />
                 <p className="relative text-sm text-slate-600 dark:text-neutral-400">{s.label}</p>
                 <p className="relative mt-1 font-mono text-3xl font-bold tabular-nums">{s.value}</p>
-                <p className="relative mt-1 truncate text-xs text-slate-500 dark:text-neutral-500">{s.hint}</p>
+                <p className="relative mt-1 truncate text-xs text-fg-muted">{s.hint}</p>
               </div>
             ))}
       </div>
 
-      {/* 3 — Charts side by side. The trend is account-scoped (it reads rows
+      {/* 3 - Charts side by side. The trend is account-scoped (it reads rows
           from history), so a guest gets the reason instead of a chart that
-          would 401 — a dark chart with no data reads as "your trend is empty",
+          would 401 - a dark chart with no data reads as "your trend is empty",
           which is not what happened. */}
       <div className="grid gap-4 lg:grid-cols-2">
         <PortsChart scan={scan} />
@@ -244,24 +242,24 @@ export default function DashboardPage() {
         )}
       </div>
 
-      {/* 4 — Open ports & services, full width */}
+      {/* 4 - Open ports & services, full width */}
       <PortsTable scan={scan} loading={loading} error={null} />
 
-      {/* 4b — CVE evidence, full width */}
+      {/* 4b - CVE evidence, full width */}
       <VulnerabilitiesCard scan={scan} loading={loading} />
 
-      {/* 4c — Threat intelligence history. Renders only when the vulnerability tab
+      {/* 4c - Threat intelligence history. Renders only when the vulnerability tab
           came back empty, which is exactly when this card has something honest
           to add; a populated CVE list means history never ran. */}
       <ThreatHistoryCard history={scan?.results.history} loading={loading} />
 
-      {/* 5 — Subdomains + WHOIS side by side */}
+      {/* 5 - Subdomains + WHOIS side by side */}
       <div className="grid gap-4 lg:grid-cols-2">
         <SubdomainsTable scan={scan} loading={loading} />
         <WhoisCard scan={scan} loading={loading} />
       </div>
 
-      {/* 6 — History + findings side by side. /api/history is account-only
+      {/* 6 - History + findings side by side. /api/history is account-only
           (require_user), so a guest gets the reason rather than a request that
           answers 401 and renders as an error badge next to a scan they can see.
           While auth is still pending nobody is a guest yet, so the slot holds a
@@ -291,14 +289,14 @@ export default function DashboardPage() {
             <CardDescription>
             {scan
               ? `${scan.target} · ${scanStatusLabel(scan.status)}`
-              : "Headline findings of your latest scan appear here."}
+              : "Headline findings from your latest scan appear here."}
           </CardDescription>
           </CardHeader>
           <CardContent className="relative">
             {!scan ? (
-              <p className="text-sm text-slate-500 dark:text-neutral-500">No findings yet — run a scan.</p>
+              <p className="text-sm text-fg-muted">No findings yet. Run a scan.</p>
             ) : findings.length === 0 ? (
-              <p className="text-sm text-slate-500 dark:text-neutral-500">No findings in this scan.</p>
+              <p className="text-sm text-fg-muted">No findings in this scan.</p>
             ) : (
               <ul className="flex flex-col gap-1.5 text-sm">
                 {findings.map((f) => (
@@ -312,7 +310,7 @@ export default function DashboardPage() {
         </Card>
       </div>
 
-      {/* 7 — Export. Last, because it is a verb on everything above it: the
+      {/* 7 - Export. Last, because it is a verb on everything above it: the
           file is built from the scan this page is already showing, so it cannot
           be offered before there is something to show. */}
       <ExportFindingsCard scan={scan} loading={loading} />
@@ -328,7 +326,7 @@ export default function DashboardPage() {
  * an answer for a visitor whose session has not been checked: mounting them
  * during `isPending` buys one doomed request (401, or a 502 while the backend
  * sleeps) and an error badge that disappears as soon as Better Auth answers.
- * A skeleton is the honest state — "we do not know whose history this is".
+ * A skeleton is the honest state - "we do not know whose history this is".
  */
 function PendingCard({ title }: { title: string }) {
   return (

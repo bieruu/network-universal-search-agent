@@ -13,19 +13,19 @@ import { PHASE_SECONDS, phaseDelay, phaseDeclarations } from "./motion-phases.ts
  * anything: prose about a rule is a rule that survives exactly until the next
  * person adds a loop and does not read the section. This file is the rule.
  *
- * FLOOR 1 — every loop collapses under `prefers-reduced-motion`.
+ * FLOOR 1 - every loop collapses under `prefers-reduced-motion`.
  *   Every `animate-*` in the frontend source must be `motion-safe:` gated, or
  *   the file must gate it in JS with `useReducedMotion()` (the only case where a
  *   class cannot work: JS-driven motion, where a class would look like a gate
  *   while doing nothing).
  *
- * FLOOR 2 — nothing readable ever moves.
+ * FLOOR 2 - nothing readable ever moves.
  *   Only `transform` / `opacity` / `filter` may be animated. No `width`,
- *   `height`, `margin`, `padding`, `top`, `left`, `font-size` — nothing that
+ *   `height`, `margin`, `padding`, `top`, `left`, `font-size` - nothing that
  *   reflows. Table rows, risk figures and banners hold still because a row that
  *   moves every frame is a row that cannot be read.
  *
- * FLOOR 3 (the one that keeps 1 and 2 from rotting) — one period table.
+ * FLOOR 3 (the one that keeps 1 and 2 from rotting) - one period table.
  *   `lib/motion-phases.ts` is the only place a duration or a delay may be
  *   invented, and `phaseDeclarations()` emits the CSS `--animate-*` lines that
  *   `globals.css` must carry. A stylesheet that drifts from the table is two
@@ -64,7 +64,7 @@ test("floor 1: every looping class is motion-safe gated", () => {
 });
 
 test("floor 1b: motion driven from JS is gated in JS, not with a class", () => {
-  // A class cannot gate a value that is set from JS — `motion-safe:` would sit in
+  // A class cannot gate a value that is set from JS - `motion-safe:` would sit in
   // the className looking like a gate while the `motion.div` keeps animating. So
   // every file that drives motion itself must ask the system.
   const drivers = SOURCES.filter(({ src }) => /from "(?:motion|framer-motion)\/react"/.test(src));
@@ -72,7 +72,7 @@ test("floor 1b: motion driven from JS is gated in JS, not with a class", () => {
   for (const { rel, src } of drivers) {
     assert.ok(
       src.includes("useReducedMotion"),
-      `${rel} animates from JS but never calls useReducedMotion() — a class gate would be theatre here`,
+      `${rel} animates from JS but never calls useReducedMotion() - a class gate would be theatre here`,
     );
   }
 });
@@ -83,12 +83,12 @@ test("floor 2: no keyframe animates a layout property", () => {
   const found = [...blocks];
   assert.ok(found.length >= 8, `expected the project's keyframes, found ${found.length}`);
   // Only compositor-friendly properties. Anything absent from this list is
-  // something that moves other content — the failure mode floor 2 exists for.
+  // something that moves other content - the failure mode floor 2 exists for.
   const allowed = new Set(["transform", "opacity", "filter"]);
   for (const [, name, body] of found) {
     const props = [...body.matchAll(/([-a-z]+)\s*:/g)].map((m) => m[1]);
     for (const p of props) {
-      assert.ok(allowed.has(p), `@keyframes ${name} animates "${p}" — only transform/opacity/filter may move`);
+      assert.ok(allowed.has(p), `@keyframes ${name} animates "${p}" - only transform/opacity/filter may move`);
     }
   }
 });
@@ -115,12 +115,12 @@ test("floor 3: the stylesheet's periods are the shared table's periods", () => {
 
 // The globe's period used to be 3 seconds, advanced once per animation frame.
 // Two bugs stacked: a three-second revolution reads as a spinner, and a
-// per-frame step means the "period" was really `3s at 60fps` — measured at
+// per-frame step means the "period" was really `3s at 60fps` - measured at
 // 41fps on one machine and 144fps on another. Both halves are gone: the period
 // is a slow rotation, and every consumer multiplies it by elapsed time.
 test("the globe period is a rotation, not a spin", () => {
   const seconds = PHASE_SECONDS.globe;
-  assert.ok(seconds >= 40, `globe: ${seconds}s per revolution is a spin — keep it at 40s or slower`);
+  assert.ok(seconds >= 40, `globe: ${seconds}s per revolution is a spin - keep it at 40s or slower`);
   assert.ok(seconds <= 120, `globe: ${seconds}s per revolution is so slow it reads as a frozen image`);
 });
 
@@ -137,7 +137,7 @@ test("the phase table spreads delays instead of clumping them", () => {
       assert.notEqual(offsets[i], offsets[i - 1], `${name}: delays ${i - 1} and ${i} collide`);
     }
     // And they do not collapse onto a handful of values.
-    assert.ok(new Set(offsets).size >= 5, `${name}: delays clump — the spread collapsed`);
+    assert.ok(new Set(offsets).size >= 5, `${name}: delays clump - the spread collapsed`);
   }
 });
 

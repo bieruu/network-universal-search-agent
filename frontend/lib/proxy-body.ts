@@ -3,7 +3,7 @@
  *
  * WHY THIS EXISTS
  *     The proxies under `app/api/**` sit in front of the backend, but they are
- *     NOT where authentication happens — `middleware.ts` matches only
+ *     NOT where authentication happens - `middleware.ts` matches only
  *     `/dashboard/:path*`, and the real gate is the backend's `require_user()`.
  *     Route handlers also read the whole body before any of that matters
  *     (`await req.text()`), and a Next.js App Router route handler has no
@@ -12,7 +12,7 @@
  *     Net effect before this module: an anonymous caller could make the Node
  *     server buffer an arbitrarily large JSON document on the way to being
  *     forwarded to a backend that would answer 401. The payload was spent in
- *     memory twice over — once here, once in the backend worker — before
+ *     memory twice over - once here, once in the backend worker - before
  *     anything said no.
  *
  *     The guard is deliberately in `lib/` and free of Next imports so it can be

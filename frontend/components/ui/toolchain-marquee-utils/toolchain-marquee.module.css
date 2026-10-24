@@ -1,5 +1,5 @@
 /*
- * Toolchain marquee — the landing's tech-stack section.
+ * Toolchain marquee - the landing's tech-stack section.
  *
  * WHY THIS IS THEMED FROM THE PAGE'S OWN TOKENS
  * --------------------------------------------
@@ -8,7 +8,7 @@
  * accent and a locked token set, so importing a second palette would have
  * produced two competing design systems on one page. Every surface below is
  * therefore built from the page's tokens (`--panel`, `--btn-border`,
- * `--foreground`, `--radius`), which already carry both themes — the component
+ * `--foreground`, `--radius`), which already carry both themes - the component
  * inherits dark/light for free and there is nothing to re-declare.
  *
  * WHY THE MARKS KEEP VENDOR COLOUR
@@ -16,7 +16,7 @@
  * Same decision as the dock this replaces: PostgreSQL is blue, Tailwind is
  * cyan, and flattening every mark to the accent would both misidentify the
  * tools and waste the one thing a mark is for. The vendor values are declared
- * as --tool-* custom properties in pp/globals.css — NOT here, because CSS
+ * as --tool-* custom properties in pp/globals.css - NOT here, because CSS
  * Modules rejects :root and .dark as impure selectors and the whole sheet
  * failed to compile when they were tried in this file. Keeping them in
  * globals.css also puts them beside every other page token and its .dark
@@ -68,7 +68,7 @@
 
 /*
  * Reduced motion: the row stops moving and becomes a scroll container. The
- * marks stay on the page and stay reachable — they simply do not drift.
+ * marks stay on the page and stay reachable - they simply do not drift.
  */
 .root[data-reduced-motion] .viewport {
   overflow-x: auto;
@@ -93,8 +93,8 @@
 
 /*
  * The badge is the same family as the terminal and bento cards: panel surface,
- * hairline border, mono type. The vendor colour appears on ONE element — the
- * icon — never as a fill, so the row still reads as one row of the page rather
+ * hairline border, mono type. The vendor colour appears on ONE element - the
+ * icon - never as a fill, so the row still reads as one row of the page rather
  * than fifteen different colours shouting.
  */
 .badge {
@@ -126,7 +126,7 @@
   height: 0.95rem;
 }
 
-/* Pause/play control — only rendered when a caller asks for it. */
+/* Pause/play control - only rendered when a caller asks for it. */
 .control {
   align-self: center;
   display: inline-flex;

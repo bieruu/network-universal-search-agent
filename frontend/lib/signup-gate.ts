@@ -117,7 +117,7 @@ export function resolveSignupPolicy(env: SignupEnv = process.env): SignupPolicy 
  * which Better Auth runs for BOTH the email/password sign-up endpoint and
  * OAuth account creation, so it cannot be side-stepped with "Continue with
  * Google". Returning `false` aborts the insert before any row is written.
- * Existing accounts are untouched — only creation is gated.
+ * Existing accounts are untouched - only creation is gated.
  */
 export function canCreateAccount(
   email: string | null | undefined,
@@ -151,7 +151,7 @@ export const SIGNUP_RESTRICTED_BODY =
  * resolve a trustworthy client IP it substitutes the literal `no-trusted-ip`,
  * so the whole internet shares one bucket per path. For `/sign-up/*` that
  * bucket is 3 requests / 10 seconds, so a single caller can lock every other
- * caller out — a user-DoS, not an auth bypass, but still an outage.
+ * caller out - a user-DoS, not an auth bypass, but still an outage.
  *
  * Everything below is a reading of the installed `better-auth@1.7.7` /
  * `@better-auth/core@1.7.7`; `lib/auth-rate-limit.test.ts` imports those
@@ -171,7 +171,7 @@ export const SIGNUP_RESTRICTED_BODY =
  *  - `advanced.ipAddress.ipAddressHeaders` cannot help either. Reordering only
  *    matters if some other header is single-valued when `x-forwarded-for` is
  *    not, and Vercel's docs describe `x-real-ip` as "identical to the
- *    `x-forwarded-for` header" — so a chain that defeats the default defeats
+ *    `x-forwarded-for` header" - so a chain that defeats the default defeats
  *    the alternative too. Preferring it would additionally let a directly
  *    reachable origin mint a fresh bucket per request with a forged header.
  *  - `advanced.ipAddress.disableIpTracking` is strictly worse than doing
@@ -193,7 +193,7 @@ export type IpAddressConfig = {
    */
   trustedProxies: string[];
   /**
-   * How many operator-supplied entries were rejected. A count only — proxy
+   * How many operator-supplied entries were rejected. A count only - proxy
    * addresses describe internal network topology and are never logged.
    */
   rejected: number;
@@ -269,7 +269,7 @@ export function parseTrustedProxyEntry(raw: string): string | null {
  *
  * Default is an empty list, i.e. Better Auth's own behaviour: unresolved IP
  * becomes the shared `no-trusted-ip` bucket. Nothing here widens the attacker's
- * budget on its own — the only way a forwarded chain becomes trusted is for an
+ * budget on its own - the only way a forwarded chain becomes trusted is for an
  * operator to name the hops they actually operate.
  */
 export function resolveIpAddressConfig(env: SignupEnv = process.env): IpAddressConfig {
@@ -291,7 +291,7 @@ export function resolveIpAddressConfig(env: SignupEnv = process.env): IpAddressC
 
 /**
  * Operator-facing warning for entries that were dropped, or `null` when the
- * configuration is clean. Counts only — never the values.
+ * configuration is clean. Counts only - never the values.
  */
 export function describeRejectedTrustedProxies(config: IpAddressConfig): string | null {
   if (config.rejected === 0) return null;

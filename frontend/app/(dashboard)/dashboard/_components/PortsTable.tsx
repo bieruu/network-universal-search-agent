@@ -36,10 +36,10 @@ export default function PortsTable({
         ) : error ? (
           <Badge variant="destructive">{error}</Badge>
         ) : services.length === 0 ? (
-          <p className="text-sm text-slate-500 dark:text-neutral-500">
+          <p className="text-sm text-fg-muted">
             {scan?.errors.some((e) => e.source === "shodan")
-              ? "Shodan and its fallback could not be reached — see the source error above."
-              : "No open ports were found for this host."}
+              ? "Shodan and its fallback could not be reached - see the source error above."
+              : "Shodan's records list no open ports. That is not a scan of the host and not proof they are closed."}
           </p>
         ) : (
           <div className="max-h-[320px] overflow-auto">
@@ -59,8 +59,8 @@ export default function PortsTable({
                   return (
                     <TRow key={s.port}>
                       <TD className="font-mono">{s.port}</TD>
-                      <TD>{s.product ?? "—"}</TD>
-                      <TD>{s.version ?? "—"}</TD>
+                      <TD>{s.product ?? "-"}</TD>
+                      <TD>{s.version ?? "-"}</TD>
                       <TD className="max-w-xs truncate" title={banner || termNote("banner")}>
                         {banner ? (
                           <>
@@ -68,7 +68,7 @@ export default function PortsTable({
                             {cut && <span className="ml-1 opacity-60">(cut short)</span>}
                           </>
                         ) : (
-                          "—"
+                          "-"
                         )}
                       </TD>
                     </TRow>

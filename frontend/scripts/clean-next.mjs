@@ -4,7 +4,7 @@
 //   When the repo lives under OneDrive (Windows "Files On-Demand"), the files
 //   inside `.next` can become placeholder / reparse points. Next.js cleans
 //   `.next` on startup with its own recursive delete that calls `readlink` on
-//   every entry — reparse points throw `EINVAL`, so `next dev` / `next build`
+//   every entry - reparse points throw `EINVAL`, so `next dev` / `next build`
 //   crash before they ever become Ready:
 //     EINVAL: invalid argument, readlink '...\.next\types\package.json'
 //   Node's own `rm` tolerates those entries, so a pre-clean avoids the crash.

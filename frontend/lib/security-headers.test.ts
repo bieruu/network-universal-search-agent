@@ -22,7 +22,7 @@ const csp = read("lib", "csp.ts");
 test("the inline theme script survives an enforcing CSP", () => {
   const script = layout.match(/dangerouslySetInnerHTML=\{\{\s*__html: `([\s\S]*?)`/);
   assert.ok(script, "inline theme script not found in app/layout.tsx");
-  // The script body must stay exactly what it was — it is the theme bootstrap,
+  // The script body must stay exactly what it was - it is the theme bootstrap,
   // and editing it while pinning a hash is how a FOUC regression ships.
   assert.ok(
     script[1].includes("document.documentElement.classList.toggle('dark', isDark)"),
@@ -58,7 +58,7 @@ test("the CSP is set on both the request and the response hand-off", () => {
     "middleware must forward the request headers through NextResponse.next",
   );
   // Response side: the policy the browser actually enforces. Every response
-  // leaves through this path — and after the 2026-10-14 reversal there is only
+  // leaves through this path - and after the 2026-10-14 reversal there is only
   // one path, because the two refusal branches are gone (see the test below).
   assert.ok(
     /response\.headers\.set\(\s*headerName\s*,\s*policy\s*\)/.test(middleware),
@@ -66,8 +66,8 @@ test("the CSP is set on both the request and the response hand-off", () => {
   );
   // Reversal 2026-10-14 (operator, guest scan): the two branches these used to
   // pin are deliberately gone.
-  //   * `send(unavailable())` answered a 503 to EVERY matched page — including
-  //     "/" — whenever BETTER_AUTH_URL was unset or not https in production, so
+  //   * `send(unavailable())` answered a 503 to EVERY matched page - including
+  //     "/" - whenever BETTER_AUTH_URL was unset or not https in production, so
   //     an auth misconfiguration could refuse the landing page with the
   //     sentence "Sign-in is temporarily unavailable."
   //   * `send(redirectToSignIn(req))` sent every signed-out /dashboard to
@@ -143,7 +143,7 @@ test("next.config.mjs no longer ships a CSP", () => {
   // inline script on the very first render.
   assert.ok(
     !/Content-Security-Policy/i.test(config),
-    "next.config.mjs must not set any CSP header — middleware owns it",
+    "next.config.mjs must not set any CSP header - middleware owns it",
   );
   assert.ok(
     !/sha256-/i.test(config),
@@ -190,7 +190,7 @@ test("the dashboard session gate is gone, and nothing else took its place", () =
   // Removed 2026-10-14 by the operator-approved guest-scan reversal (see
   // DESIGN.md): a signed-out visitor renders /dashboard in guest mode and scans
   // against a daily quota, so redirecting them to /sign-in was precisely the
-  // behaviour the reversal removed. Authorization did not move with it — the
+  // behaviour the reversal removed. Authorization did not move with it - the
   // backend has always owned that, on `require_user` for every account-only
   // route and `require_user_or_guest` for the two scan routes. What is given up
   // is the fail-closed HTML gate: the shell renders for anyone and the API
@@ -209,7 +209,7 @@ test("the dashboard session gate is gone, and nothing else took its place", () =
   );
   assert.ok(
     !middleware.includes("UNAVAILABLE_BODY"),
-    "the fail-closed page body must not return — it could refuse the landing page",
+    "the fail-closed page body must not return - it could refuse the landing page",
   );
   // What the matcher is still for: minting one nonce per rendered document.
   assert.ok(middleware.includes("generateNonce()"), "the nonce must still be minted per request");

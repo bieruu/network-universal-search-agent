@@ -56,20 +56,20 @@ export default function Nav() {
           </span>
         </Link>
         <div className="hidden items-center gap-7 text-sm text-slate-600 dark:text-neutral-400 md:flex">
-          <Link href="#sources" className="transition-colors hover:text-accent">
+          <Link href="#sources" className="transition-colors hover:text-accent-text">
             Sources
           </Link>
-          <Link href="#how" className="transition-colors hover:text-accent">
+          <Link href="#how" className="transition-colors hover:text-accent-text">
             How it works
           </Link>
-          <Link href="#security" className="transition-colors hover:text-accent">
+          <Link href="#security" className="transition-colors hover:text-accent-text">
             Security
           </Link>
         </div>
         <div className="flex items-center gap-2">
           {/* The repo link sits with the anchors it belongs to: hidden below
               `md`, the same breakpoint the anchor cluster above collapses at.
-              That is not only consistency — the nav at 390px is already
+              That is not only consistency - the nav at 390px is already
               monogram + wordmark + toggle + CTA, and a fourth fixed-width
               control pushes the row past the viewport.
 
@@ -81,14 +81,14 @@ export default function Nav() {
             target="_blank"
             rel="noreferrer noopener"
             aria-label={GITHUB_LINK_LABEL}
-            className="hidden h-10 w-10 items-center justify-center rounded-full border border-border/80 bg-background/80 text-foreground transition-colors hover:bg-accent/10 hover:text-accent focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-accent/40 md:inline-flex"
+            className="hidden h-10 w-10 items-center justify-center rounded-full border border-btn-border/80 bg-background/80 text-foreground transition-colors hover:bg-accent/10 hover:text-accent focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-accent/40 md:inline-flex"
           >
             <GithubMark />
           </a>
-          <ThemeToggle className="border border-border/80 bg-background/80 hover:bg-accent/10" />
+          <ThemeToggle className="border border-btn-border/80 bg-background/80 hover:bg-accent/10" />
           <Link
             href="/dashboard"
-            className="rounded-full bg-accent px-5 py-2 text-sm font-semibold text-accent-foreground transition-all duration-300 ease-out hover:-translate-y-0.5 hover:bg-accent-hover hover:shadow-md hover:shadow-accent/25 active:translate-y-0 motion-reduce:transition-colors motion-reduce:hover:translate-y-0"
+            className="relative inline-flex h-8 items-center rounded-full bg-accent px-3 text-xs font-semibold text-accent-foreground transition-colors duration-200 after:absolute after:-inset-1.5 after:content-[''] hover:bg-accent-hover focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-accent/50 sm:h-9 sm:px-4 sm:text-sm sm:hover:-translate-y-0.5 sm:hover:shadow-md sm:hover:shadow-accent/25 sm:active:translate-y-0 sm:motion-reduce:hover:translate-y-0"
           >
             Open dashboard
           </Link>

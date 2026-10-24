@@ -57,7 +57,7 @@ const signupPolicy = resolveSignupPolicy();
 
 // Better Auth rate-limits on `${ip}|${path}` and falls back to the literal
 // `no-trusted-ip` when it cannot resolve a trustworthy client IP, which makes
-// every caller share one bucket — 3 requests / 10 seconds on `/sign-up/*`, so
+// every caller share one bucket - 3 requests / 10 seconds on `/sign-up/*`, so
 // one caller could lock out every other caller. `trustedProxies` is the only
 // option in better-auth 1.7.7 that resolves a multi-hop `x-forwarded-for`, and
 // it can only be set by an operator who knows their own topology, so it stays
@@ -107,7 +107,7 @@ export const auth = betterAuth({
     disableSignUp: !signupPolicy.enabled,
     // Required for the reset flow at all: without it Better Auth answers
     // `RESET_PASSWORD_DISABLED`. The sender never throws and never varies its
-    // result by account existence — see `lib/reset-email.ts`.
+    // result by account existence - see `lib/reset-email.ts`.
     sendResetPassword,
   },
   socialProviders,

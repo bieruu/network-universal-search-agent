@@ -16,3 +16,5 @@ dist/
 *.log
 graphify-out/
 .opencode
+# Browser session artifacts (console logs, page snapshots) must never be committed.
+.playwright-mcp/

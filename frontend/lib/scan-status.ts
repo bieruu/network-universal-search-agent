@@ -6,7 +6,7 @@
  * that, both serious enough to warrant a dedicated map:
  *
  *  1. `partial` reads as a minor footnote. It actually means "some sources
- *     failed and you are looking at an incomplete picture" — the exact moment
+ *     failed and you are looking at an incomplete picture" - the exact moment
  *     where a user is most likely to read absence-of-findings as safety. It
  *     must not render as a single neutral word.
  *  2. The NVD enum is snake_case (`insufficient_evidence`). An underscore in
@@ -17,7 +17,7 @@ import type { NvdStatus, ScanStatus } from "./api.ts";
 import { plural } from "./terms.ts";
 
 export interface StatusView {
-  /** Badge text. Complete on its own — never a bare identifier. */
+  /** Badge text. Complete on its own - never a bare identifier. */
   label: string;
   /** One line saying what this state means for the user's data. */
   detail: string;
@@ -28,7 +28,7 @@ export interface StatusView {
 const SCAN_STATUS: Record<ScanStatus, StatusView> = {
   pending: {
     label: "Queued",
-    detail: "In the queue — it will start shortly.",
+    detail: "In the queue. It will start shortly.",
     tone: "secondary",
   },
   running: {
@@ -43,7 +43,7 @@ const SCAN_STATUS: Record<ScanStatus, StatusView> = {
   },
   partial: {
     label: "Partly answered",
-    detail: "A source failed, so the result is incomplete. Missing items were not checked — treat them as unknown, not absent.",
+    detail: "A source failed, so some items are unknown, not absent.",
     tone: "default",
   },
   failed: {
@@ -59,12 +59,12 @@ export function scanStatusView(status: ScanStatus | string | null | undefined): 
   }
   return {
     label: "Unknown",
-    detail: "Unknown status returned — treat the result as unknown, not clean.",
+    detail: "Unknown status. Treat the result as unknown, not clean.",
     tone: "outline",
   };
 }
 
-/** Short badge text only — for dense rows like the history list. */
+/** Short badge text only - for dense rows like the history list. */
 export function scanStatusLabel(status: ScanStatus | string | null | undefined): string {
   return scanStatusView(status).label;
 }
@@ -72,27 +72,27 @@ export function scanStatusLabel(status: ScanStatus | string | null | undefined):
 const NVD_STATUS: Record<NvdStatus, StatusView> = {
   found: {
     label: "Checked against known vulnerabilities",
-    detail: "Catalogue entries match the running product and version exactly.",
+    detail: "Entries match the running product and version exactly.",
     tone: "default",
   },
   no_match: {
-    label: "Checked — no matching entries",
-    detail: "No catalogue entry matches the exact product and version — not proof the host is safe.",
+    label: "Checked - no matching entries",
+    detail: "No entry matches this exact version. That is not proof the host is safe.",
     tone: "secondary",
   },
   insufficient_evidence: {
     label: "Could not check",
-    detail: "The running software did not advertise an exact product and version. Coverage is unknown, not zero.",
+    detail: "No exact product and version was advertised. Coverage is unknown, not zero.",
     tone: "outline",
   },
   unavailable: {
     label: "Database unreachable",
-    detail: "The vulnerability database did not respond — incomplete, not empty.",
+    detail: "The database did not respond. Incomplete, not empty.",
     tone: "destructive",
   },
   keyword_derived: {
     label: "Keyword leads only",
-    detail: "No exact match, so entries are listed because their description mentions a detected product. Investigate — not confirmed.",
+    detail: "Listed because a description mentions a detected product. Investigate, not confirmed.",
     tone: "outline",
   },
 };
@@ -117,12 +117,12 @@ export const CVE_TIER: Record<string, StatusView> = {
   },
   unverified: {
     label: "Reported, unconfirmed",
-    detail: "A public index reported this vulnerability for this host, but we could not confirm it against the exact product and version.",
+    detail: "A public index reported it. We could not confirm the exact version.",
     tone: "outline",
   },
   rejected: {
     label: "Rejected by the publisher",
-    detail: "The catalogue vendor marked this entry as rejected or disputed. Shown for completeness — never counted.",
+    detail: "The publisher marked this entry rejected or disputed. Never counted.",
     tone: "secondary",
   },
 };

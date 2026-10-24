@@ -4,16 +4,16 @@ import { ThemeToggle } from "@/components/ui/theme-toggle";
 import DemoReportView from "./demo-report-view";
 
 /**
- * `/demo` — a finished report anyone can open, signed in or not.
+ * `/demo` - a finished report anyone can open, signed in or not.
  *
  * WHY NO SESSION IS READ: the middleware is CSP-only since the guest-scan
  * reversal (see `middleware.ts`), so nothing redirects this route, and the
- * page itself never asks who is looking — the fixtures are the same for a
+ * page itself never asks who is looking - the fixtures are the same for a
  * visitor and for an account. That is the whole point of item (a): a target
  * that can be inspected from the landing page without an account and without
  * a backend. One caveat worth writing down: the root layout calls `headers()`
  * for the CSP nonce, so this route renders per request like the rest of the
- * app — but a render makes no outbound request either, which the contract in
+ * app - but a render makes no outbound request either, which the contract in
  * `lib/demo-page.test.ts` pins at source level.
  *
  * METADATA: the title and description say "simulated"/"no live scan" in
@@ -21,7 +21,7 @@ import DemoReportView from "./demo-report-view";
  * results where it could read as a real finding.
  */
 export const metadata: Metadata = {
-  title: "Demo report — simulated output, no live scan",
+  title: "Demo report: sample data, no live scan",
   description:
     "A static sample of the report, built from shipped fixtures: no source is contacted and no request is made.",
   robots: { index: false, follow: true },
@@ -29,7 +29,7 @@ export const metadata: Metadata = {
 
 /**
  * Minimal chrome, shaped like the landing nav (same monogram ring, same
- * controls) minus the anchor cluster — those anchors point at sections that
+ * controls) minus the anchor cluster - those anchors point at sections that
  * only exist on `/`, and a nav full of dead links is worse than a short one.
  */
 function DemoHeader() {
@@ -48,11 +48,11 @@ function DemoHeader() {
             N
           </span>
           <span className="font-mono text-sm font-semibold tracking-tight text-foreground dark:text-neutral-100">
-            NUSA project — demo
+            NUSA project: demo
           </span>
         </Link>
         <div className="flex items-center gap-2">
-          <ThemeToggle className="border border-border/80 bg-background/80 hover:bg-accent/10" />
+          <ThemeToggle className="border border-btn-border/80 bg-background/80 hover:bg-accent/10" />
           <Link
             href="/dashboard"
             className="rounded-full bg-accent px-5 py-2 text-sm font-semibold text-accent-foreground transition-all duration-300 ease-out hover:-translate-y-0.5 hover:bg-accent-hover hover:shadow-md hover:shadow-accent/25 active:translate-y-0 motion-reduce:transition-colors motion-reduce:hover:translate-y-0"

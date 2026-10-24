@@ -20,7 +20,7 @@ export async function GET(req: NextRequest) {
     // account has no scans"; returning that shape for a failed request makes a
     // dead backend indistinguishable from a new account, and the dashboard
     // renders it as the friendly "No scans yet" empty state. Propagate a real
-    // failure instead — `lib/api.ts` maps the status to a sentence the UI shows.
+    // failure instead - `lib/api.ts` maps the status to a sentence the UI shows.
     return NextResponse.json({ error: messageForStatus(502) }, { status: 502 });
   }
 }

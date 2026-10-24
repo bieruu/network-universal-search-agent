@@ -4,7 +4,7 @@ import { buttonClasses } from "@/components/ui/button";
 import { resolveSignupPolicy, signupClosedBody, SIGNUP_CLOSED_TITLE } from "@/lib/signup-gate";
 import SignUpForm from "./sign-up-form";
 
-// The gate below is presentation only — the authoritative check lives in
+// The gate below is presentation only - the authoritative check lives in
 // `lib/auth.ts` (betterAuth `databaseHooks.user.create.before`), which cannot
 // be bypassed by posting straight to the auth endpoint. This route is forced
 // dynamic so the copy always reflects the env actually loaded at request time

@@ -15,7 +15,7 @@ import SecurityStrip from "./_components/landing/SecurityStrip";
 import StackStrip from "./_components/landing/StackStrip";
 
 export const metadata: Metadata = {
-  title: "NUSA project — see what a domain exposes",
+  title: "NUSA project: see what a domain exposes",
   description:
     "Search a domain or IP; read its open ports, subdomains, registration details and risk score.",
 };
@@ -85,12 +85,12 @@ export default async function Home() {
   const sample = await latestScanLines(cookie);
 
   return (
-    <div className="relative isolate bg-background text-foreground dark:bg-[#0a0f14] dark:text-neutral-100">
+    <div className="relative isolate bg-background text-foreground">
       {/* Full-bleed ambient layer behind nav + hero: spans the whole viewport
           width (no centered max-w strip → no hard vertical edges) and fades
           out toward the bottom so nothing reads as a cut-off rectangle.
           Decorative only: pointer-events-none, behind content via -z-10.
-          Order is the depth order — grid, wash, parallax washes. */}
+          Order is the depth order - grid, wash, parallax washes. */}
       <div
         aria-hidden="true"
         className="pointer-events-none absolute inset-x-0 top-0 -z-10 h-[100dvh] overflow-hidden [mask-image:linear-gradient(to_bottom,black_58%,transparent)]"

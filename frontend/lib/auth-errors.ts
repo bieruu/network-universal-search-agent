@@ -6,7 +6,7 @@
  * or control. Rendering it verbatim puts `INVALID_EMAIL_OR_PASSWORD`,
  * `INVALID_PROVIDER`, `STATE_MISMATCH` and `USER_BANNED` on screen, and the
  * `catch` fallbacks next to it told end users to "check provider
- * configuration" — an operator message, not a user one.
+ * configuration" - an operator message, not a user one.
  *
  * The house voice (see `lib/user-errors.ts`): what failed, why when known, what
  * to do next. Two rules this file must never break:
@@ -36,7 +36,7 @@ function hasAny(haystack: string, needles: string[]): boolean {
 }
 
 /**
- * Sign-in. Used on BOTH the email/password path and the OAuth path — the
+ * Sign-in. Used on BOTH the email/password path and the OAuth path - the
  * second one used to be the worst offender, because OAuth codes arrive on the
  * normal `result.error` branch with no catch of their own.
  */
@@ -53,7 +53,7 @@ export function describeSignInError(error: RawError): string {
   }
 
   // One message for "wrong password", "no such user" and "account exists but
-  // uses a social login" — any split would tell an attacker which addresses
+  // uses a social login" - any split would tell an attacker which addresses
   // have accounts here.
   if (
     hasAny(text, [
@@ -126,7 +126,7 @@ export function describeSignInError(error: RawError): string {
  * deliberately generic FAILED_TO_CREATE_USER / EMAIL_PASSWORD_SIGN_UP_DISABLED
  * so an anonymous caller cannot probe the allowlist. "Failed to create user" is
  * useless to someone who mistyped their address, so map it to something
- * actionable — without splitting the known-email case from the unknown one.
+ * actionable - without splitting the known-email case from the unknown one.
  */
 export function describeSignUpError(error: RawError): string {
   const text = textOf(error);
@@ -201,7 +201,7 @@ export function describeResetError(error: RawError): string {
 }
 
 /**
- * The one message the forgot-password page shows for EVERY outcome — success,
+ * The one message the forgot-password page shows for EVERY outcome - success,
  * unknown address, mail failure. Enumeration defence: if the known-email and
  * unknown-email paths read differently, this form becomes an account oracle.
  * It must therefore say nothing about whether the account exists.

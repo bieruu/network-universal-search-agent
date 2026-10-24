@@ -21,7 +21,7 @@ import AmbientLayer from "./ambient-layer";
 // so it is gone rather than faked.
 //
 // The ambient layer behind the shell is the 2026-10-12 reversal of the old
-// "dashboard data 100% static" lock — see `ambient-layer.tsx` for what the
+// "dashboard data 100% static" lock - see `ambient-layer.tsx` for what the
 // reversal kept. In short: the plane moves, nothing on it does.
 export default function AppShell({
   target,
@@ -35,7 +35,7 @@ export default function AppShell({
   const session = sessionState.data;
   // Logout only means something with a session to end. A guest clicking it
   // would call signOut() against no session and land on a sign-in page for an
-  // account they do not have — so the control is hidden instead of faked.
+  // account they do not have - so the control is hidden instead of faked.
   const guest = isGuestSession(sessionState);
 
   async function handleLogout() {
@@ -67,7 +67,7 @@ export default function AppShell({
           `absolute` and therefore out of flow, which leaves the sidebar and the
           inset as the two flex items again. `relative isolate` keeps the layer's
           `-z-10` inside this stacking context so it sits above the page
-          background and below the content — the same pattern the landing page
+          background and below the content - the same pattern the landing page
           already uses. */}
       <div className="relative isolate flex w-full">
         <AmbientLayer />
@@ -81,10 +81,14 @@ export default function AppShell({
                 </Button>
               </SheetTrigger>
               <SheetContent side="left">
-                <SheetHeader>
+                <SheetHeader className="shrink-0">
                   <SheetTitle>NUSA project</SheetTitle>
                 </SheetHeader>
-                <App1Sidebar active="/dashboard" className="flex w-full border-r-0 p-0 max-md:flex" />
+                {/* The sheet is a fixed column: header, the sidebar's own
+                    scrolling body, then the Log out footer pinned at the
+                    bottom. The sheet itself must not scroll - when it did, the
+                    footer sat below the fold (operator report, 2026-10-21). */}
+                <App1Sidebar active="/dashboard" className="flex min-h-0 w-full flex-1 border-r-0 p-0 max-md:flex" />
               </SheetContent>
             </Sheet>
             <h1 className="min-w-0 flex-1 truncate text-base font-semibold">
@@ -92,7 +96,7 @@ export default function AppShell({
             </h1>
             {/* One session indicator, and one element rather than two: the
                 header used to print the account name and then the account's
-                initial again in an avatar beside it — the same fact twice. What
+                initial again in an avatar beside it - the same fact twice. What
                 is left says the one thing an analyst needs from chrome at a
                 glance: this session is live, and here is whose it is. */}
             {session?.user && (
@@ -105,7 +109,7 @@ export default function AppShell({
               </p>
             )}
             {/* The repo link, in the ghost icon-button family the header's
-                other controls already use — the same classes, on an <a>,
+                other controls already use - the same classes, on an <a>,
                 so it reads as one of the header's controls rather than a
                 stray link. Taken from `buttonClasses` rather than retyped so
                 the two cannot drift apart.

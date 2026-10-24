@@ -90,7 +90,7 @@ export default function HistoryList({
           // "No scans yet" and told a signed-in analyst their account was empty.
           <Badge variant="destructive">{error}</Badge>
         ) : shown.length === 0 ? (
-          <p className="text-sm text-slate-500 dark:text-neutral-500">No scans yet — run your first scan above.</p>
+          <p className="text-sm text-fg-muted">No scans yet. Run your first scan above.</p>
         ) : (
           <ul className="flex flex-col gap-2">
             {shown.map((h) => {
@@ -105,7 +105,7 @@ export default function HistoryList({
                     <span className="min-w-0 flex-1">
                       <span className="block truncate font-mono">{h.target}</span>
                       {when && (
-                        <span className="block text-xs text-slate-500 dark:text-neutral-500">{when}</span>
+                        <span className="block text-xs text-fg-muted">{when}</span>
                       )}
                     </span>
                     <Badge variant="secondary">{scanStatusLabel(h.status)}</Badge>

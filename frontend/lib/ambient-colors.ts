@@ -8,12 +8,12 @@
  * button does: three.js wants a colour, cobe wants `[r, g, b]` in 0..1, and
  * both need the value as text first. Each file used to parse the tokens for
  * itself, which is how the globe ended up sampling `--accent` and `--panel`
- * exactly once at mount — a theme toggle after that left a black sphere sitting
+ * exactly once at mount - a theme toggle after that left a black sphere sitting
  * on a white page, because the observer flipped `dark` but never the colours.
  * One reader, used by every consumer, means the fix applies everywhere.
  *
  * The parse mirrors `globals.css`: the tokens are bare HSL triplets
- * (`--accent: 160 100% 45%`), not `hsl(...)` calls — Tailwind wraps them only
+ * (`--accent: 160 100% 45%`), not `hsl(...)` calls - Tailwind wraps them only
  * at the `--color-*` layer.
  *
  * Browser-only (`getComputedStyle`), so every caller must already be a
@@ -31,7 +31,7 @@ export function readToken(name: string): string {
  * `160 100% 45%` → `[0, 1, 0.45ish]` as sRGB floats.
  *
  * Tolerates `hsl(...)` wrappers and comma separators because a token that is
- * spelled differently must not crash a decorative layer — it falls back to
+ * spelled differently must not crash a decorative layer - it falls back to
  * whatever parsed, defaulting to black.
  */
 export function hslTripletToRgb(triplet: string): Rgb {
@@ -56,7 +56,7 @@ export function hslTripletToRgb(triplet: string): Rgb {
 /**
  * A token as RGB floats, re-read from the DOM every call.
  *
- * `fallback` is what a caller renders if the token is missing or unparseable —
+ * `fallback` is what a caller renders if the token is missing or unparseable -
  * a decorative scene must degrade to a sensible colour, never to a crash or to
  * an unthemed white blob.
  */
@@ -64,7 +64,7 @@ export function tokenRgb(name: string, fallback: Rgb): Rgb {
   const raw = readToken(name);
   if (!raw) return fallback;
   const rgb = hslTripletToRgb(raw);
-  // Unparseable input yields NaN, and a NaN colour shows up as black — which
+  // Unparseable input yields NaN, and a NaN colour shows up as black - which
   // reads as "the theme broke" rather than as "the token was absent".
   return rgb.some((c) => !Number.isFinite(c)) ? fallback : rgb;
 }
@@ -79,7 +79,7 @@ export function mixRgb(a: Rgb, b: Rgb, t: number): Rgb {
  *
  * Commas, not spaces: three's `Color.setStyle` splits `rgb()` on commas, and a
  * space-separated triplet parses as a single component and comes out grey. The
- * values are sRGB — the same space the tokens are authored in — which is what
+ * values are sRGB - the same space the tokens are authored in - which is what
  * three expects before it converts to its working space.
  */
 export function rgbCss(c: Rgb): string {

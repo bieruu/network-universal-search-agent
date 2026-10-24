@@ -15,7 +15,7 @@ import {
  * failure they lock out is a request body being buffered before anything said
  * no: an oversized upload reaching the Node server on the way to a backend that
  * would answer 401 anyway. So the assertions below care less about the decoded
- * string than about WHEN the read is abandoned — the counting path must refuse
+ * string than about WHEN the read is abandoned - the counting path must refuse
  * on the chunk that crosses the cap, not after slurping the whole body.
  */
 
@@ -216,7 +216,7 @@ test("requestBodyChunks cancels the stream when the consumer stops early", async
   assert.equal(cancelled, true, "an early-returning consumer must cancel the upload");
   // Unlike the completed-stream path, the cancel branch does NOT release the
   // lock (it cancels instead), so the reader stays held. What matters is that
-  // the upload was aborted, asserted above — a leaked lock here is reclaimable,
+  // the upload was aborted, asserted above - a leaked lock here is reclaimable,
   // whereas an undrained hostile body is not.
   assert.equal(stream.locked, true);
 });

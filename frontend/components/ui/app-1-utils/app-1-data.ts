@@ -25,10 +25,10 @@ export const SOURCE_MONOGRAMS = [
 export function statsFromScan(scan: ScanResult | null): StatItem[] {
   if (!scan) {
     return [
-      { key: "ports", label: TERM.ports.label, value: "—", hint: "no scan yet" },
-      { key: "services", label: TERM.services.label, value: "—", hint: "no scan yet" },
-      { key: "vulns", label: TERM.cves.label, value: "—", hint: "no scan yet" },
-      { key: "subs", label: TERM.subdomains.label, value: "—", hint: "no scan yet" },
+      { key: "ports", label: TERM.ports.label, value: "-", hint: "no scan yet" },
+      { key: "services", label: TERM.services.label, value: "-", hint: "no scan yet" },
+      { key: "vulns", label: TERM.cves.label, value: "-", hint: "no scan yet" },
+      { key: "subs", label: TERM.subdomains.label, value: "-", hint: "no scan yet" },
     ];
   }
   const hint = `${scan.target} · ${scanStatusLabel(scan.status)}`;
@@ -39,7 +39,7 @@ export function statsFromScan(scan: ScanResult | null): StatItem[] {
     {
       key: "vulns",
       label: TERM.cves.label,
-      value: evidence.count == null ? "—" : String(evidence.count),
+      value: evidence.count == null ? "-" : String(evidence.count),
       hint: evidence.hint,
     },
     { key: "subs", label: TERM.subdomains.label, value: String(getSubdomainCount(scan.results)), hint },

@@ -25,7 +25,7 @@ const CELLS = [
   {
     icon: TrendUp,
     title: "Know where to look first",
-    body: "A 0 to 100 risk score per search, and your last ten scans of the target charted over time.",
+    body: "A 0 to 100 score per search, with your recent scans charted.",
     visual: "metrics" as const,
   },
   {
@@ -43,7 +43,7 @@ function Visual({ kind }: { kind: (typeof CELLS)[number]["visual"] }) {
     return (
       <div aria-hidden="true" className="mt-4 rounded-xl border border-accent/25 bg-accent/5 p-3 font-mono text-xs text-slate-700 dark:text-neutral-300">
         <p>Your search history</p>
-        <p className="mt-1 text-slate-600 dark:text-neutral-500">
+        <p className="mt-1 text-fg-muted">
           Every search you run, newest first
         </p>
       </div>
@@ -59,7 +59,7 @@ export default function FeatureBento() {
           What one search shows you
         </h2>
         <p className="mt-3 max-w-[65ch] text-slate-600 dark:text-neutral-400">
-          A slow source never blanks the report — its card says what could not be checked.
+          A slow source never blanks the report. Every failed check is named, so a gap is never good news.
         </p>
       </Reveal>
       <div className="mt-10 grid gap-4 sm:grid-cols-2 lg:grid-cols-3">

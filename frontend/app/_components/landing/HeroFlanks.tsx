@@ -16,7 +16,7 @@ import { cn } from "@/lib/utils";
  * desktop hero too empty and asked, explicitly, for something INTERACTIVE on
  * the left and right of the globe. These two panels are that answer: three
  * example targets you can pick on the left, and an honest readout of the pick
- * on the right — the same fixtures `/demo` lays out as a full report.
+ * on the right - the same fixtures `/demo` lays out as a full report.
  *
  * STATE FLOW
  * ----------
@@ -34,10 +34,10 @@ import { cn } from "@/lib/utils";
  *   (`lg:w-[22rem] xl:w-[24rem]`, centred). At exactly 1024px the band's
  *   content width is 976px, the sphere square spans x=312..664, the left
  *   panel (w-[13rem] = 208px) spans 0..208 and the right (w-[16rem] = 256px)
- *   spans 720..976 — both clear of the square by more than 50px. The widths
+ *   spans 720..976 - both clear of the square by more than 50px. The widths
  *   are fixed rem for that reason: a fluid width could grow into the sphere.
  * - The band root keeps `pointer-events-none` (drag-to-spin must reach the
- *   canvas); only the real controls — the chip buttons and the two links —
+ *   canvas); only the real controls - the chip buttons and the two links -
  *   opt back in with `pointer-events-auto`. Nothing here ever covers the
  *   sphere, so no hit on a panel can be a hit the canvas expected.
  *
@@ -46,19 +46,19 @@ import { cn } from "@/lib/utils";
  * The readout renders fixture data and nothing else: the target name, the
  * sample's own output lines (source id + text, verbatim from
  * `playground-samples.ts` via `/demo`'s `buildDemoReport`), and the scripted
- * source failure — only `api.acme.co` has one (`errors: [{source: "nvd"}]`,
+ * source failure - only `api.acme.co` has one (`errors: [{source: "nvd"}]`,
  * declared in `app/demo/demo-report.ts`). That file is imported, NOT copied:
  * a second hand-written error map here is exactly the drift trap both fixture
  * files were built to end, and it is also the only place that knows the
  * failure is simulated. No number is parsed, inferred or invented in this
- * file — a fact the fixture does not carry simply does not render. The
- * "Demo — simulated output" caption is the same wording `/demo` prints
- * (`DEMO_CAPTION` there, the playground's caption here), so a visitor never
- * mistakes the panel for a live scan.
+ * file - a fact the fixture does not carry simply does not render. The panel
+ * header's "Sample" badge is the whole disclosure here: `/demo` carries the
+ * page-level one, and repeating the same sentence on both surfaces was the
+ * duplication the copy audit flagged.
  *
  * MOTION AND COLOUR
  * -----------------
- * Selection feedback is `transition-colors` only — no keyframe loops, no
+ * Selection feedback is `transition-colors` only - no keyframe loops, no
  * entrance animation of its own (the band's `Reveal` in `Hero` covers the
  * entrance). Token colours throughout; zero hex literals (contract-tested).
  * Hover and focus use the same accent-wash + ring tokens the LogoStrip chips
@@ -80,7 +80,7 @@ export default function HeroFlanks({
 
   return (
     <>
-      {/* LEFT — "Example targets": the three shared demo targets as a
+      {/* LEFT - "Example targets": the three shared demo targets as a
           single-select chip list. Toggle-off allowed: null is the resting
           state, and the globe label returns to its default style. */}
       <section
@@ -102,8 +102,8 @@ export default function HeroFlanks({
                   className={cn(
                     "pointer-events-auto w-full rounded-full border px-3 py-1.5 text-left font-mono text-xs transition-colors duration-200 focus:outline-none focus:ring-2 focus:ring-accent/40",
                     on
-                      ? "border-accent/60 bg-accent/10 text-accent"
-                      : "border-neutral-200 text-slate-700 hover:border-accent/40 hover:bg-accent/5 hover:text-accent dark:border-neutral-800 dark:text-neutral-300",
+                      ? "border-accent/60 bg-accent/10 text-accent-text"
+                      : "border-neutral-200 text-slate-700 hover:border-accent/40 hover:bg-accent/5 hover:text-accent-text dark:border-neutral-800 dark:text-neutral-300",
                   )}
                 >
                   {target}
@@ -113,11 +113,11 @@ export default function HeroFlanks({
           })}
         </ul>
         <p className="mt-2 font-mono text-[10px] leading-relaxed text-slate-500 dark:text-neutral-500">
-          Pick one — the globe lights up its point.
+          Pick a target to preview it here.
         </p>
       </section>
 
-      {/* RIGHT — the readout. `aria-live` because the selection happens on
+      {/* RIGHT - the readout. `aria-live` because the selection happens on
           the other side of the globe; without it a screen-reader user gets
           no news when this panel changes. */}
       <section
@@ -127,8 +127,13 @@ export default function HeroFlanks({
       >
         {report ? (
           <div className="rounded-xl border border-neutral-200 bg-background/85 p-3 dark:border-neutral-800">
-            <p className="font-mono text-xs font-semibold text-accent">
-              {report.target}
+            <p className="flex items-center justify-between gap-2">
+              <span className="font-mono text-xs font-semibold text-accent-text">
+                {report.target}
+              </span>
+              <span className="rounded-full border border-neutral-200 px-2 py-0.5 font-mono text-[9px] uppercase tracking-[0.14em] text-slate-500 dark:border-neutral-800 dark:text-neutral-500">
+                Sample
+              </span>
             </p>
             {/* The sample's own output lines, verbatim: source id plus what
                 that source reported. Nothing is re-worded or re-counted. */}
@@ -146,26 +151,22 @@ export default function HeroFlanks({
               ))}
             </ul>
             {/* The scripted failure, if this target has one. The message is
-                the fixture's own — it says "simulated" in words, and so does
-                the caption below. */}
+                the fixture's own, and the panel header already says Sample. */}
             {report.errors.length > 0 && (
               <p className="mt-2 rounded-lg border border-neutral-200 bg-panel p-2 font-mono text-[10px] leading-snug text-slate-600 dark:border-neutral-800 dark:text-neutral-300">
-                {report.errors.map((e) => `${e.source} — ${e.message}`).join(" · ")}
+                {report.errors.map((e) => `${e.source} - ${e.message}`).join(" · ")}
               </p>
             )}
-            <p className="mt-2 font-mono text-[10px] leading-relaxed text-slate-500 dark:text-neutral-500">
-              Demo — simulated output, no live scan.
-            </p>
             <p className="mt-2 flex flex-wrap items-center gap-x-3 gap-y-1 font-mono text-[10px]">
               <Link
                 href="/demo"
-                className="pointer-events-auto rounded-full transition-colors hover:text-accent focus:outline-none focus:ring-2 focus:ring-accent/40"
+                className="pointer-events-auto rounded-full transition-colors hover:text-accent-text focus:outline-none focus:ring-2 focus:ring-accent/40"
               >
-                Open full demo report →
+                Full sample report
               </Link>
               <Link
                 href="/dashboard"
-                className="pointer-events-auto rounded-full transition-colors hover:text-accent focus:outline-none focus:ring-2 focus:ring-accent/40"
+                className="pointer-events-auto rounded-full transition-colors hover:text-accent-text focus:outline-none focus:ring-2 focus:ring-accent/40"
               >
                 Open dashboard
               </Link>
@@ -175,7 +176,7 @@ export default function HeroFlanks({
           /* Resting state: the invitation. Same surface as the active panel
              so selecting does not shift the band's composition. */
           <p className="rounded-xl border border-neutral-200 bg-background/85 p-3 text-xs leading-relaxed text-slate-600 dark:border-neutral-800 dark:text-neutral-400">
-            Pick a target on the left to preview its simulated report here.
+            Pick a target to preview it.
           </p>
         )}
       </section>

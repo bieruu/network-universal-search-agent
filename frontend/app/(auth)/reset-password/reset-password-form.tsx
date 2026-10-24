@@ -145,12 +145,12 @@ export function ResetPasswordForm({ token, error }: { token?: string; error?: st
       )}
 
       <p className="mt-5 text-center text-sm text-slate-600 dark:text-neutral-400">
-        <Link className="font-medium text-accent hover:underline" href="/forgot-password">
+        <Link className="font-medium text-accent-text hover:underline" href="/forgot-password">
           Request a new reset link
         </Link>
       </p>
       <p className="mt-2 text-center text-sm">
-        <Link className="text-xs text-slate-500 underline-offset-2 hover:text-accent hover:underline dark:text-neutral-500" href="/sign-in">
+        <Link className="text-xs text-slate-500 underline-offset-2 hover:text-accent-text hover:underline dark:text-neutral-500" href="/sign-in">
           Back to sign in
         </Link>
       </p>

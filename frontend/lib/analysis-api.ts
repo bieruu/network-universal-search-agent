@@ -7,7 +7,7 @@
  * silently if ignored:
  *
  *   1. The browser must not call Shodan / crt.sh / any source itself
- *      (AGENTS.md §7) — only the backend holds the keys.
+ *      (AGENTS.md §7) - only the backend holds the keys.
  *   2. Every analysis endpoint calls `require_user()`, so the call must arrive
  *      with the session cookie attached. Same-origin fetch sends it by default
  *      (`credentials: "same-origin"`), and the proxy forwards it. A direct call
@@ -17,7 +17,7 @@
  * (`BACKEND_URL`, read in the proxy route) and must never reach the client.
  */
 
-/** Where the proxy lives. Relative on purpose — see the note above. */
+/** Where the proxy lives. Relative on purpose - see the note above. */
 export const ANALYSIS_PROXY_PREFIX = "/api/analysis";
 
 import { extractTechnicalDetail, messageForStatus } from "./user-errors.ts";
@@ -36,7 +36,7 @@ export type AnalysisCapability =
 /**
  * The capabilities that are a POST with a JSON body. `phone` carries its
  * argument in the path and `capabilities` takes no argument at all, so neither
- * can be reached through {@link runAnalysis} — passing one of them there is a
+ * can be reached through {@link runAnalysis} - passing one of them there is a
  * type error rather than a 404 from the backend.
  */
 export type AnalysisPostCapability = Exclude<AnalysisCapability, "phone" | "capabilities">;
@@ -57,7 +57,7 @@ export interface AnalysisSourceError {
  * payload is actually being rendered.
  *
  * A capability that fails is HTTP 200 with `status: "error"` and an entry in
- * `errors` — that is not an exception and must be rendered, not retried blindly.
+ * `errors` - that is not an exception and must be rendered, not retried blindly.
  */
 export interface AnalysisResponse<T = Record<string, unknown>> {
   capability: string;
@@ -69,7 +69,7 @@ export interface AnalysisResponse<T = Record<string, unknown>> {
   fetched_at: string;
 }
 
-/** `GET /analysis/capabilities` — which optional sources are configured. */
+/** `GET /analysis/capabilities` - which optional sources are configured. */
 export interface AnalysisCapabilities {
   always_available: string[];
   optional_sources: Record<string, boolean>;
@@ -88,7 +88,7 @@ export interface AnalysisCapabilities {
 export class AnalysisError extends Error {
   readonly status: number;
   readonly detail: string;
-  /** Raw upstream text. Never render this — log it. */
+  /** Raw upstream text. Never render this - log it. */
   readonly technicalDetail: string | undefined;
 
   constructor(detail: string, status = 0, technicalDetail?: string) {
@@ -168,7 +168,7 @@ async function request<T>(url: string, init: RequestInit): Promise<T> {
     res = await fetch(url, init);
   } catch {
     // No HTTP response at all: the request never reached the proxy. The
-    // proxy's own failure mode is different and much better — it answers 502
+    // proxy's own failure mode is different and much better - it answers 502
     // with `{"detail": "Backend unreachable"}`, which lands below.
     throw new AnalysisError("We could not reach the server. Check your connection and try again.");
   }
@@ -242,7 +242,7 @@ export type AnalysisRequestBody = Record<string, unknown>;
  * (`{url, force?}` for the fetching capabilities, `{target, force?}` for
  * `dns`/`tls`, `{data, filename?, force?}` for `exif`).
  *
- * Resolves with the envelope, including `status: "error"` — a blocked or
+ * Resolves with the envelope, including `status: "error"` - a blocked or
  * unreachable target is a 200 with `errors[]` (AGENTS.md §5.4) and the UI is
  * expected to render it. It throws only when there is no envelope at all.
  */

@@ -11,7 +11,7 @@ const src = readFileSync(
 );
 const shell = readFileSync(join(here, "..", "app", "(auth)", "_components", "auth-shell.tsx"), "utf8");
 
-// DESIGN.md mandates Phosphor-only for this project's icons ("No emojis in UI —
+// DESIGN.md mandates Phosphor-only for this project's icons ("No emojis in UI -
 // Phosphor only"), and the sign-in form is one of the nine files that used to
 // carry lucide alongside it. Two icon families in one tree is both a visual tell
 // and a written-rule violation, so the contract now names the winner.
@@ -27,7 +27,7 @@ test("login has no debug logs, and the forgot-password link is live", () => {
   assert.ok(!src.includes("console.log"), "no console.log");
   // This used to assert the absence of "Forgot password": there was no reset
   // flow, so the link would have been dead. The route now exists
-  // (app/(auth)/forgot-password/page.tsx), so the guard is inverted — a link
+  // (app/(auth)/forgot-password/page.tsx), so the guard is inverted - a link
   // must be present AND the page it points at must exist on disk.
   assert.ok(src.includes("Forgot password?"), "forgot-password link required");
   assert.ok(
@@ -40,7 +40,7 @@ test("login has no debug logs, and the forgot-password link is live", () => {
 
 test("login accent uses the global token, no hardcoded hex", () => {
   assert.ok(shell.includes("bg-accent") || shell.includes("text-accent"), "global accent token required");
-  assert.ok(!shell.includes("00E59B") && !shell.includes("00e59b"), "no hardcoded emerald hex — use bg-accent/text-accent/border-accent");
+  assert.ok(!shell.includes("00E59B") && !shell.includes("00e59b"), "no hardcoded emerald hex - use bg-accent/text-accent/border-accent");
   for (const banned of ["#3b82f6", "#5046e6", "from-blue", "to-purple", "via-purple"]) {
     assert.ok(!shell.includes(banned), `banned accent: ${banned}`);
   }
@@ -50,8 +50,8 @@ test("login motion is transform/opacity with reduced-motion fallback", () => {
   assert.ok(shell.includes("useReducedMotion"), "reduced-motion fallback required");
   // Hydration (2026-10-14): `useReducedMotion()` answers null on the server but
   // true on a reduce client at first render, so a pre-mount branch on it
-  // mismatches the server HTML. The shell gates both of its branches — the
-  // local Reveal and the two decorative spans — behind `mounted`.
+  // mismatches the server HTML. The shell gates both of its branches - the
+  // local Reveal and the two decorative spans - behind `mounted`.
   assert.ok(shell.includes("const [mounted, setMounted] = useState(false)"), "the shell gates on mount, not on first render");
   assert.ok(shell.includes("if (!mounted || reduce) return <div>"), "Reveal must render the same tree on server and pre-mount client");
   assert.ok(shell.includes("mounted && !reduce"), "the decorative spans must stay absent until mount");

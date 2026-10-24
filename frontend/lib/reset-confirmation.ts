@@ -5,11 +5,11 @@
  * Carried in `sessionStorage`, not in the URL, for two reasons: a query
  * parameter would land in browser history, server access logs and any
  * `Referer` the next navigation sends, and it would also make the notice
- * survive a copy-paste — surviving is not the problem, leaking the fact that
+ * survive a copy-paste - surviving is not the problem, leaking the fact that
  * someone just reset a password is. It is cleared on read, so a refresh does
  * not repeat it.
  *
- * No token, no address, no user id — the whole payload is one boolean.
+ * No token, no address, no user id - the whole payload is one boolean.
  */
 
 const KEY = "us:password-reset-confirmation";

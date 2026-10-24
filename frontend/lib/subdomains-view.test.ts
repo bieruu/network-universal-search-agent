@@ -19,7 +19,7 @@ import type { ScanResult } from "./api.ts";
  *
  * The log returns one row per (name, certificate) pair, so cleansing has to
  * merge duplicates and label certificates that have expired. Both changes have
- * the same failure mode — a quiet drop — so every test here checks the two
+ * the same failure mode - a quiet drop - so every test here checks the two
  * numbers that make the drop visible: how many rows the source sent, and how
  * many the view is not showing.
  */
@@ -29,7 +29,7 @@ const NOW = new Date("2026-10-14T12:00:00.000Z");
 const FUTURE = "2099-01-01T00:00:00Z";
 const PAST = "2001-01-01T00:00:00Z";
 
-/** A crtsh block typed as the backend sends it — deliberately loose, because
+/** A crtsh block typed as the backend sends it - deliberately loose, because
  *  the test feeds it junk as well as well-formed rows. */
 function results(subdomains: Array<Record<string, unknown>>): ScanResult["results"] {
   return { crtsh: { domain: "example.com", subdomains } } as unknown as ScanResult["results"];
@@ -70,12 +70,12 @@ test("each validity has a short label and a note that explains itself", () => {
   assert.equal(subdomainValidityLabel("expired"), "Expired");
   assert.equal(subdomainValidityLabel("unknown"), "Unknown");
   // The expired note has to say why the row is still on screen.
-  assert.ok(subdomainValidityNote("expired").includes("shown here on purpose"), subdomainValidityNote("expired"));
+  assert.ok(subdomainValidityNote("expired").includes("still in the log"), subdomainValidityNote("expired"));
   assert.ok(subdomainValidityNote("unknown").includes("not expired"), subdomainValidityNote("unknown"));
 });
 
 /* ------------------------------------------------------------------ *
- * Deduplication — the count travels, nothing is dropped
+ * Deduplication - the count travels, nothing is dropped
  * ------------------------------------------------------------------ */
 
 test("duplicate names are merged and the merge is counted", () => {
@@ -98,7 +98,7 @@ test("duplicate names are merged and the merge is counted", () => {
 test("the surviving row for a name is the one whose certificate is still valid", () => {
   // The log listed the expired certificate first. Merging by "the latest
   // not_after wins" keeps the name active instead of reporting a live host as
-  // expired — and it is a merge, not a drop, so the duplicate count still says
+  // expired - and it is a merge, not a drop, so the duplicate count still says
   // the log sent two rows.
   const view = normalizeSubdomains(
     results([row("a.example.com", PAST), row("a.example.com", FUTURE)]),
@@ -177,7 +177,7 @@ test("a clean log produces no note at all", () => {
 });
 
 /* ------------------------------------------------------------------ *
- * Pagination — the page is a page, and the hidden count is stated
+ * Pagination - the page is a page, and the hidden count is stated
  * ------------------------------------------------------------------ */
 
 test("pageCount never returns zero pages", () => {
@@ -201,8 +201,9 @@ test("the first page says how many names are hidden behind it", () => {
   assert.equal(v.hiddenByFilter, 0);
   assert.equal(v.firstOnPage, 1);
   assert.equal(v.lastOnPage, 50);
-  // The existing contract sentence: "Showing the first ..." — kept verbatim.
-  assert.match(v.rowNote, /^Showing the first 50 of 120 names — 70 hidden on 2 more pages\.$/);
+  // The row note states the range and the total, so a paged list can never
+  // read as the log's own output.
+  assert.match(v.rowNote, /^Showing 1 to 50 of 120 names\. 70 more on 2 pages\.$/);
 });
 
 test("the second page names its own range and still states the hidden count", () => {
@@ -212,7 +213,7 @@ test("the second page names its own range and still states the hidden count", ()
   assert.equal(v.firstOnPage, 51);
   assert.equal(v.lastOnPage, 100);
   assert.equal(v.hiddenByPage, 70);
-  assert.match(v.rowNote, /^Showing 51–100 of 120 names — 70 hidden on other pages\.$/);
+  assert.match(v.rowNote, /^Showing 51 to 100 of 120 names\. 70 more on other pages\.$/);
 });
 
 test("a single page says it is showing everything", () => {
@@ -231,9 +232,9 @@ test("a page past the end is clamped, never empty-and-silent", () => {
   assert.equal(v.shown, 20, "the last page holds the remainder");
   assert.equal(v.firstOnPage, 101);
   // Everything not on this page is "hidden by the page", whichever side of the
-  // list it sits on — the count is a total, not a remainder.
+  // list it sits on - the count is a total, not a remainder.
   assert.equal(v.hiddenByPage, 100);
-  assert.match(v.rowNote, /^Showing 101–120 of 120 names — 100 hidden on other pages\.$/);
+  assert.match(v.rowNote, /^Showing 101 to 120 of 120 names\. 100 more on other pages\.$/);
 });
 
 test("MAX_ROWS is a page size, and a longer one only moves the same rows", () => {
@@ -246,7 +247,7 @@ test("MAX_ROWS is a page size, and a longer one only moves the same rows", () =>
 });
 
 /* ------------------------------------------------------------------ *
- * Filters — every filter states what it hides
+ * Filters - every filter states what it hides
  * ------------------------------------------------------------------ */
 
 function mixed() {
@@ -291,7 +292,7 @@ test("an active-only filter states how many expired names it is hiding", () => {
   assert.equal(v.hiddenByFilter, 4);
   assert.match(v.rowNote, /^All 2 matching names are shown\.$/);
   // The whole point: the screen must not read as "there are 2 subdomains".
-  assert.match(v.honestyNote, /The "active" filter is hiding 4 of 6 names; choose all names to see every one\./);
+  assert.match(v.honestyNote, /The "active" filter hides 4 of 6 names\. Choose all names to see every one\./);
   assert.ok(v.honestyNote.includes("3 names carry a certificate that has already expired"), v.honestyNote);
 });
 
@@ -301,8 +302,8 @@ test("the expired filter shows exactly the expired rows and says so", () => {
   assert.equal(v.visible, 3);
   assert.equal(v.hiddenByFilter, 3);
   assert.match(v.rowNote, /^All 3 matching names are shown\.$/);
-  assert.ok(v.honestyNote.includes("hide 3 of 6 names") === false, "the filter hides the other 3, not itself");
-  assert.match(v.honestyNote, /The "expired" filter is hiding 3 of 6 names/);
+  assert.ok(v.honestyNote.includes("labelled, not hidden"), "the counts note keeps the rows visible by label");
+  assert.match(v.honestyNote, /The "expired" filter hides 3 of 6 names/);
 });
 
 test("a filter with no matches still reports the whole universe", () => {
@@ -312,8 +313,8 @@ test("a filter with no matches still reports the whole universe", () => {
   assert.equal(v.shown, 0);
   assert.equal(v.hiddenByFilter, 1);
   assert.equal(v.firstOnPage, 0);
-  assert.match(v.rowNote, /^No names match this filter — 1 of 1 name is hidden by it\.$/);
-  assert.ok(v.honestyNote.includes("Nothing was removed from the scan"), v.honestyNote);
+  assert.match(v.rowNote, /^No names match this filter\. 1 of 1 name is hidden by it\.$/);
+  assert.match(v.honestyNote, /^The "expired" filter hides 1 of 1 name\. Choose all names to see every one\.$/);
 });
 
 test("a filter and a page can both hide rows, and both are counted", () => {
@@ -329,12 +330,11 @@ test("a filter and a page can both hide rows, and both are counted", () => {
   assert.equal(v.shown, MAX_ROWS);
   assert.equal(v.hiddenByPage, 20, "the rows past the page are hidden by the page");
   assert.equal(v.hiddenByFilter, 30, "and the filtered-out rows are hidden by the filter");
-  assert.match(v.rowNote, /^Showing the first 50 of 70 names — 20 hidden on 1 more page\.$/);
-  assert.match(v.honestyNote, /The "expired" filter is hiding 30 of 100 names/);
-  // The table's caption ("Showing the first ... of ...") is the same sentence
-  // the pre-pagination contract required, so a paged and filtered list can
-  // never read as the log's own output.
-  assert.ok(v.rowNote.startsWith("Showing the first"));
+  assert.match(v.rowNote, /^Showing 1 to 50 of 70 names\. 20 more on 1 page\.$/);
+  assert.match(v.honestyNote, /The "expired" filter hides 30 of 100 names/);
+  // The table's caption states the range AND the total, so a paged and filtered
+  // list can never read as the log's own output.
+  assert.ok(v.rowNote.startsWith("Showing 1 to 50"));
 });
 
 test("the view never lets a hidden expired row disappear from the counts", () => {

@@ -7,7 +7,7 @@
  * The same three samples are used twice: they are what the hero terminal
  * replays while nobody is in a session (the attract loop), and they are what a
  * signed-out visitor gets when they type `scan <target>` in the playground.
- * Those two were separate copies of the same data, which is a drift trap — an
+ * Those two were separate copies of the same data, which is a drift trap - an
  * edit to one silently made the playground disagree with the static hero. One
  * export, both consumers, no way for them to diverge.
  *
@@ -19,7 +19,7 @@
  * wikipedia.org or github.com would be invented claims about companies that
  * exist, which is a different and much worse thing to publish.
  *
- * The wording matches the shapes a real scan renders — source, count, issuer —
+ * The wording matches the shapes a real scan renders - source, count, issuer -
  * so the playground demonstrates the product's output format without inventing
  * facts about anyone.
  */
@@ -38,8 +38,8 @@ export interface ScanSample {
  *
  * WHY DERIVED AND NOT DECLARED TWICE
  * ----------------------------------
- * The bento visuals used to carry their own hand-written arrays — six grid
- * cells and seven bar heights — that *looked* like the same information the
+ * The bento visuals used to carry their own hand-written arrays - six grid
+ * cells and seven bar heights - that *looked* like the same information the
  * terminal prints and was not. Two sets of numbers for one sample is exactly
  * the drift trap this file was created to end (see the header): editing the
  * terminal output silently left the visuals disagreeing with it.
@@ -50,7 +50,7 @@ export interface ScanSample {
  * back to saying nothing. It cannot invent a number to fill the gap, which is
  * the failure mode a second hand-written array would have had.
  *
- * Invented numbers either way — these are the samples' own, not facts about
+ * Invented numbers either way - these are the samples' own, not facts about
  * the reserved names they are attached to.
  */
 export interface SampleMetrics {
@@ -78,7 +78,7 @@ export function sampleMetrics(sample: ScanSample): SampleMetrics {
 /**
  * Every sample with its figures, for consumers that render the whole set.
  * Samples whose lines stopped carrying a number come back with `null` figures
- * rather than being dropped — a missing target is not the same as a target with
+ * rather than being dropped - a missing target is not the same as a target with
  * zero ports, and a visual that quietly omits one invents the difference.
  */
 export function demoSampleMetrics(): Array<{ sample: ScanSample; metrics: SampleMetrics }> {

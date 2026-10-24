@@ -1,5 +1,5 @@
 /**
- * What each data source contributes, and what the result says when it fails.
+ * What each data source contributes, and the part of the report it fills.
  *
  * WHY THIS IS SHARED
  * ------------------
@@ -14,9 +14,13 @@
  * other half quietly still describing the old behaviour. So the sentences are
  * declared once here and both surfaces read them.
  *
- * The `whenSlow` half is the product's core honest claim — a gap is never
- * mistaken for good news — so it belongs in one place rather than being
- * re-derived per component.
+ * The logo strip's answer panel shows `gives` alone, one line per source saying
+ * what it contributes. `HowItWorks` shows `result` + `outcome`, the row's part
+ * of the report and what the visitor gets from it.
+ *
+ * COPY LIMITS (DESIGN.md): `gives` <= 12 words, `outcome` <= 12 words,
+ * `result` <= 4 words, `detail` <= 18 words. `lib/copy-rules.test.ts` enforces
+ * them.
  */
 
 export interface Source {
@@ -26,41 +30,39 @@ export interface Source {
   detail: string;
   /** What this source contributes to a result, in plain words. */
   gives: string;
-  /** What the visitor sees when this source fails — never a silent blank. */
-  whenSlow: string;
+  /** The part of the report this source fills. At most four words. */
+  result: string;
+  /** What the visitor gets from that part, in one short line. */
+  outcome: string;
 }
 
 export const SOURCES: readonly Source[] = [
   {
     mark: "shodan",
-    detail: "public scan records anyone can look up",
-    gives:
-      "Open ports, and the software answering on each.",
-    whenSlow:
-      "If Shodan is slow, the ports card says it could not check — an empty list is not proof that nothing is open.",
+    detail: "public scan records",
+    gives: "Open ports and the software running on them.",
+    result: "Open ports",
+    outcome: "Which ports answer, and what runs on them.",
   },
   {
     mark: "crt.sh",
-    detail: "the public certificate log",
-    gives:
-      "Machine names under your domain that ever appeared in a public certificate.",
-    whenSlow:
-      "If the certificate log is slow, the subdomains card says it could not check — no names there is not proof none exist.",
+    detail: "public certificate log",
+    gives: "Subdomains that appear in public certificates.",
+    result: "Subdomains",
+    outcome: "Names under the domain from public certificates.",
   },
   {
     mark: "whois",
-    detail: "the public domain registration record",
-    gives:
-      "Who holds the domain, and when it was created and expires.",
-    whenSlow:
-      "If the domain record does not answer, the details card says so.",
+    detail: "public registration record",
+    gives: "Who registered the domain, and when it expires.",
+    result: "Domain details",
+    outcome: "Who registered it, and when it expires.",
   },
   {
     mark: "NVD",
-    detail: "the public vulnerability database",
-    gives:
-      "Weak spots in the software the target reports — listed when we can match them.",
-    whenSlow:
-      "If matching does not complete, the vulnerabilities card says what was not checked.",
+    detail: "public vulnerability database",
+    gives: "Known vulnerabilities in the software we find.",
+    result: "Known issues",
+    outcome: "Weak spots in the software we find.",
   },
 ];

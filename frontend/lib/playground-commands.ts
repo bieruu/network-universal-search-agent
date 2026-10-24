@@ -27,7 +27,7 @@
  * gate makes the visitor run `list` first, which is the whole point of the
  * terminal: in a real shell you discover what a box can do before you ask it
  * to do something, and `list` is that discovery step. It also keeps the
- * signed-out path honest — the targets are shown as a known, fixed set rather
+ * signed-out path honest - the targets are shown as a known, fixed set rather
  * than as anything the visitor can aim at an arbitrary host. A visitor who
  * skips straight to `scan` is told what to do instead of being refused with a
  * dead end.
@@ -37,7 +37,7 @@
  * caller is expected to be able to trust that a non-null `target` means this
  * very keystroke asked for it.
  *
- * ERROR STYLE. Errors are plain user-facing English, returned in `error` —
+ * ERROR STYLE. Errors are plain user-facing English, returned in `error` -
  * never thrown. A terminal does not stack traces. Every message here is copy a
  * signed-out visitor is expected to read and understand, and `echo` is always
  * returned untouched so the transcript shows what was actually typed rather
@@ -63,7 +63,7 @@ export interface ParsedCommand {
 /**
  * The `help` output. Line order matches the order the commands are meant to be
  * discovered in, and the list-before-scan rule is stated in the line where the
- * reader needs it — next to `scan`, not in a footnote at the bottom.
+ * reader needs it - next to `scan`, not in a footnote at the bottom.
  *
  * No `%` anywhere: these lines are rendered as plain text, and a stray
  * percent sign reads as a broken format spec to anyone reading them raw.
@@ -135,7 +135,7 @@ function resolveScan(target: string, ctx: { listed: boolean }, echo: string): Pa
     return {
       command: "scan",
       target: "",
-      error: "Run list first — it shows what this terminal scans.",
+      error: "Run list first - it shows what this terminal scans.",
       echo,
     };
   }
@@ -145,7 +145,7 @@ function resolveScan(target: string, ctx: { listed: boolean }, echo: string): Pa
 
 /**
  * Cheap shape test for the bare-domain shorthand: something that carries a
- * dot and has no spaces. Deliberately permissive — this only decides whether
+ * dot and has no spaces. Deliberately permissive - this only decides whether
  * to treat the line as a target, never whether the target is acceptable. Real
  * validation still belongs to the scan layer.
  */

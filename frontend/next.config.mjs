@@ -7,7 +7,7 @@
 // Why it cannot live in a static `headers()` block: Next.js emits inline
 // hydration scripts (`self.__next_f`, the prefetch bootstrap, anything pushed
 // in through `ServerInsertedHTML`) whose bytes depend on the props of the page
-// being rendered. No static allowlist can name them — a hash goes stale the
+// being rendered. No static allowlist can name them - a hash goes stale the
 // moment any page's data changes, and `'unsafe-inline'` would make the policy
 // decorative. A nonce is the only source that scales: Next reads it back out
 // of the request's own policy header and stamps every script it emits with

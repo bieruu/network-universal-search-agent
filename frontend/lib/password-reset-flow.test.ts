@@ -45,8 +45,8 @@ test("the reset routes exist and are reachable while signed out", () => {
   // CSP nonce has to be minted wherever a document renders. What it must NOT
   // carry is a session gate of any width: that gate was removed 2026-10-14 with
   // the guest-scan reversal (a signed-out visitor is a supported visitor now),
-  // so the invariant this assertion used to express — "the session lookup is
-  // scoped to /dashboard" — is gone with it. A reset page behind a blanket gate
+  // so the invariant this assertion used to express - "the session lookup is
+  // scoped to /dashboard" - is gone with it. A reset page behind a blanket gate
   // could never be used by the person holding the emailed token; now there is
   // no gate at all, and the backend still answers 401 for anything account-only.
   assert.ok(

@@ -5,13 +5,13 @@
  * The BACKEND is authoritative for every number here: it admits the guest
  * (`require_user_or_guest`) and charges the quota (`guest_scan_limit_per_day`,
  * `guest_scan_daily_total`). This module only mirrors the per-guest default so
- * the UI can say something true before the first scan — and it is pinned to the
+ * the UI can say something true before the first scan - and it is pinned to the
  * backend's default by `lib/guest-mode.test.ts`, which reads
  * `backend/app/core/config.py`. If that test fails, the backend moved: change
  * the value here, do not argue with the test.
  *
  * Copy rules this file follows: no promise the backend does not keep (a quota
- * is a quota — never "unlimited" for a guest), and a sign-in path next to every
+ * is a quota - never "unlimited" for a guest), and a sign-in path next to every
  * limit so the restriction always comes with its way out.
  */
 export const GUEST_SCAN_LIMIT_PER_DAY = 2;
@@ -20,8 +20,8 @@ export const GUEST_SCAN_LIMIT_PER_DAY = 2;
 export const GUEST_BANNER_TITLE = "Guest mode";
 
 export const GUEST_BANNER_DESCRIPTION =
-  `Scanning without an account: ${GUEST_SCAN_LIMIT_PER_DAY} scans a day, not saved to history. ` +
-  "Sign in to keep results and scan without the limit.";
+  `Scanning without an account: ${GUEST_SCAN_LIMIT_PER_DAY} scans a day, no history. ` +
+  "Sign in to keep your results.";
 
 /** Rendered instead of the 429 sentence from lib/user-errors.ts. */
 export function guestQuotaMessage(): string {
@@ -33,11 +33,11 @@ export function guestQuotaMessage(): string {
 
 /** Replaces the History card for a guest: the endpoint is account-only. */
 export const GUEST_HISTORY_LOCKED =
-  "History is saved for accounts. Sign in to keep your scans and reopen them later.";
+  "History is saved for accounts. Sign in to keep your scans.";
 
 /** Replaces the risk-trend card for a guest: trend rows come from saved scans. */
 export const GUEST_TREND_LOCKED =
-  "The risk trend reads saved scans, and a guest has none. Sign in to see it.";
+  "The trend reads saved scans, and a guest has none. Sign in to see it.";
 
 /**
  * True once Better Auth has ANSWERED with no session.

@@ -10,7 +10,7 @@ import {
   Legend,
 } from "chart.js";
 import type { ScanResult } from "@/lib/api";
-import { chartPalette, useThemeTick } from "@/lib/chart-theme";
+import { chartPalette, chartTooltipOptions, useThemeTick } from "@/lib/chart-theme";
 
 ChartJS.register(CategoryScale, LinearScale, BarElement, Title, Tooltip, Legend);
 
@@ -56,7 +56,7 @@ export default function PortsChartInner({ scan }: { scan: ScanResult }) {
         options={{
           responsive: true,
           maintainAspectRatio: false,
-          plugins: { legend: { display: false } },
+          plugins: { legend: { display: false }, tooltip: chartTooltipOptions(pal) },
           scales: {
             x: { grid: { color: pal.grid }, ticks: { color: pal.tick, maxRotation: 45, minRotation: 0 } },
             y: { beginAtZero: true, grid: { color: pal.grid }, ticks: { color: pal.tick, precision: 0 } },
@@ -65,7 +65,7 @@ export default function PortsChartInner({ scan }: { scan: ScanResult }) {
       />
       {/* Highlight band: a soft sweep travelling across the plot area. This is
           the one loop inside a data surface, and it stays inside the floor the
-          dashboard lock was protecting — opacity and transform on a decorative
+          dashboard lock was protecting - opacity and transform on a decorative
           overlay only. The bars themselves never change height, never grow and
           are never re-animated: a bar whose height is alive is a bar you cannot
           compare against the number printed beside it. */}

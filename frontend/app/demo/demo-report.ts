@@ -1,5 +1,5 @@
 /**
- * `/demo`'s report fixtures — one finished report per shared sample target.
+ * `/demo`'s report fixtures - one finished report per shared sample target.
  *
  * WHAT THIS FILE IS
  * -----------------
@@ -12,19 +12,19 @@
  *
  * THE TWO KINDS OF DATA HERE, AND HOW TO TELL THEM APART
  * -----------------------------------------------------
- * 1. FIXTURE — read out of the sample's own output lines: the four source
+ * 1. FIXTURE - read out of the sample's own output lines: the four source
  *    lines verbatim, the port count, the certificate-name count, the issuer,
  *    the registrar, the risk status word, the nameserver count. None of it is
  *    recomputed anywhere else. `sampleMetrics` already returns `null` rather
  *    than guess when a line stops carrying a number, and this file follows the
  *    same rule: a gap renders as "not recorded", never as a zero.
- * 2. ILLUSTRATIVE — detail the fixture does not carry (individual subdomain
+ * 2. ILLUSTRATIVE - detail the fixture does not carry (individual subdomain
  *    names, nameserver hostnames). Invented on purpose, about the reserved
- *    targets only, and every surface that renders it says "illustrative —
+ *    targets only, and every surface that renders it says "illustrative -
  *    demo data" beside it. It contains NO invented measurements: no scores, no
  *    dates, no version numbers, no CVE ids. Where the fixture has no number
  *    (individual ports, registration dates, a risk score), the report says so
- *    instead of filling the gap — that is what keeps this a demo rather than a
+ *    instead of filling the gap - that is what keeps this a demo rather than a
  *    fabrication.
  *
  * SIMULATED FAILURE: `api.acme.co` carries one scripted source error, because
@@ -59,7 +59,7 @@ export interface DemoReport {
   target: string;
   /** The full command line, e.g. `scan example.com`. */
   command: string;
-  /** The sample's output lines, verbatim — the fixture itself. */
+  /** The sample's output lines, verbatim - the fixture itself. */
   output: string[];
   /** The same lines split into id + text for rendering. */
   lines: DemoSourceLine[];
@@ -73,16 +73,16 @@ export interface DemoReport {
   issuer: string | null;
   /** Nameserver count in the whois line (`ns 3 found`), or `null` when unrecorded. */
   nameserverCount: number | null;
-  /** ILLUSTRATIVE — a handful of names under the reserved target. */
+  /** ILLUSTRATIVE - a handful of names under the reserved target. */
   names: string[];
-  /** ILLUSTRATIVE — hostnames, built only when the fixture records a count. */
+  /** ILLUSTRATIVE - hostnames, built only when the fixture records a count. */
   nameServers: string[];
-  /** SIMULATED — sources scripted to have "not answered" for this demo. */
+  /** SIMULATED - sources scripted to have "not answered" for this demo. */
   errors: DemoSourceError[];
 }
 
 /**
- * ILLUSTRATIVE names. Reserved/invented zones only — the same rule the shared
+ * ILLUSTRATIVE names. Reserved/invented zones only - the same rule the shared
  * samples live by: fabricated output may only ever attach to targets nobody
  * owns. Counts in the table below are deliberately SMALLER than the fixture's
  * name counts (except example.com, where they match), so the page has an
@@ -97,7 +97,7 @@ const ILLUSTRATIVE_NAMES: Record<string, string[]> = {
 /**
  * SIMULATED failures. Only `nvd` is scripted, and only for one target: the
  * fixture's four source lines never contain it, so reporting it as failed
- * contradicts nothing the report shows — the vulnerability card simply moves
+ * contradicts nothing the report shows - the vulnerability card simply moves
  * from its honest empty state to the honest failure state.
  */
 const SCRIPTED_ERRORS: Record<string, DemoSourceError[]> = {
@@ -111,7 +111,7 @@ const SCRIPTED_ERRORS: Record<string, DemoSourceError[]> = {
 };
 
 /**
- * Friendly names for sources this demo can report as failed — the same words
+ * Friendly names for sources this demo can report as failed - the same words
  * the dashboard prints for them (see `SOURCE_NAMES` in
  * `app/(dashboard)/dashboard/page.tsx`). Kept beside the fixture so the report
  * is self-contained; both maps name the same four sources.
@@ -144,7 +144,7 @@ const REGISTRAR = /registrar\s+([a-z0-9.-]+)/;
 const RISK_STATUS = /status\s+([a-z0-9.-]+)/;
 const NS_COUNT = /\bns\s+(\d+)\s+found/;
 
-/** `api.acme.co` -> `acme.co` — the zone the illustrative hostnames live under. */
+/** `api.acme.co` -> `acme.co` - the zone the illustrative hostnames live under. */
 function registrable(target: string): string {
   const labels = target.split(".");
   return labels.slice(1).join(".") || target;
@@ -190,14 +190,14 @@ export interface DemoStat {
   hint: string;
 }
 
-/** `—` for "the fixture does not record this", never a zero. */
+/** `-` for "the fixture does not record this", never a zero. */
 function countValue(n: number | null): string {
-  return n == null ? "—" : String(n);
+  return n == null ? "-" : String(n);
 }
 
 /**
  * The instrument strip. Every value is either a count parsed out of the
- * fixture's own lines or the scripted failure count — there is no number in
+ * fixture's own lines or the scripted failure count - there is no number in
  * this function that was not already in the data.
  */
 export function demoStats(report: DemoReport): DemoStat[] {
@@ -247,11 +247,11 @@ export function nameListNote(report: DemoReport): string {
   }
   const total = report.metrics.certNames;
   if (total == null) {
-    return "The fixture counts no names for this target — the list above is illustrative demo data.";
+    return "The fixture counts no names for this target - the list above is illustrative demo data.";
   }
   const hidden = total - report.names.length;
   if (hidden <= 0) {
     return `Every name the fixture counts (${total}) is listed. The names themselves are illustrative demo data.`;
   }
-  return `${report.names.length} of the ${total} names counted in the fixture line are shown. The rest are not invented here — illustrative demo data stops where the count would start lying.`;
+  return `${report.names.length} of the ${total} names counted in the fixture line are shown. The rest are not invented here - illustrative demo data stops where the count would start lying.`;
 }

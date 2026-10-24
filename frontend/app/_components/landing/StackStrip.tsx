@@ -25,7 +25,7 @@ import Reveal from "./Reveal";
  * ----------------------------
  * A logo wall answers "what is this built with?" by dumping every mark at the
  * same size, which reads as decoration; a dock (the first attempt) made the
- * same marks interactive for no gain — nothing happens when you click a
+ * same marks interactive for no gain - nothing happens when you click a
  * framework. Two rows of drifting badges carry the same information, stay out
  * of the way, and fit a longer list without either truncating it or turning the
  * section into a grid of dead squares.
@@ -38,18 +38,18 @@ import Reveal from "./Reveal";
  * backend. That constraint is the point: a tech-stack section that invents a
  * tool to fill a row is a false claim about the product, and it is the one
  * thing here that cannot be fixed later by a designer.
- * `duration` is deliberately slow — the fastest row crosses in ~22s — so the
+ * `duration` is deliberately slow - the fastest row crosses in ~22s - so the
  * section never reads as urgency, and the drift stops entirely under
  * `prefers-reduced-motion`, where the rows become scrollable instead.
  *
  * The marks keep vendor colour (PostgreSQL blue, Tailwind cyan) rather than
  * the accent: flattening them to one colour misidentifies the tools and wastes
- * the one thing a brand mark is for. Next.js is the exception — its glyph is
- * near-black — so it takes the page's ink per theme. Those colours live in the
+ * the one thing a brand mark is for. Next.js is the exception - its glyph is
+ * near-black - so it takes the page's ink per theme. Those colours live in the
  * component's own CSS module, which is the only place on the page they appear.
  */
 
-/** Frontend row — everything here is in `frontend/package.json`. */
+/** Frontend row - everything here is in `frontend/package.json`. */
 const FRONTEND: ToolchainItem[] = [
   { label: "Next.js", icon: <AppWindow weight="regular" />, accent: "var(--tool-nextjs)" },
   { label: "TypeScript", icon: <FileCode weight="regular" />, accent: "var(--tool-typescript)" },
@@ -61,11 +61,11 @@ const FRONTEND: ToolchainItem[] = [
   { label: "Better Auth", icon: <LockKey weight="regular" />, accent: "var(--accent)" },
 ];
 
-/** Backend row — everything here is in `backend/requirements.txt`. */
+/** Backend row - everything here is in `backend/requirements.txt`. */
 const BACKEND: ToolchainItem[] = [
   { label: "FastAPI", icon: <HardDrives weight="regular" />, accent: "var(--tool-fastapi)" },
   { label: "SQLAlchemy", icon: <Database weight="regular" />, accent: "var(--tool-sqlalchemy)" },
-  // PostgreSQL is the database, not a pip package — its drivers (`asyncpg`
+  // PostgreSQL is the database, not a pip package - its drivers (`asyncpg`
   // here, `pg` on the frontend) are what the dependency files actually name.
   { label: "PostgreSQL", icon: <Database weight="regular" />, accent: "var(--tool-postgres)" },
   { label: "Alembic", icon: <GitBranch weight="regular" />, accent: "var(--tool-alembic)" },
@@ -83,7 +83,7 @@ export default function StackStrip() {
         {/* The heading is what marks this section, and it is the only marker it
             gets. The dock that previously lived here also carried a mono
             eyebrow, which named the section in a voice the page reserves for
-            captions — and the landing is already over its eyebrow budget
+            captions - and the landing is already over its eyebrow budget
             (hero badge + how-it-works), so the heading matches How-it-works
             directly above it and tells a visitor what they are looking at
             before the first badge drifts past. */}

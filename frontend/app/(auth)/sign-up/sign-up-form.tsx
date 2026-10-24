@@ -157,10 +157,10 @@ export default function SignUpForm({ restricted = false }: { restricted?: boolea
         </Button>
       </div>
       <p className="mt-5 text-center text-sm text-slate-600 dark:text-neutral-400">
-        Already have an account? <Link className="font-medium text-accent hover:underline" href="/sign-in">Sign in</Link>
+        Already have an account? <Link className="font-medium text-accent-text hover:underline" href="/sign-in">Sign in</Link>
       </p>
       <p className="mt-2 text-center text-xs text-slate-500 dark:text-neutral-500">
-        <Link className="hover:text-accent hover:underline" href="/forgot-password">
+        <Link className="hover:text-accent-text hover:underline" href="/forgot-password">
           Forgot your password?
         </Link>
       </p>

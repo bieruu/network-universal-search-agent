@@ -14,7 +14,7 @@
  *     never pay for.
  *
  * So the playground answers from the samples in `playground-samples.ts` and
- * nothing else — it stays fixture-only and never touches the network — the
+ * nothing else - it stays fixture-only and never touches the network - the
  * same three the hero terminal replays while nobody is in a session, so what a
  * visitor gets from `scan` here is exactly what they just watched on the
  * static hero.
@@ -77,7 +77,7 @@ export function findDemoTarget(input: string): DemoTarget | null {
 }
 
 /** Printed immediately above any simulated output. Keep it under about 70 characters. */
-export const DEMO_NOTICE = "Simulated output — not a live scan.";
+export const DEMO_NOTICE = "Simulated output - not a live scan.";
 
 /** Printed at the bottom of `list`. */
 export const DEMO_LIST_NOTICE =

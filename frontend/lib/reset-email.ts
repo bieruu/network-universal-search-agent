@@ -15,7 +15,7 @@
  * two branches differ in whether mail is sent, and how long the request takes
  * if Resend is slow. {@link createResetPasswordSender} closes that seam:
  *
- *  - it never branches its return value on whether the user exists — Better
+ *  - it never branches its return value on whether the user exists - Better
  *    Auth's own response is what the caller sees, and ours is identical;
  *  - on a delivery failure it logs a warning containing NO address and rethrows
  *    nothing, so a Resend outage cannot turn into a "this account does not
@@ -87,7 +87,7 @@ export function resetEmailHtml(url: string, appName = "NUSA project"): string {
   return [
     `<p>Someone asked to set a new password for their ${safeName} account.</p>`,
     `<p><a href="${safeUrl}">Set a new password</a></p>`,
-    "<p>This link works once and stops working after an hour. If you did not ask for it, ignore this email and nothing changes — your current password still works.</p>",
+    "<p>This link works once and stops working after an hour. If you did not ask for it, ignore this email and nothing changes - your current password still works.</p>",
   ].join("");
 }
 
@@ -98,7 +98,7 @@ export function resetEmailText(url: string, appName = "NUSA project"): string {
     `Set a new password: ${url}`,
     "",
     "This link works once and stops working after an hour.",
-    "If you did not ask for it, ignore this email — nothing changes.",
+    "If you did not ask for it, ignore this email - nothing changes.",
   ].join("\n");
 }
 
@@ -133,7 +133,7 @@ export function createResetPasswordSender(env: ResetSenderEnv, deps: ResetSender
     if (missingKeyWarning) {
       if (!warnedMissingKey) warn(missingKeyWarning);
       warnedMissingKey = true;
-      // Fail closed: no key means no pretending. Do not throw — see the module
+      // Fail closed: no key means no pretending. Do not throw - see the module
       // comment on why a throw would be an enumeration oracle.
       return;
     }

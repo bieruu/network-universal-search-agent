@@ -11,7 +11,7 @@ import {
   Legend,
 } from "chart.js";
 import { fetchTrend } from "@/lib/api";
-import { chartPalette, useThemeTick } from "@/lib/chart-theme";
+import { chartPalette, chartTooltipOptions, useThemeTick } from "@/lib/chart-theme";
 import { Badge } from "@/components/ui/badge";
 
 ChartJS.register(CategoryScale, LinearScale, PointElement, LineElement, Tooltip, Legend);
@@ -57,7 +57,7 @@ export default function RiskTrendChartInner({ target }: { target: string }) {
   }
   if (points.length === 0) {
     return (
-      <p className="flex h-[240px] items-center justify-center px-4 text-center text-sm text-slate-500 dark:text-neutral-500">
+      <p className="flex h-[240px] items-center justify-center px-4 text-center text-sm text-fg-muted">
         Only one scan so far. A trend line appears once this target has been scanned more than once.
       </p>
     );
@@ -85,7 +85,7 @@ export default function RiskTrendChartInner({ target }: { target: string }) {
         options={{
           responsive: true,
           maintainAspectRatio: false,
-          plugins: { legend: { labels: { color: pal.tick } } },
+          plugins: { legend: { labels: { color: pal.tick } }, tooltip: chartTooltipOptions(pal) },
           scales: {
             x: { grid: { color: pal.grid }, ticks: { color: pal.tick } },
             y: { beginAtZero: true, grid: { color: pal.grid }, ticks: { color: pal.tick, precision: 0 } },

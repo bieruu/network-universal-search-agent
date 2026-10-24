@@ -2,7 +2,7 @@ import test from "node:test";
 import assert from "node:assert/strict";
 import { parseCommand, HELP_LINES } from "./playground-commands.ts";
 
-const GATE_ERROR = "Run list first — it shows what this terminal scans.";
+const GATE_ERROR = "Run list first - it shows what this terminal scans.";
 const USAGE_ERROR = "usage: scan <domain>";
 
 test("empty input is ignored, not an error", () => {

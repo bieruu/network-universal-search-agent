@@ -8,19 +8,23 @@
   --color-input: hsl(var(--input));
   --color-btn-border: hsl(var(--btn-border));
   --color-accent: hsl(var(--accent));
+  --color-accent-text: hsl(var(--accent-text));
   --color-accent-foreground: hsl(var(--accent-foreground));
   --color-accent-hover: hsl(var(--accent-hover));
   --color-muted: hsl(var(--muted));
+  --color-fg-muted: hsl(var(--fg-muted));
   --color-warning: hsl(var(--warning));
   --color-danger: hsl(var(--danger));
   --color-panel: hsl(var(--panel));
+  --color-card: hsl(var(--card));
+  --color-band: hsl(var(--band));
   --font-mono: var(--font-landing-mono), ui-monospace, SFMono-Regular, Menlo, monospace;
   --shadow-input:
     0px 2px 3px -1px rgba(0, 0, 0, 0.1), 0px 1px 0px 0px rgba(25, 28, 33, 0.02),
     0px 0px 0px 1px rgba(25, 28, 33, 0.08);
   --animate-ripple: ripple 2s ease calc(var(--i, 0) * 0.2s) infinite;
   --animate-orbit: orbit calc(var(--duration) * 1s) linear infinite;
-  /* Periods come from lib/motion-phases.ts — the single table every layer reads
+  /* Periods come from lib/motion-phases.ts - the single table every layer reads
      from. The numbers below are mirrored there and asserted identical by
      lib/loop-contract.test.ts, so this is one claim, not two. */
   --animate-ambient-drift: ambient-drift 14s ease-in-out infinite;
@@ -123,7 +127,7 @@
   }
 
   /* Burger sheet open/close (components/ui/sheet.tsx). Transform + opacity
-     only — floor 2 of lib/loop-contract.test.ts. `--sheet-off` is the distance
+     only - floor 2 of lib/loop-contract.test.ts. `--sheet-off` is the distance
      from the sheet's OWN edge and is set per side in the component (`-100%` for
      side="left", `100%` for side="right"), so one pair of keyframes serves both
      directions; the fallback covers a sheet rendered before that class exists. */
@@ -175,12 +179,26 @@
   --btn-border: 214 32% 91%;
   --input: 220 20% 90%;
   --accent: 160 100% 32%;
+  /* Text-only accent. `--accent` is tuned for fills (buttons, bars, rings),
+     where 3:1 is the bar; small text needs 4.5:1, and the fill value lands at
+     ~3.2:1 on white. Never use this token for a fill. */
+  --accent-text: 160 100% 23%;
   --accent-foreground: 0 0% 0%;
   --accent-hover: 160 100% 28%;
-  --muted: 220 14% 46%;
+  /* Muted reads as chart tick labels and card helper text, which sit on the
+     card surface plus its 4% accent wash; 46% landed at 4.46:1 there, so the
+     light token is one step darker to keep AA. */
+  --muted: 220 14% 45%;
+  /* Secondary body text (helper lines, empty states). Light is Tailwind
+     slate-600 (#45556c) in HSL, so the token is pixel-identical to the class
+     it replaced. Dark is a lighter neutral: neutral-500 lands at 3.90:1 on
+     --card and fails AA for small text. */
+  --fg-muted: 215 22% 34.7%;
   --warning: 32 95% 44%;
   --danger: 0 72% 51%;
   --panel: 210 40% 98%;
+  /* Section band, one step away from the page in both themes. */
+  --band: 210 40% 97%;
   /* Raised card surface for components that sit on a plane of their own (the
      toolchain marquee badges, popovers, tooltips). Deliberately SEPARATE from
      --panel: the panel is the terminal + bento surface, one token for both, and
@@ -209,12 +227,15 @@
   --btn-border: 0 0% 20%;
   --input: 0 0% 9%;
   --accent: 160 100% 45%;
+  --accent-text: 160 100% 45%;
   --accent-foreground: 0 0% 0%;
   --accent-hover: 160 84% 55%;
   --muted: 0 0% 64%;
+  --fg-muted: 0 0% 52%;
   --warning: 46 100% 70%;
   --danger: 0 91% 71%;
   --panel: 210 32% 7%;
+  --band: 210 32% 7%;
   --card: 210 33% 8%;
   /* Near-black official glyph: neutral ink reads on the dark page, where the
      light #0f172a would vanish into the tray. */
@@ -241,7 +262,7 @@ body {
      `scrollbar-color` covers Firefox; the ::-webkit rules cover Chromium. */
   .terminal-scroll {
     scrollbar-width: thin;
-    scrollbar-color: hsl(var(--border)) transparent;
+    scrollbar-color: hsl(var(--btn-border)) transparent;
   }
   .terminal-scroll::-webkit-scrollbar {
     width: 8px;
@@ -251,7 +272,7 @@ body {
     background: transparent;
   }
   .terminal-scroll::-webkit-scrollbar-thumb {
-    background-color: hsl(var(--border));
+    background-color: hsl(var(--btn-border));
     border-radius: 9999px;
   }
   .terminal-scroll:hover::-webkit-scrollbar-thumb,

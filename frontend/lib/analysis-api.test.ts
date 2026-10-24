@@ -437,7 +437,7 @@ test("the proxy forwards the session and never a backend URL to the client", () 
   );
   assert.ok(
     !analysisRouteSrc.includes("Backend unreachable"),
-    'the detail must not read as "Backend unreachable" — it names plumbing the user cannot act on',
+    'the detail must not read as "Backend unreachable" - it names plumbing the user cannot act on',
   );
   assert.ok(analysisRouteSrc.includes("status: 502"));
   // Both verbs are needed: phone and capabilities are GETs, the rest are POSTs.

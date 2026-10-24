@@ -3,7 +3,7 @@
  *
  * The rule here is blunt: a status code is never the message. Before the copy
  * audit, a failed scan rendered a badge reading `Request failed (500)` and a
- * rejected target rendered `Backend unreachable` — which tells a user nothing
+ * rejected target rendered `Backend unreachable` - which tells a user nothing
  * about whether to retry, and describes plumbing they cannot act on.
  *
  * We deliberately do NOT echo the backend's `detail` string into the UI. That
@@ -86,7 +86,7 @@ export function toUserFacingError(status: number, body?: unknown): UserFacingErr
   return new UserFacingError(messageForStatus(status), status, extractTechnicalDetail(body));
 }
 
-/** No response at all — offline, DNS failure, or a CORS rejection. */
+/** No response at all - offline, DNS failure, or a CORS rejection. */
 export function networkError(): UserFacingError {
   return new UserFacingError(
     "We could not reach the server. Check your connection and try again.",

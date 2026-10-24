@@ -4,7 +4,7 @@ import { JetBrains_Mono, Space_Grotesk } from "next/font/google";
 import "./globals.css";
 
 export const metadata: Metadata = {
-  title: "NUSA project — see what a domain exposes",
+  title: "NUSA project: see what a domain exposes",
   description:
     "Search a domain or IP and read its open ports, subdomain names, registration details, and a risk score in one place.",
 };
@@ -18,7 +18,7 @@ export default async function RootLayout({ children }: { children: React.ReactNo
   // `headers()` is safe to call here: the routes this app renders are already
   // dynamic (`app/page.tsx` and `app/(auth)/sign-up/page.tsx` both export
   // `dynamic = "force-dynamic"`), so nothing is being lost from static
-  // generation — this only hands the render the nonce the middleware minted
+  // generation - this only hands the render the nonce the middleware minted
   // for this request.
   const nonce = (await headers()).get("x-nonce") ?? undefined;
 

@@ -19,11 +19,11 @@ export default function RiskMeter() {
   return (
     <div className="relative h-full w-full overflow-hidden rounded-full">
       {mounted && reduce ? (
-        <div className="h-full w-1/3 rounded-full bg-gradient-to-r from-emerald-400 to-accent" />
+        <div className="h-full w-1/3 rounded-full bg-gradient-to-r from-accent/60 to-accent" />
       ) : (
         <motion.div
           aria-hidden="true"
-          className="absolute inset-0 origin-left rounded-full bg-gradient-to-r from-emerald-400 to-accent"
+          className="absolute inset-0 origin-left rounded-full bg-gradient-to-r from-accent/60 to-accent"
           initial={{ scaleX: 0 }}
           whileInView={{ scaleX: 0.33 }}
           viewport={{ once: true, margin: "-40px" }}

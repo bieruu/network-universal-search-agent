@@ -51,7 +51,7 @@ export function getCveEvidence(results: ScanResult["results"] | null | undefined
         ids,
         count: ids.length,
         status: "source_only",
-        hint: "Identifiers only — not checked against the vulnerability database",
+        hint: "Identifiers only. Not checked against the database.",
       };
     }
     return { ids, count: null, status: "none", hint: "Nothing to show yet" };
@@ -63,8 +63,8 @@ export function getCveEvidence(results: ScanResult["results"] | null | undefined
       status,
       hint:
         ids.length > 0
-          ? "Partial evidence — the vulnerability database did not answer"
-          : "Not checked — the vulnerability database did not answer, so this is unknown rather than none",
+          ? "Partial evidence. The database did not answer."
+          : "Not checked. The database did not answer, so this is unknown, not none.",
     };
   }
   if (status === "insufficient_evidence") {
@@ -74,13 +74,13 @@ export function getCveEvidence(results: ScanResult["results"] | null | undefined
       status,
       hint:
         ids.length > 0
-          ? "Identifiers only — no exact product version was detected to verify them against"
-          : "Not checked — no exact product version was detected, so coverage is unknown rather than none",
+          ? "Identifiers only. No exact version was detected to verify them."
+          : "Not checked. No exact version was detected, so coverage is unknown.",
     };
   }
   if (status === "no_match") {
-    return { ids, count: ids.length, status, hint: "Checked — nothing in the catalogue for this product and version" };
+    return { ids, count: ids.length, status, hint: "Checked. Nothing matches this product and version." };
   }
-  return { ids, count: ids.length, status: "found", hint: "Matched on the exact product and version running here" };
+  return { ids, count: ids.length, status: "found", hint: "Matched on the exact product and version." };
 }
 

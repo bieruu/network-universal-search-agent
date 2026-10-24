@@ -31,7 +31,7 @@ export default function SignInForm() {
   }, []);
 
   // The error paragraph only exists after a render, so focus cannot be moved
-  // from inside the submit handler — this effect runs once it is mounted.
+  // from inside the submit handler - this effect runs once it is mounted.
   useEffect(() => {
     if (errorField) errorRef.current?.focus();
   }, [errorField]);
@@ -113,7 +113,7 @@ export default function SignInForm() {
           <div className="flex items-center justify-between gap-3">
             <Label htmlFor="password">Password</Label>
             <Link
-              className="text-xs font-medium text-accent hover:underline"
+              className="text-xs font-medium text-accent-text hover:underline"
               href="/forgot-password"
             >
               Forgot password?
@@ -156,7 +156,7 @@ export default function SignInForm() {
         </Button>
       </div>
       <p className="mt-5 text-center text-sm text-slate-600 dark:text-neutral-400">
-        Don&apos;t have an account? <Link className="font-medium text-accent hover:underline" href="/sign-up">Sign up</Link>
+        Don&apos;t have an account? <Link className="font-medium text-accent-text hover:underline" href="/sign-up">Sign up</Link>
       </p>
     </AuthShell>
   );

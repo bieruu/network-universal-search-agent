@@ -8,7 +8,7 @@ import { demoSampleMetrics } from "./playground-samples";
 // Bento visuals. Both cells now read the SAME figures the terminal prints:
 // open-port counts in the grid, certificate-name counts in the bars, taken from
 // `playground-samples.ts` via `demoSampleMetrics()`. The earlier versions
-// carried their own hand-written arrays that only looked like those figures —
+// carried their own hand-written arrays that only looked like those figures -
 // a second set of numbers for one sample is how a visual ends up disagreeing
 // with the output it sits under, and it is now impossible by construction.
 //
@@ -100,7 +100,7 @@ export function BentoMetricsVisual() {
           return (
             <div key={sample.target} className="flex h-full flex-1 flex-col justify-end gap-1">
               <div
-                className="w-full rounded-t-md bg-gradient-to-t from-accent/70 to-emerald-300/90"
+                className="w-full rounded-t-md bg-gradient-to-t from-accent/70 to-accent"
                 style={{ height: `${height}px` }}
               />
               <span className="truncate font-mono text-[10px] text-slate-400">{names}</span>
@@ -118,7 +118,7 @@ export function BentoMetricsVisual() {
             >
               {/* Inner equalizer: each bar keeps breathing after it grows in. */}
               <div
-                className="absolute inset-0 origin-bottom rounded-t-md bg-gradient-to-t from-accent/70 to-emerald-300/90 motion-safe:animate-eq"
+                className="absolute inset-0 origin-bottom rounded-t-md bg-gradient-to-t from-accent/70 to-accent motion-safe:animate-eq"
                 style={{ animationDelay: phaseDelay(index, "eq") }}
               />
             </motion.div>

@@ -12,7 +12,7 @@
     "lint": "eslint . --max-warnings=0",
     "tsc": "tsc --noEmit",
     "auth:migrate": "node --env-file=.env.local node_modules/auth/dist/index.mjs migrate --config ./lib/auth.ts --yes",
-    "test": "node --test lib/validators.test.ts lib/components.test.ts lib/landing.test.ts lib/loop-contract.test.ts lib/playground-commands.test.ts lib/scan-shape.test.ts lib/login.test.ts lib/signup.test.ts lib/signup-gate.test.ts lib/signup-gate-integration.test.ts lib/auth-rate-limit.test.ts lib/dashboard.test.ts lib/palette.test.ts lib/devlogin.test.ts lib/security-headers.test.ts lib/analysis-api.test.ts lib/threat-history-shape.test.ts lib/auth-errors.test.ts lib/reset-email.test.ts lib/password-reset-flow.test.ts lib/terminal-lines.test.ts lib/proxy-body.test.ts lib/csp.test.ts lib/export-findings.test.ts lib/subdomains-view.test.ts lib/react-stack.test.ts lib/guest-mode.test.ts lib/demo-page.test.ts"
+    "test": "node --test lib/validators.test.ts lib/components.test.ts lib/landing.test.ts lib/loop-contract.test.ts lib/playground-commands.test.ts lib/scan-shape.test.ts lib/login.test.ts lib/signup.test.ts lib/signup-gate.test.ts lib/signup-gate-integration.test.ts lib/auth-rate-limit.test.ts lib/dashboard.test.ts lib/palette.test.ts lib/devlogin.test.ts lib/security-headers.test.ts lib/analysis-api.test.ts lib/threat-history-shape.test.ts lib/auth-errors.test.ts lib/reset-email.test.ts lib/password-reset-flow.test.ts lib/terminal-lines.test.ts lib/proxy-body.test.ts lib/csp.test.ts lib/export-findings.test.ts lib/subdomains-view.test.ts lib/react-stack.test.ts lib/guest-mode.test.ts lib/demo-page.test.ts lib/copy-rules.test.ts"
   },
   "dependencies": {
     "@phosphor-icons/react": "^2.1.10",

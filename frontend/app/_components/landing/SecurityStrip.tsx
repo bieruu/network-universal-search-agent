@@ -5,22 +5,22 @@ const ITEMS = [
   {
     icon: ShieldCheck,
     title: "Your searches are yours",
-    body: "Nothing shows without sign-in, so a shared link reveals nothing.",
+    body: "Nothing shows without sign-in.",
   },
   {
     icon: Key,
     title: "Secrets stay server-side",
-    body: "Source credentials stay on the server, never sent to your browser.",
+    body: "Source credentials never reach your browser.",
   },
   {
     icon: Prohibit,
     title: "Nothing private is looked up",
-    body: "Private addresses like localhost or 10.x are refused before a search.",
+    body: "Localhost and private addresses are refused.",
   },
   {
     icon: Eye,
     title: "A record you can point to",
-    body: "Every search is kept with its target and time; past results never change.",
+    body: "Every search is kept with its target and time.",
   },
 ];
 

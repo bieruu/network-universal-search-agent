@@ -25,8 +25,8 @@ import {
  * The window is a demo until it is clicked. Hover was tried and rejected: the
  * pointer passes over a window on its way somewhere else, so merely crossing the
  * hero blanked the output and stole the keyboard. A click is a decision. On that
- * click the terminal wipes itself — animated, never a silent vanish, so the
- * visitor can see what was cleared and does not think it broke — and the prompt
+ * click the terminal wipes itself - animated, never a silent vanish, so the
+ * visitor can see what was cleared and does not think it broke - and the prompt
  * is already waiting when the wipe finishes. Clicking anywhere outside hands
  * the window back to the attract loop.
  *
@@ -74,7 +74,7 @@ type EntryKind = "echo" | "line" | "muted" | "notice" | "error";
  * This exists so `list` and `help` can render the way a terminal does: the
  * command or target in normal weight, its explanation pushed back a step. A
  * single flat string cannot express that, and flattening it was the original
- * complaint — the list looked like prose pasted into a monospace block rather
+ * complaint - the list looked like prose pasted into a monospace block rather
  * than a terminal answering.
  */
 interface Part {
@@ -156,7 +156,7 @@ export default function PlaygroundTerminal({
   // The id is captured into a local BEFORE setEntries. Reading `nextId.current`
   // inside the updater looks equivalent and is not: the updater runs later, by
   // which time two calls have already advanced the counter, and React then gets
-  // handed the same key twice — which silently duplicates and omits rows instead
+  // handed the same key twice - which silently duplicates and omits rows instead
   // of throwing.
   const push = useCallback((kind: EntryKind, text: string) => {
     const id = (nextId.current += 1);
@@ -166,7 +166,7 @@ export default function PlaygroundTerminal({
   // One entry PER LINE, staggered, so a four-line scan result prints as four
   // rows. An earlier version routed it through a helper that built ONE entry
   // from the whole array, which ran all four together into a single unreadable
-  // row — the stagger only exists per entry, so lines must be separate entries.
+  // row - the stagger only exists per entry, so lines must be separate entries.
   const pushLines = useCallback((kind: EntryKind, lines: readonly string[]) => {
     const batch = lines.map((text, i) => ({
       id: nextId.current + 1 + i,
@@ -209,7 +209,7 @@ export default function PlaygroundTerminal({
    *
    * The transcript is emptied HERE, after the exit animation has played, never
    * at the moment the click landed. Removing it immediately is what makes a
-   * terminal look broken — the output vanishes with nothing explaining why.
+   * terminal look broken - the output vanishes with nothing explaining why.
    */
   const finishWipe = useCallback(() => {
     setEntries([]);
@@ -312,7 +312,7 @@ export default function PlaygroundTerminal({
 
   const runLiveScan = useCallback(
     async (target: string) => {
-      push("muted", "reading sources — shodan, crt.sh, whois, dns");
+      push("muted", "reading sources - shodan, crt.sh, whois, dns");
       try {
         const started = await startScan(target);
         const result = await pollScan(started.scan_id, { timeoutMs: 60000 });
@@ -350,7 +350,7 @@ export default function PlaygroundTerminal({
           .filter((t): t is string => typeof t === "string" && t.length > 0)
           .slice(0, MAX_HISTORY_ROWS);
       } catch {
-        push("muted", "history could not load — any domain still works.");
+        push("muted", "history could not load - any domain still works.");
       }
       const unique = Array.from(new Set(rows));
       if (unique.length) {
@@ -359,7 +359,7 @@ export default function PlaygroundTerminal({
           unique.map((t) => ({ lead: t.padEnd(LIST_COLUMN), rest: "your last scan" })),
         );
       } else {
-        push("muted", "no scans recorded yet — any domain or public IP works.");
+        push("muted", "no scans recorded yet - any domain or public IP works.");
       }
       push(
         "muted",
@@ -405,7 +405,7 @@ export default function PlaygroundTerminal({
       //
       // "in", not "out": `finishWipe` only hands the window back to the attract
       // loop when it sees "out", so "in" keeps `session === true` and leaves the
-      // prompt where it was — just focused, and the transcript empty. Nothing is
+      // prompt where it was - just focused, and the transcript empty. Nothing is
       // duplicated: the existing wipe effect owns the timing and `finishWipe`
       // still empties `entries` once the exit has played.
       //
@@ -504,10 +504,10 @@ export default function PlaygroundTerminal({
   const caption = !session
     ? sample
       ? "Your last search"
-      : "Sample output — click the terminal to try it"
+      : "Sample output - click the terminal to try it"
     : mode === "demo"
-      ? "Demo — simulated output, fixed targets"
-      : "Live — scans run against the real API";
+      ? "Demo: sample data"
+      : "Live: scans run against the real API";
 
   return (
     <div
@@ -532,7 +532,7 @@ export default function PlaygroundTerminal({
               <motion.p
                 key={entry.id}
                 // On the way in the seeded lines are ALREADY on screen, so they
-                // must appear at rest and then leave — giving them the entrance
+                // must appear at rest and then leave - giving them the entrance
                 // `initial` would play a fade-in of text that is mid-fade-out.
                 initial={
                   reduce
@@ -565,7 +565,7 @@ export default function PlaygroundTerminal({
                         : entry.kind === "echo"
                           ? "text-slate-900 dark:text-neutral-100"
                           : entry.kind === "error"
-                            ? "text-accent"
+                            ? "text-accent-text"
                             : entry.kind === "notice" || entry.kind === "muted"
                               ? "text-slate-500 dark:text-neutral-500"
                               : "text-slate-700 dark:text-neutral-300"
@@ -577,7 +577,7 @@ export default function PlaygroundTerminal({
               </motion.p>
             ))}
             {/* The prompt is the last line of the transcript, not a separate
-                field under it — one terminal, one prompt, nothing between. It
+                field under it - one terminal, one prompt, nothing between. It
                 wipes out with the rest of the output on the way OUT only; on the
                 way in it must appear while the text above it is leaving, which is
                 what makes the click read as `clear` followed by a live prompt. It
@@ -636,7 +636,7 @@ export default function PlaygroundTerminal({
           <div className="mt-auto">
             {/* The attract loop keeps its own blinking caret AND its own typed
                 `clear`, because while nobody is in a session there is no real
-                prompt for either to collide with — the green block is the whole
+                prompt for either to collide with - the green block is the whole
                 point of the demo, and hiding it left a dead-looking window.
                 It is suppressed the moment a session starts, because then the
                 real prompt below IS the cursor and two blocks would read as two

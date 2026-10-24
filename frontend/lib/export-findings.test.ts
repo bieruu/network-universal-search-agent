@@ -368,13 +368,13 @@ test("a null scan still exports a report that says it has nothing", () => {
   assert.equal(report.target, "");
   assert.equal(report.subdomains, null);
   const md = buildMarkdownExport(null, NOW);
-  assert.ok(md.includes("Findings export — no scan"));
+  assert.ok(md.includes("Findings export") && md.includes("no scan"), "the empty report names itself as empty");
   assert.ok(md.includes("not proof the target is safe"));
 });
 
 test("file names are safe, and the format decides the extension", () => {
   // `exportFileStem` drops the trailing Z of the ISO stamp, so the names end
-  // "...000.json" — asserted exactly so a change in that stripping is visible.
+  // "...000.json" - asserted exactly so a change in that stripping is visible.
   assert.equal(exportFileName("json", "example.com", NOW), "nusa-example-com-2026-10-14T12-00-00-000.json");
   assert.equal(exportFileName("markdown", "example.com", NOW), "nusa-example-com-2026-10-14T12-00-00-000.md");
   assert.equal(exportFileName("pdf", "example.com", NOW), "nusa-example-com-2026-10-14T12-00-00-000.pdf");

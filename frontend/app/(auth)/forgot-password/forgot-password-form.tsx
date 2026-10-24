@@ -24,7 +24,7 @@ const emailSchema = z
  * page must not become the layer that reintroduces the difference: no
  * "we found your account", no different copy on failure, no redirect. One
  * message, always. The only field here that varies with the outcome is
- * `pending` — and it settles before the message renders in every branch.
+ * `pending` - and it settles before the message renders in every branch.
  */
 export function ForgotPasswordForm() {
   const [email, setEmail] = useState("");
@@ -124,12 +124,12 @@ export function ForgotPasswordForm() {
         </form>
       )}
       <p className="mt-5 text-center text-sm text-slate-600 dark:text-neutral-400">
-        <Link className="font-medium text-accent hover:underline" href="/sign-in">
+        <Link className="font-medium text-accent-text hover:underline" href="/sign-in">
           Back to sign in
         </Link>
       </p>
       <p className="mt-4 text-center">
-        <Link className="text-xs text-slate-500 underline-offset-2 hover:text-accent hover:underline dark:text-neutral-500" href="/reset-password">
+        <Link className="text-xs text-slate-500 underline-offset-2 hover:text-accent-text hover:underline dark:text-neutral-500" href="/reset-password">
           Already have a reset link? Set a new password
         </Link>
       </p>

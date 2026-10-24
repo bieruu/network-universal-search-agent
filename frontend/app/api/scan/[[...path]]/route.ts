@@ -7,8 +7,8 @@ const BACKEND = process.env.BACKEND_URL ?? "http://localhost:8000";
 /**
  * Guest identity (reversal 2026-10-14: signed-out visitors can scan).
  *
- * The backend cannot bucket this traffic by IP — the caller it sees is always
- * this Node process, never the browser — so the identity is minted HERE and
+ * The backend cannot bucket this traffic by IP - the caller it sees is always
+ * this Node process, never the browser - so the identity is minted HERE and
  * handed over as `x-guest-token`: `<32-hex-id>.<unpadded base64url HMAC-SHA256>`
  * over `"nusa-guest:" + id`, keyed with the shared `BETTER_AUTH_SECRET`.
  *
@@ -16,7 +16,7 @@ const BACKEND = process.env.BACKEND_URL ?? "http://localhost:8000";
  *
  *   1. Only this process can mint one (it holds the secret), so a caller who
  *      hits the backend directly has no way to author a subject. The backend
- *      re-verifies the signature and the id shape (`app/core/security.py`) —
+ *      re-verifies the signature and the id shape (`app/core/security.py`) -
  *      this side is the minter, not the authority.
  *   2. What it does NOT prove is scarcity. Anyone can clear a cookie and buy a
  *      fresh id, which is why the backend pairs the per-guest quota with an
@@ -84,7 +84,7 @@ interface GuestIdentity {
  * quietly continuing as someone else.
  *
  * A signed-in caller is handled by the backend preferring its session, so this
- * side does not need to know who is signed in — minting a token a session will
+ * side does not need to know who is signed in - minting a token a session will
  * override costs one cookie and keeps one code path.
  */
 function resolveGuest(req: NextRequest, mayMint: boolean): GuestIdentity {
@@ -145,7 +145,7 @@ async function proxy(req: NextRequest, path: string[], body?: string) {
  * Read the body under the size cap, or `null` when it was already refused.
  *
  * The 401 path for an unauthenticated caller is the backend's, and it runs
- * after this read — which is exactly why the read cannot be unbounded. The 413
+ * after this read - which is exactly why the read cannot be unbounded. The 413
  * is answered here, before any byte of the body is read, whenever the client
  * declared an oversized Content-Length. Otherwise the body is streamed through
  * `collectBounded`, which stops the moment it crosses the cap and cancels the
