@@ -81,7 +81,7 @@ def encode(
 ) -> bytes:
     """Real bytes in `image_format`, written by Pillow's own encoder.
 
-    Pillow 12's JPEG writer calls `len(exif)` on whatever it is handed, so a
+    Pillow's JPEG writer calls `len(exif)` on whatever it is handed, so a
     plain save has to omit the kwarg rather than pass `exif=None`.
     """
     buf = io.BytesIO()

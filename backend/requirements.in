@@ -13,7 +13,8 @@ python-dotenv
 dnspython
 # EXIF parsing in-process. Preferred over the `exiftool` system binary: no extra
 # binary in the image, and no shell-out to parse untrusted upload bytes.
-pillow
+# Floor 13.0.0: 12.3.0 carries 37 published advisories, which fails pip-audit in CI.
+pillow>=13.0.0
 # Offline phone format/country validation. Carrier and line-type lookup stays
 # out (it needs a paid source) - see TODO.md.
 phonenumbers
@@ -23,3 +24,10 @@ phonenumbers
 # scan should *report* a broken certificate, not fail on it) and parse the DER
 # here.
 cryptography
+
+# Transitive-but-audited floors. These are not direct imports, but pip-audit scans
+# the resolved lockfiles and fails CI on the versions below, so the floor has to
+# live where the resolver sees it. Listing them here is deliberate: hand-editing
+# the generated requirements*.txt is what let the version and its hash drift apart.
+certifi>=2026.10.19            # via httpx -> httpcore; PYSEC-2026-4320 fixed in 2026.10.19
+opentelemetry-api>=1.45.1      # via fastapi; CVE-2026-114603 fixed in 1.45.1

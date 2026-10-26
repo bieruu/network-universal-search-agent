@@ -10,7 +10,7 @@ WHAT THIS IS
 WHY PILLOW AND NOT `exiftool`
     The TODO named `exiftool`, and that was the wrong tool for a server that
     parses bytes an anonymous user just uploaded. The alternative is Pillow,
-    which is already a pinned dependency (`pillow==12.3.0`):
+    which is already a pinned dependency (`pillow`, pinned in `requirements.in`):
 
     * No new system binary in the container image. `exiftool` is a Perl
       program plus a large tag database; shipping it means a second parser to
