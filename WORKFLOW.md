@@ -388,12 +388,16 @@ The fallback is the Supavisor pooler in **SESSION** mode: port **5432**, user `p
 4. Set `BACKEND_URL=https://<user>-<space-name>.hf.space` in the Vercel project environment and redeploy the frontend. The browser never calls the backend directly — requests go through the Next.js proxy routes — so CORS is a second layer rather than the mechanism, and the exact origins still matter for the day something does call it directly.
 5. Run the §8.2 step 6 check on the production domain: sign up, scan a public domain, sign out.
 
-#### The Space sleeps, and the ping that stops it
+#### The Space sleeps, and nothing pings it any more
 
-Spaces sleep after an idle period — reported at roughly **48 hours**, but the exact window is neither documented nor guaranteed, so treat that number as unverified and read the Space's own logs rather than this paragraph. Either way `.github/workflows/keep-backend-awake.yml` still applies: a 5-minute `GET /health` holds the clock whatever the window turns out to be.
+Spaces sleep after an idle period — reported at roughly **48 hours**, but the exact window is neither documented nor guaranteed, so treat that number as unverified and read the Space's own logs rather than this paragraph.
 
-- Arm it by setting the repository variable `BACKEND_HEALTH_URL` to `https://<user>-<space-name>.hf.space/health` (Settings → Secrets and variables → Actions → Variables).
-- Keep the existing caveat rather than assuming it away: GitHub's scheduler runs late under load — 15 minutes is routine and it can be worse. If the Space still sleeps, move the ping to an external scheduler (cron-job.org, UptimeRobot) instead of tightening this cron further.
+There is **no keepalive automation in this repository**. `.github/workflows/keep-backend-awake.yml` was deleted on 2026-10-26 together with the `BACKEND_HEALTH_URL` repository variable it read: it was written for the Koyeb path, and the backend is not going to Koyeb. Setting `BACKEND_HEALTH_URL` now does nothing, because no workflow consumes it. An older revision of this file describes that cron as still applying; this section is the current state.
+
+What is left is manual or external, and the cold-start risk is unmitigated in-repo:
+
+- Warm the instance by hand with `GET https://<user>-<space-name>.hf.space/health` before the first scan after an idle period, and read a first-scan 504 as "retry in a minute" rather than as a broken deploy. That failure mode is described under "A cold backend is a 504" at the end of this section.
+- If a manual warm is not enough, point an external scheduler at the same URL (cron-job.org, UptimeRobot). GitHub's scheduler would have run late under load anyway — 15 minutes was routine — so an external one is the better answer if a ping is wanted at all.
 
 #### Manual equivalent
 

@@ -359,5 +359,5 @@ Write-Step 'Done'
 Write-Host "    backend : $url"
 Write-Host "    next    : set BACKEND_URL=$url in Vercel, then redeploy" -ForegroundColor Yellow
 Write-Host '    then    : sign up, scan example.com, sign out (WORKFLOW.md 8.2 step 6)' -ForegroundColor Yellow
-Write-Host '    keepalive: set the repo variable BACKEND_HEALTH_URL=' -ForegroundColor Yellow
-Write-Host "              '$url$HealthPath' to arm .github/workflows/keep-backend-awake.yml" -ForegroundColor Yellow
+Write-Host '    sleeping: free instances sleep when idle - warm it before a scan' -ForegroundColor Yellow
+Write-Host "              GET $url$HealthPath ; or an external scheduler (WORKFLOW.md 8.6)" -ForegroundColor Yellow
