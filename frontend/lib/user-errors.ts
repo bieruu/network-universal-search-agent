@@ -53,6 +53,14 @@ export function messageForStatus(status: number): string {
   if (status === 413) {
     return "That target is too long to search. Check the address and try again.";
   }
+  if (status === 504) {
+    // Distinct from the generic 5xx line because the next action differs: wait,
+    // then retry. The cause is deliberately not asserted - a 504 here can be a
+    // cold start OR a healthy-but-slow scan (the proxy's sequential certificate
+    // chain can outlast the budget), so both are offered as possibilities. The
+    // upstream `detail` stays in technicalDetail only.
+    return "The service did not answer in time. It may be starting up, or the search may be taking longer than usual - wait about a minute and try again.";
+  }
   if (status >= 500) {
     return "Something went wrong on our side, not yours. Try again in a moment.";
   }

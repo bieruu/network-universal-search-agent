@@ -1,8 +1,14 @@
 import { NextRequest, NextResponse } from "next/server";
 import { createHmac, randomBytes, timingSafeEqual } from "node:crypto";
 import { collectBounded, declaredTooLarge, PayloadTooLargeError, PROXY_MAX_BODY_BYTES, requestBodyChunks } from "@/lib/proxy-body";
+import { isTimeoutAbort, timedOut, upstreamSignal } from "@/lib/proxy-timeout";
 
 const BACKEND = process.env.BACKEND_URL ?? "http://localhost:8000";
+
+// Vercel's Hobby ceiling. The upstream budget (PROXY_UPSTREAM_TIMEOUT_MS, 45s)
+// sits below it on purpose, so this function answers first with a parseable 504
+// instead of the platform killing the request at 60s.
+export const maxDuration = 60;
 
 /**
  * Guest identity (reversal 2026-10-14: signed-out visitors can scan).
@@ -128,6 +134,7 @@ async function proxy(req: NextRequest, path: string[], body?: string) {
       method: req.method,
       headers,
       body,
+      signal: upstreamSignal(),
     });
     const text = await res.text();
     const response = new NextResponse(text, {
@@ -136,7 +143,22 @@ async function proxy(req: NextRequest, path: string[], body?: string) {
     });
     if (guest.setCookie) response.headers.append("set-cookie", guest.setCookie);
     return response;
-  } catch {
+  } catch (error) {
+    // The backend did not answer inside the budget: it is reachable, just slow
+    // (typically still waking up). A refused connection or DNS failure is not
+    // that, and stays the existing 502 below.
+    if (isTimeoutAbort(error)) {
+      // Hand over the identity even though the answer is a 504. The backend
+      // charges the guest's quota when it ADMITS the scan (`check_guest_rate_limit`
+      // runs before the work), so the charge stands whether or not this proxy
+      // waits for the reply. Dropping the cookie would leave that charge on an
+      // id the caller never receives: every retry would mint a fresh guest and
+      // restart `GUEST_SCAN_LIMIT_PER_DAY`, leaving the instance-wide total as
+      // the only bound in exactly the case it is meant to be the second line.
+      const response = timedOut();
+      if (guest.setCookie) response.headers.append("set-cookie", guest.setCookie);
+      return response;
+    }
     return NextResponse.json({ detail: "The search service did not respond." }, { status: 502 });
   }
 }

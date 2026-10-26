@@ -1,8 +1,14 @@
 import { NextRequest, NextResponse } from "next/server";
 import { collectBounded, declaredTooLarge, PayloadTooLargeError, PROXY_MAX_BODY_BYTES, requestBodyChunks } from "@/lib/proxy-body";
 import { encodeAnalysisSegment } from "@/lib/analysis-api";
+import { isTimeoutAbort, timedOut, upstreamSignal } from "@/lib/proxy-timeout";
 
 const BACKEND = process.env.BACKEND_URL ?? "http://localhost:8000";
+
+// Vercel's Hobby ceiling. The upstream budget (PROXY_UPSTREAM_TIMEOUT_MS, 45s)
+// sits below it on purpose, so this function answers first with a parseable 504
+// instead of the platform killing the request at 60s.
+export const maxDuration = 60;
 
 // `${BACKEND}/api/v1/analysis/<path>`, one encoded segment per path entry.
 //
@@ -59,13 +65,17 @@ async function proxy(req: NextRequest, path: string[], body?: string) {
       method: req.method,
       body,
       headers,
+      signal: upstreamSignal(),
     });
     const text = await res.text();
     return new NextResponse(text, {
       status: res.status,
       headers: { "content-type": res.headers.get("content-type") ?? "application/json" },
     });
-  } catch {
+  } catch (error) {
+    // Reachable but silent past the budget (usually a cold start) is a 504; a
+    // refused connection or DNS failure is not, and stays the existing 502.
+    if (isTimeoutAbort(error)) return timedOut();
     return NextResponse.json({ detail: "The search service did not respond." }, { status: 502 });
   }
 }
