@@ -2,7 +2,10 @@
 
 import { useRouter } from "next/navigation";
 import Link from "next/link";
-import { ClockClockwise, SignIn, SignOut, SquaresFour } from "@phosphor-icons/react/dist/ssr";
+import { ClockClockwise } from "@phosphor-icons/react/dist/ssr/ClockClockwise";
+import { SignIn } from "@phosphor-icons/react/dist/ssr/SignIn";
+import { SignOut } from "@phosphor-icons/react/dist/ssr/SignOut";
+import { SquaresFour } from "@phosphor-icons/react/dist/ssr/SquaresFour";
 import { NAV_ITEMS, SOURCE_MONOGRAMS } from "./app-1-data";
 import { authClient } from "@/lib/auth-client";
 import { isGuestSession } from "@/lib/guest";

@@ -1,7 +1,8 @@
 "use client";
 
 import * as React from "react";
-import { Pause, Play } from "@phosphor-icons/react/dist/ssr";
+import { Pause } from "@phosphor-icons/react/dist/ssr/Pause";
+import { Play } from "@phosphor-icons/react/dist/ssr/Play";
 import {
   motion,
   useAnimationFrame,

@@ -1,4 +1,7 @@
-import { Eye, Key, Prohibit, ShieldCheck } from "@phosphor-icons/react/dist/ssr";
+import { Eye } from "@phosphor-icons/react/dist/ssr/Eye";
+import { Key } from "@phosphor-icons/react/dist/ssr/Key";
+import { Prohibit } from "@phosphor-icons/react/dist/ssr/Prohibit";
+import { ShieldCheck } from "@phosphor-icons/react/dist/ssr/ShieldCheck";
 import Reveal from "./Reveal";
 
 const ITEMS = [

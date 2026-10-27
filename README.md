@@ -128,7 +128,7 @@ Open `http://localhost:3000`, sign up, and scan `example.com`.
 
 ### Shortcut for Windows
 
-`.\dev.ps1` installs missing dependencies, reclaims ports 3000 and 8000 if they are busy, starts both servers, waits for both health checks, and opens the sign-up page. `.\dev.ps1 -NoBrowser` skips the browser.
+`.\dev.ps1` installs missing dependencies, starts both servers, waits for both health checks, and opens the sign-up page. It reclaims ports 3000 and 8000 only when the holder is a stale dev process from this repo; anything else is left alone. If a non-dev process holds 3000 - the Windows SearchHost WebView2 service sometimes binds it - the frontend moves to 3001, 3002, 3003 or 3010 and `BETTER_AUTH_URL`, `NEXT_PUBLIC_APP_URL` and `NEXT_PUBLIC_API_URL` are pointed at the chosen port, with the caveat that OAuth callback URLs registered for :3000 will not work on the fallback port. `.\dev.ps1 -NoBrowser` skips the browser.
 
 ### If you do not have a Shodan key
 

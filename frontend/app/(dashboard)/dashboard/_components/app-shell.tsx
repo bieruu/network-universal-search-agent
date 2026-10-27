@@ -2,7 +2,10 @@
 
 import type { ReactNode } from "react";
 import { useRouter } from "next/navigation";
-import { GithubLogo, List, MagnifyingGlass, SignOut } from "@phosphor-icons/react/dist/ssr";
+import { GithubLogo } from "@phosphor-icons/react/dist/ssr/GithubLogo";
+import { List } from "@phosphor-icons/react/dist/ssr/List";
+import { MagnifyingGlass } from "@phosphor-icons/react/dist/ssr/MagnifyingGlass";
+import { SignOut } from "@phosphor-icons/react/dist/ssr/SignOut";
 import { Button, buttonClasses } from "@/components/ui/button";
 import { Sheet, SheetContent, SheetHeader, SheetTitle, SheetTrigger } from "@/components/ui/sheet";
 import { GITHUB_LINK_LABEL, GITHUB_REPO_URL } from "@/lib/site";

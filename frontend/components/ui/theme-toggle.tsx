@@ -1,6 +1,7 @@
 "use client";
 
-import { Moon, Sun } from "@phosphor-icons/react/dist/ssr";
+import { Moon } from "@phosphor-icons/react/dist/ssr/Moon";
+import { Sun } from "@phosphor-icons/react/dist/ssr/Sun";
 import { useEffect, useState } from "react";
 import { Button } from "@/components/ui/button";
 import { cn } from "@/lib/utils";

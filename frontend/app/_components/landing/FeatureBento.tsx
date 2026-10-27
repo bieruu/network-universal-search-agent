@@ -1,5 +1,9 @@
 import { Card, CardTitle } from "@/components/ui/card";
-import { Certificate, Database, HardDrives, LockKey, TrendUp } from "@phosphor-icons/react/dist/ssr";
+import { Certificate } from "@phosphor-icons/react/dist/ssr/Certificate";
+import { Database } from "@phosphor-icons/react/dist/ssr/Database";
+import { HardDrives } from "@phosphor-icons/react/dist/ssr/HardDrives";
+import { LockKey } from "@phosphor-icons/react/dist/ssr/LockKey";
+import { TrendUp } from "@phosphor-icons/react/dist/ssr/TrendUp";
 import { BentoGridVisual, BentoMetricsVisual } from "./BentoVisuals";
 import Reveal from "./Reveal";
 

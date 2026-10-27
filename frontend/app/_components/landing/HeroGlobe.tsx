@@ -2,7 +2,8 @@
 
 import { useEffect, useRef } from "react";
 import createGlobe from "cobe";
-import { CaretDown, CaretUp } from "@phosphor-icons/react/dist/ssr";
+import { CaretDown } from "@phosphor-icons/react/dist/ssr/CaretDown";
+import { CaretUp } from "@phosphor-icons/react/dist/ssr/CaretUp";
 import { useReducedMotion } from "motion/react";
 import { PHASE_SECONDS } from "@/lib/motion-phases";
 import { mixRgb, tokenRgb, type Rgb } from "@/lib/ambient-colors";

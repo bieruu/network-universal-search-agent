@@ -1,18 +1,16 @@
 "use client";
 
-import {
-  AppWindow,
-  BracketsCurly,
-  Cube,
-  Database,
-  FileCode,
-  GitBranch,
-  HardDrives,
-  LockKey,
-  Pulse,
-  Waves,
-  Wind,
-} from "@phosphor-icons/react/dist/ssr";
+import { AppWindow } from "@phosphor-icons/react/dist/ssr/AppWindow";
+import { BracketsCurly } from "@phosphor-icons/react/dist/ssr/BracketsCurly";
+import { Cube } from "@phosphor-icons/react/dist/ssr/Cube";
+import { Database } from "@phosphor-icons/react/dist/ssr/Database";
+import { FileCode } from "@phosphor-icons/react/dist/ssr/FileCode";
+import { GitBranch } from "@phosphor-icons/react/dist/ssr/GitBranch";
+import { HardDrives } from "@phosphor-icons/react/dist/ssr/HardDrives";
+import { LockKey } from "@phosphor-icons/react/dist/ssr/LockKey";
+import { Pulse } from "@phosphor-icons/react/dist/ssr/Pulse";
+import { Waves } from "@phosphor-icons/react/dist/ssr/Waves";
+import { Wind } from "@phosphor-icons/react/dist/ssr/Wind";
 import ToolchainMarquee, {
   type ToolchainItem,
 } from "@/components/ui/toolchain-marquee";

@@ -3,7 +3,8 @@
 import { useEffect, useRef, useState, type FormEvent } from "react";
 import { useRouter } from "next/navigation";
 import Link from "next/link";
-import { GithubLogo, GoogleLogo } from "@phosphor-icons/react/dist/ssr";
+import { GithubLogo } from "@phosphor-icons/react/dist/ssr/GithubLogo";
+import { GoogleLogo } from "@phosphor-icons/react/dist/ssr/GoogleLogo";
 import { AuthShell } from "@/app/(auth)/_components/auth-shell";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
