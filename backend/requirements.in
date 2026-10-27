@@ -10,7 +10,10 @@ python-whois
 structlog
 python-dotenv
 # DNS record resolution (A/AAAA/MX/NS/TXT/CNAME/SOA) for v2 analysis modules.
-dnspython
+# Floor 2.9.0: direct import (dns.asyncresolver); CVE-2026-114605 /
+# GHSA-45c3-73f7-pv4m is an unbounded compression-pointer traversal in
+# dns.name.from_wire_parser, a CPU DoS on untrusted DNS responses.
+dnspython>=2.9.0
 # EXIF parsing in-process. Preferred over the `exiftool` system binary: no extra
 # binary in the image, and no shell-out to parse untrusted upload bytes.
 # Floor 13.0.0: 12.3.0 carries 37 published advisories, which fails pip-audit in CI.
